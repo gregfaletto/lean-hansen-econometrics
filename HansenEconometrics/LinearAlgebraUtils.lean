@@ -104,9 +104,6 @@ lemma gram_quadratic_nonneg {n k : Type*} [Fintype n] [Fintype k]
       vecMul_eq_mulVec_transpose, Matrix.transpose_transpose]
   exact dotProduct_star_self_nonneg (X *ᵥ v)
 
-/-- For a real symmetric idempotent matrix, rank equals the natural-number value of the trace.
-Eigenvalues of such a matrix are 0 or 1, so
-rank = #{nonzero eigenvalues} = ∑ eigenvalues = trace. -/
 /-- Eigenvalues of a real Hermitian idempotent matrix are `0` or `1`. -/
 theorem eigenvalues_zero_or_one_of_isHermitian_idempotent {n : Type*} [Fintype n] [DecidableEq n]
     {A : Matrix n n ℝ}

@@ -124,8 +124,9 @@ omit [DecidableEq k] in
 /-- Bridge lemma: the Chapter 3 sum-of-squared-errors equals the Chapter 2
 `linearProjectionMSE` when the moment matrices are the sample Gram matrix and
 cross-moment vector. This connects the two notations so we can reuse the
-Chapter 2 minimization theorem. -/
-lemma sumSquaredErrors_eq_linearProjectionMSE
+Chapter 2 minimization theorem. Private — internal to this file's proof of
+`sumSquaredErrors_olsBeta_le`. -/
+private lemma sumSquaredErrors_eq_linearProjectionMSE
     (X : Matrix n k ℝ) (y : n → ℝ) (b : k → ℝ) :
     sumSquaredErrors X y b =
       linearProjectionMSE (Xᵀ * X) (Xᵀ *ᵥ y) (y ⬝ᵥ y) b := by
