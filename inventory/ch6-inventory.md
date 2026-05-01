@@ -45,7 +45,7 @@
 4. Add the needed measure/probability infrastructure before attempting the main stochastic theorem.
 
 ## Status
-- not started
+- partial — load-bearing Mathlib + AsymptoticUtils backing in place; outstanding theorems tracked in #41
 
 ## LaTeX / Lean Crosswalk
 
@@ -64,26 +64,42 @@ Conventions:
 
 | Textbook result | LaTeX | Lean theorem |
 | --- | --- | --- |
-| Theorem 6.1 Weak Law of Large Numbers | If $Y_i \in \mathbb{R}^k$ are i.i.d. and $\mathbb{E}\|Y\| < \infty$, then $\bar{Y} = \frac{1}{n} \sum_{i=1}^n Y_i \xrightarrow{p} \mathbb{E}[Y]$ |  |
-| Theorem 6.2 transformed WLLN | If $Y_i \in \mathbb{R}^k$ are i.i.d., $h : \mathbb{R}^k \to \mathbb{R}^q$, and $\mathbb{E}\|h(Y)\| < \infty$, then $\hat{\mu} = \frac{1}{n} \sum_{i=1}^n h(Y_i) \xrightarrow{p} \mu = \mathbb{E}[h(Y)]$ |  |
+| Theorem 6.1 Weak Law of Large Numbers | If $Y_i \in \mathbb{R}^k$ are i.i.d. and $\mathbb{E}\lVert Y \rVert < \infty$, then $\bar{Y} = \frac{1}{n} \sum_{i=1}^n Y_i \xrightarrow{p} \mathbb{E}[Y]$ | [tendstoInMeasure_wlln](../HansenEconometrics/AsymptoticUtils.lean#L896) — Banach-valued; upgrades Mathlib's `ProbabilityTheory.strong_law_ae` to convergence in measure. |
+| Theorem 6.2 transformed WLLN | If $Y_i \in \mathbb{R}^k$ are i.i.d., $h : \mathbb{R}^k \to \mathbb{R}^q$, and $\mathbb{E}\lVert h(Y) \rVert < \infty$, then $\hat{\mu} = \frac{1}{n} \sum_{i=1}^n h(Y_i) \xrightarrow{p} \mu = \mathbb{E}[h(Y)]$ |  |
 | Definition 6.3 consistency | $\hat{\theta}$ is consistent for $\theta$ if $\hat{\theta} \xrightarrow{p} \theta$ |  |
-| Theorem 6.3 multivariate Lindeberg-Lévy CLT | If $Y_i \in \mathbb{R}^k$ are i.i.d. and $\mathbb{E}\|Y\|^2 < \infty$, then $\sqrt{n}(\bar{Y} - \mu) \xrightarrow{d} N(0,V)$ where $\mu = \mathbb{E}[Y]$ and $V = \mathbb{E}[(Y-\mu)(Y-\mu)']$ |  |
-| Theorem 6.4 multivariate Lindeberg CLT | If $Y_{ni}$ are independent with $\mathbb{E}[Y_{ni}] = 0$, variance matrices $V_{ni}$, $\nu_n^2 = \lambda_{\min}(V_n) > 0$, and the Lindeberg condition $\nu_n^{-2} \sum_i \mathbb{E}[\|Y_{ni}\|^2 1\{\|Y_{ni}\|^2 \ge \epsilon \nu_n^2\}] \to 0$, then $V_n^{-1/2} \sum_i Y_{ni} \xrightarrow{d} N(0,I_k)$ |  |
-| Theorem 6.5 heterogeneous-array CLT | If $Y_{ni}$ are independent with $\mathbb{E}[Y_{ni}] = 0$, $n^{-1}\sum_i V_{ni} \to V > 0$, and $\sup_{n,i} \mathbb{E}\|Y_{ni}\|^{2+\delta} < \infty$ for some $\delta > 0$, then $\sqrt{n}\,\bar{Y} \xrightarrow{d} N(0,V)$ |  |
-| Theorem 6.6 Continuous Mapping Theorem in probability | If $Z_n \xrightarrow{p} c$ and $g$ is continuous at $c$, then $g(Z_n) \xrightarrow{p} g(c)$ |  |
+| Theorem 6.3 multivariate Lindeberg-Lévy CLT | If $Y_i \in \mathbb{R}^k$ are i.i.d. and $\mathbb{E}\lVert Y \rVert^2 < \infty$, then $\sqrt{n}(\bar{Y} - \mu) \xrightarrow{d} N(0,V)$ where $\mu = \mathbb{E}[Y]$ and $V = \mathbb{E}[(Y-\mu)(Y-\mu)']$ |  |
+| Theorem 6.4 multivariate Lindeberg CLT | If $Y_{ni}$ are independent with $\mathbb{E}[Y_{ni}] = 0$, variance matrices $V_{ni}$, $\nu_n^2 = \lambda_{\min}(V_n) > 0$, and the Lindeberg condition $\nu_n^{-2} \sum_i \mathbb{E}[\lVert Y_{ni} \rVert^2 1\{\lVert Y_{ni} \rVert^2 \ge \epsilon \nu_n^2\}] \to 0$, then $V_n^{-1/2} \sum_i Y_{ni} \xrightarrow{d} N(0,I_k)$ |  |
+| Theorem 6.5 heterogeneous-array CLT | If $Y_{ni}$ are independent with $\mathbb{E}[Y_{ni}] = 0$, $n^{-1}\sum_i V_{ni} \to V > 0$, and $\sup_{n,i} \mathbb{E}\lVert Y_{ni} \rVert^{2+\delta} < \infty$ for some $\delta > 0$, then $\sqrt{n}\,\bar{Y} \xrightarrow{d} N(0,V)$ |  |
+| Theorem 6.6 Continuous Mapping Theorem in probability | If $Z_n \xrightarrow{p} c$ and $g$ is continuous at $c$, then $g(Z_n) \xrightarrow{p} g(c)$ | [tendstoInMeasure_continuous_comp](../HansenEconometrics/AsymptoticUtils.lean#L47) — global CMT in probability; structured corollaries include [tendstoInMeasure_pi](../HansenEconometrics/AsymptoticUtils.lean#L104), [tendstoInMeasure_matrix_inv](../HansenEconometrics/AsymptoticUtils.lean#L223), [tendstoInMeasure_prodMk](../HansenEconometrics/AsymptoticUtils.lean#L252), [tendstoInMeasure_add](../HansenEconometrics/AsymptoticUtils.lean#L284), [tendstoInMeasure_mulVec](../HansenEconometrics/AsymptoticUtils.lean#L304), and [tendstoInMeasure_matrix_mul](../HansenEconometrics/AsymptoticUtils.lean#L325). |
 | Theorem 6.7 Continuous Mapping Theorem in distribution | If $Z_n \xrightarrow{d} Z$ and $g$ is continuous $Z$-a.s., then $g(Z_n) \xrightarrow{d} g(Z)$ |  |
 | Theorem 6.8 Delta Method | If $p_n(\hat{\mu} - \mu) \xrightarrow{d} \xi$ and $g$ is continuously differentiable near $\mu$, then $p_n(g(\hat{\mu}) - g(\mu)) \xrightarrow{d} G' \xi$ where $G = \partial g(\mu)'/\partial u$ |  |
-| Theorem 6.9 smooth-function consistency | If $Y_i \in \mathbb{R}^m$ are i.i.d., $h : \mathbb{R}^m \to \mathbb{R}^k$, $\mathbb{E}\|h(Y)\| < \infty$, and $g : \mathbb{R}^k \to \mathbb{R}^q$ is continuous at $\mu$, then $\hat{\theta} \xrightarrow{p} \theta$ |  |
-| Theorem 6.10 smooth-function asymptotic normality | If $Y_i \in \mathbb{R}^m$ are i.i.d., $\mathbb{E}\|h(Y)\|^2 < \infty$, and $g$ is continuously differentiable near $\mu$, then $\sqrt{n}(\hat{\theta} - \theta) \xrightarrow{d} N(0,V_\theta)$ where $V_\theta = G' V G$ |  |
-| Theorem 6.11 best unbiased estimation of the mean | If $\tilde{\mu}$ is unbiased for $\mu = \mathbb{E}[h(Y)]$ and $\mathbb{E}\|h(Y)\|^2 < \infty$, then $\operatorname{Var}(\tilde{\mu}) \ge n^{-1} V$ where $V = \mathbb{E}[(h(Y)-\mu)(h(Y)-\mu)']$ |  |
-| Theorem 6.12 moment bound implies stochastic boundedness | If $\mathbb{E}\|Z_n\|^\delta = O(a_n)$ for some $\delta > 0$, then $Z_n = O_p(a_n^{1/\delta})$; if $\mathbb{E}\|Z_n\|^\delta = o(a_n)$, then $Z_n = o_p(a_n^{1/\delta})$ |  |
-| Theorem 6.13 bounded first moments pass to the limit | If $Z_n \xrightarrow{d} Z$ and $\mathbb{E}\|Z_n\| \le C$, then $\mathbb{E}\|Z\| \le C$ |  |
-| Definition 6.4 uniform integrability | $Z_n$ is uniformly integrable if $\lim_{M \to \infty} \limsup_{n \to \infty} \mathbb{E}[\|Z_n\| 1\{\|Z_n\| > M\}] = 0$ |  |
-| Theorem 6.14 primitive condition for uniform integrability | If for some $\delta > 0$, $\mathbb{E}\|Z_n\|^{1+\delta} \le C < \infty$, then $Z_n$ is uniformly integrable |  |
+| Theorem 6.9 smooth-function consistency | If $Y_i \in \mathbb{R}^m$ are i.i.d., $h : \mathbb{R}^m \to \mathbb{R}^k$, $\mathbb{E}\lVert h(Y) \rVert < \infty$, and $g : \mathbb{R}^k \to \mathbb{R}^q$ is continuous at $\mu$, then $\hat{\theta} \xrightarrow{p} \theta$ |  |
+| Theorem 6.10 smooth-function asymptotic normality | If $Y_i \in \mathbb{R}^m$ are i.i.d., $\mathbb{E}\lVert h(Y) \rVert^2 < \infty$, and $g$ is continuously differentiable near $\mu$, then $\sqrt{n}(\hat{\theta} - \theta) \xrightarrow{d} N(0,V_\theta)$ where $V_\theta = G' V G$ |  |
+| Theorem 6.11 best unbiased estimation of the mean | If $\tilde{\mu}$ is unbiased for $\mu = \mathbb{E}[h(Y)]$ and $\mathbb{E}\lVert h(Y) \rVert^2 < \infty$, then $\operatorname{Var}(\tilde{\mu}) \ge n^{-1} V$ where $V = \mathbb{E}[(h(Y)-\mu)(h(Y)-\mu)']$ |  |
+| Theorem 6.12 moment bound implies stochastic boundedness | If $\mathbb{E}\lVert Z_n \rVert^\delta = O(a_n)$ for some $\delta > 0$, then $Z_n = O_p(a_n^{1/\delta})$; if $\mathbb{E}\lVert Z_n \rVert^\delta = o(a_n)$, then $Z_n = o_p(a_n^{1/\delta})$ | [BoundedInProbability](../HansenEconometrics/AsymptoticUtils.lean#L667) definition plus [BoundedInProbability.of_tendstoInDistribution](../HansenEconometrics/AsymptoticUtils.lean#L675), [BoundedInProbability.of_tendstoInMeasure_const](../HansenEconometrics/AsymptoticUtils.lean#L727), [BoundedInProbability.of_abs_le](../HansenEconometrics/AsymptoticUtils.lean#L748), [BoundedInProbability.add](../HansenEconometrics/AsymptoticUtils.lean#L764), and Slutsky-style [TendstoInMeasure.mul_boundedInProbability](../HansenEconometrics/AsymptoticUtils.lean#L835). |
+| Theorem 6.13 bounded first moments pass to the limit | If $Z_n \xrightarrow{d} Z$ and $\mathbb{E}\lVert Z_n \rVert \le C$, then $\mathbb{E}\lVert Z \rVert \le C$ |  |
+| Definition 6.4 uniform integrability | $Z_n$ is uniformly integrable if $\lim_{M \to \infty} \limsup_{n \to \infty} \mathbb{E}[\lVert Z_n \rVert 1\{\lVert Z_n \rVert > M\}] = 0$ |  |
+| Theorem 6.14 primitive condition for uniform integrability | If for some $\delta > 0$, $\mathbb{E}\lVert Z_n \rVert^{1+\delta} \le C < \infty$, then $Z_n$ is uniformly integrable |  |
 | Theorem 6.15 convergence of moments under uniform integrability | If $Z_n \xrightarrow{d} Z$ and $Z_n$ is uniformly integrable, then $\mathbb{E}[Z_n] \to \mathbb{E}[Z]$ |  |
-| Theorem 6.16 uniform stochastic bounds for maxima | If $|Y_i|^r$ is uniformly integrable, then $n^{-1/r} \max_{1 \le i \le n} |Y_i| \xrightarrow{p} 0$ |  |
+| Theorem 6.16 uniform stochastic bounds for maxima | If $\lvert Y_i \rvert^r$ is uniformly integrable, then $n^{-1/r} \max_{1 \le i \le n} \lvert Y_i \rvert \xrightarrow{p} 0$ |  |
+
+## Lean-only bridge results
+
+These reusable Lean bridges support Chapter 6 and later asymptotic chapters, but do not have a one-to-one Hansen textbook statement in the crosswalk above.
+
+- [cramerWold_tendstoInDistribution](../HansenEconometrics/AsymptoticUtils.lean#L160) — Cramér–Wold device for `TendstoInDistribution` over an inner-product space, used to lift Mathlib's one-dimensional CLT to multivariate CLTs.
+- [tendstoInMeasure_continuousAt_const_comp](../HansenEconometrics/AsymptoticUtils.lean#L70) — CMT-at-a-point specialization, allowing pointwise rather than global continuity.
+- [tendstoInMeasure_pi](../HansenEconometrics/AsymptoticUtils.lean#L104) — coordinatewise convergence implies joint convergence over a finite-dimensional product, independently useful as matrix-CMT scaffolding.
+- Structured CMT corollaries: [tendstoInMeasure_matrix_inv](../HansenEconometrics/AsymptoticUtils.lean#L223), [tendstoInMeasure_matrix_mul](../HansenEconometrics/AsymptoticUtils.lean#L325), [tendstoInMeasure_mulVec](../HansenEconometrics/AsymptoticUtils.lean#L304), [tendstoInMeasure_add](../HansenEconometrics/AsymptoticUtils.lean#L284), and [tendstoInMeasure_prodMk](../HansenEconometrics/AsymptoticUtils.lean#L252).
+- `BoundedInProbability` family: [BoundedInProbability.of_tendstoInDistribution](../HansenEconometrics/AsymptoticUtils.lean#L675), [BoundedInProbability.of_tendstoInMeasure_const](../HansenEconometrics/AsymptoticUtils.lean#L727), [BoundedInProbability.of_abs_le](../HansenEconometrics/AsymptoticUtils.lean#L748), and [BoundedInProbability.add](../HansenEconometrics/AsymptoticUtils.lean#L764).
+- [TendstoInMeasure.mul_boundedInProbability](../HansenEconometrics/AsymptoticUtils.lean#L835) — Slutsky-style “small times bounded is small” lemma feeding Chapter 7 noise terms.
+- [TendstoInDistribution.tendsto_measure_preimage_of_null_frontier_real](../HansenEconometrics/AsymptoticUtils.lean#L802) — Portmanteau direction used as the working CMT-in-distribution face.
 
 ## Notes
 
-- Chapter 6 is not yet formalized in Lean in this repo, so this crosswalk is intentionally textbook-
-  side only for now.
+- The Chapter 6 results that Chapter 7 actually consumes — WLLN, CLT, Cramér–Wold, CMT in probability, `O_p`/`o_p`, and Slutsky — are backed by Mathlib plus `HansenEconometrics/AsymptoticUtils.lean`.
+- **Compositional / definitional blanks:** Theorem 6.2 is obtained as the composition of `tendstoInMeasure_wlln` and `tendstoInMeasure_continuous_comp`. Definition 6.3 (consistency) is the Mathlib idiom `TendstoInMeasure μ X atTop (fun _ => θ)` used directly throughout `AsymptoticUtils.lean` and Chapter 7; no standalone `Consistent` definition is added.
+- **CLT path blank:** Theorem 6.3 (multivariate Lindeberg–Lévy CLT) does not have a Hansen-shaped wrapper in the repo. The Chapter 7 vector CLT path consumes Mathlib's i.i.d. one-dimensional CLT (`ProbabilityTheory.tendstoInDistribution_inv_sqrt_mul_sum_sub`) composed with the local `cramerWold_tendstoInDistribution` bridge (see Lean-only bridge results above).
+- **CMT-in-distribution blank:** Theorem 6.7 has no Hansen-shaped wrapper. The Portmanteau-direction theorem `TendstoInDistribution.tendsto_measure_preimage_of_null_frontier_real` is the working face used by Chapter 7 (see Lean-only bridge results above).
+- **Outstanding work, tracked:** Theorems 6.8, 6.9, 6.10, 6.11, 6.13, Definition 6.4 / Theorems 6.14 / 6.15 (UI layer), and Theorem 6.16 are genuinely outstanding and tracked in [#41](https://github.com/mostlyharmfuleconometrics/lean-hansen-econometrics/issues/41).
+- **Outstanding work, not tracked:** Theorems 6.4 (multivariate Lindeberg CLT) and 6.5 (heterogeneous-array CLT) are not yet formalized and are **not** tracked there.
