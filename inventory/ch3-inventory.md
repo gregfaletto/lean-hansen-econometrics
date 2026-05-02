@@ -116,8 +116,9 @@ Conventions:
 
 | Lean theorem | Role |
 | --- | --- |
-| [gram_quadratic_nonneg](../../HansenEconometrics/LinearAlgebraUtils.lean#L100) | `0 ≤ v ⬝ᵥ ((Xᵀ * X) *ᵥ v)` for all `v`; the Gram matrix is positive semidefinite |
+| [gram_quadratic_nonneg](../../HansenEconometrics/LinearAlgebraUtils.lean#L110) | `0 ≤ v ⬝ᵥ ((Xᵀ * X) *ᵥ v)` for all `v`; the Gram matrix is positive semidefinite |
 | [gram_transpose](../../HansenEconometrics/LinearAlgebraUtils.lean#L51) | `(Xᵀ * X)ᵀ = Xᵀ * X` (relocated from `Chapter3Projections.lean` to break a potential circular import) |
+| [inv_gram_transpose](../../HansenEconometrics/LinearAlgebraUtils.lean#L60) | `(⅟ (Xᵀ * X))ᵀ = ⅟ (Xᵀ * X)` (relocated from `Chapter3Projections.lean` alongside `gram_transpose`; cited from Ch 3–5) |
 
 Note: the file-local helper `sumSquaredErrors_eq_linearProjectionMSE` (a pure notation bridge
 between Chapter 3's `sumSquaredErrors` and Chapter 2's `linearProjectionMSE`) is `private` and

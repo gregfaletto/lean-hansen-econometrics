@@ -53,6 +53,16 @@ theorem gram_transpose {n k : Type*} [Fintype n]
     (Xᵀ * X)ᵀ = Xᵀ * X := by
   rw [Matrix.transpose_mul, Matrix.transpose_transpose]
 
+/-- Hansen Theorem 3.3.1 helper: the inverse of the symmetric Gram matrix is symmetric.
+Relocated here from `Chapter3Projections.lean` so that downstream chapters can cite it
+directly from the shared linear-algebra helper layer. -/
+@[simp]
+theorem inv_gram_transpose {n k : Type*} [Fintype n] [Fintype k] [DecidableEq k]
+    (X : Matrix n k ℝ) [Invertible (Xᵀ * X)] :
+    (⅟ (Xᵀ * X))ᵀ = ⅟ (Xᵀ * X) := by
+  simpa [gram_transpose (X := X)] using
+    (Matrix.transpose_invOf (A := Xᵀ * X))
+
 /-- Left-multiplication by a row vector is right-multiplication by the transpose. -/
 @[simp]
 lemma vecMul_eq_mulVec_transpose {m n : Type*} [Fintype m]
