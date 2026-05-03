@@ -57,8 +57,8 @@ Theorem 3.5 coefficient and residual equivalence now landed. Theorem 3.4 partiti
 coefficient formulae are still pending.
 
 ## Immediate target
-Backfill Theorem 3.4 partitioned coefficient formulae or the objective-level Theorem 3.1 argmin
-statement, then continue forward to leverage and leave-one-out results.
+Backfill Theorem 3.4 partitioned coefficient formulae, then continue forward to leverage and
+leave-one-out results.
 
 ## Source text
 - `textbook/ch03/ch3_excerpt.txt` is a text extract of `chapters/03-the-algebra-of-least-squares.pdf`,
@@ -128,8 +128,9 @@ not surfaced here.
 ## Notes
 
 - Theorem 3.4 is still intentionally blank: it is one of the main remaining Chapter 3
-  theorem labels not yet wrapped in the current Lean layer. Theorem 3.1 has its existence
-  half landed; uniqueness is still pending.
+  theorem labels not yet wrapped in the current Lean layer. Theorem 3.1 is fully landed
+  (existence half via `sumSquaredErrors_olsBeta_le` / `olsBeta_isMinOn`; uniqueness via
+  `olsBeta_eq_of_minimizer`).
 - Several Lean helper results in the projection file are stronger than the textbook labels because
   they package reusable matrix facts such as rank and Hermitian structure.
 - The projection-rank helper [rank_hatMatrix](../../HansenEconometrics/Chapter3Projections.lean#L174)
