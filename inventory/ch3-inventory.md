@@ -18,9 +18,9 @@ Status:
 - Definition 3.1 SSE notation and the `β̂` residual-sum-of-squares specialization landed.
 - Equation (3.17), residuals summing to zero when a constant is in the column span, landed.
 - normal-equation uniqueness for the closed-form OLS coefficient landed.
-- Theorem 3.1 existence half (β̂ attains the minimum) landed via `sumSquaredErrors_olsBeta_le`
-  and `olsBeta_isMinOn`. Uniqueness (any minimizer equals β̂) is still pending, mirroring
-  `linearProjectionBeta_eq_of_MSE_eq` in Chapter 2.
+- Theorem 3.1 (β̂ is the unique minimizer of SSE) fully landed via
+  `sumSquaredErrors_olsBeta_le`, `olsBeta_isMinOn`, and `olsBeta_eq_of_minimizer`.
+  The bridge `sumSquaredErrors_eq_linearProjectionMSE` is private to the file.
 
 ### Layer 2: projection matrices
 7. define hat matrix `P = X (Xᵀ X)⁻¹ Xᵀ`
@@ -94,7 +94,7 @@ Conventions:
 
 | Textbook result | LaTeX | Lean theorem |
 | --- | --- | --- |
-| Theorem 3.1 objective-level argmin statement (existence half) | $\hat{\beta} = \arg\min_b (Y - X b)'(Y - X b)$ | [sumSquaredErrors_olsBeta_le](../../HansenEconometrics/Chapter3LeastSquaresAlgebra.lean#L150)<br>`sumSquaredErrors X y (olsBeta X y) ≤ sumSquaredErrors X y b`<br>[olsBeta_isMinOn](../../HansenEconometrics/Chapter3LeastSquaresAlgebra.lean#L161)<br>`IsMinOn (sumSquaredErrors X y) Set.univ (olsBeta X y)` |
+| Theorem 3.1 objective-level argmin statement | $\hat{\beta} = \arg\min_b (Y - X b)'(Y - X b)$ | [sumSquaredErrors_olsBeta_le](../../HansenEconometrics/Chapter3LeastSquaresAlgebra.lean#L150)<br>`sumSquaredErrors X y (olsBeta X y) ≤ sumSquaredErrors X y b`<br>[olsBeta_isMinOn](../../HansenEconometrics/Chapter3LeastSquaresAlgebra.lean#L161)<br>`IsMinOn (sumSquaredErrors X y) Set.univ (olsBeta X y)`<br>[olsBeta_eq_of_minimizer](../../HansenEconometrics/Chapter3LeastSquaresAlgebra.lean#L171)<br>`SSE(b) = SSE(olsBeta X y) → b = olsBeta X y` |
 | Definition 3.1 sum of squared errors | $S(b) = (Y - X b)'(Y - X b)$ | [sumSquaredErrors](../../HansenEconometrics/Chapter3LeastSquaresAlgebra.lean#L16)<br><code>sumSquaredErrors X y b := (y - X *ᵥ b) ⬝ᵥ (y - X *ᵥ b)</code> |
 | Theorem 3.2 closed-form OLS coefficient | $\hat{\beta} = (X'X)^{-1} X' Y$ | [olsBeta](../../HansenEconometrics/Chapter3LeastSquaresAlgebra.lean#L20)<br><code>olsBeta X y := (⅟ (Xᵀ * X)) *ᵥ (Xᵀ *ᵥ y)</code> |
 | Theorem 3.2 normal equations | $X' \hat{e} = 0$ | [normal_equations](../../HansenEconometrics/Chapter3LeastSquaresAlgebra.lean#L32)<br><code>Xᵀ *ᵥ residual X y = 0</code> |
@@ -117,6 +117,7 @@ Conventions:
 | Lean theorem | Role |
 | --- | --- |
 | [gram_quadratic_nonneg](../../HansenEconometrics/LinearAlgebraUtils.lean#L110) | `0 ≤ v ⬝ᵥ ((Xᵀ * X) *ᵥ v)` for all `v`; the Gram matrix is positive semidefinite |
+| [gram_quadratic_pos](../../HansenEconometrics/LinearAlgebraUtils.lean#L121) | `0 < v ⬝ᵥ ((Xᵀ * X) *ᵥ v)` for any `v ≠ 0` under `[Invertible (Xᵀ * X)]`; the strict-positive-definiteness companion of `gram_quadratic_nonneg`, used to discharge the uniqueness hypothesis of Hansen Theorem 3.1 |
 | [gram_transpose](../../HansenEconometrics/LinearAlgebraUtils.lean#L51) | `(Xᵀ * X)ᵀ = Xᵀ * X` (relocated from `Chapter3Projections.lean` to break a potential circular import) |
 | [inv_gram_transpose](../../HansenEconometrics/LinearAlgebraUtils.lean#L60) | `(⅟ (Xᵀ * X))ᵀ = ⅟ (Xᵀ * X)` (relocated from `Chapter3Projections.lean` alongside `gram_transpose`; cited from Ch 3–5) |
 
