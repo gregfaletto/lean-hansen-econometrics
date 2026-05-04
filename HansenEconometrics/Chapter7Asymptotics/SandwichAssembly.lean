@@ -1213,6 +1213,10 @@ noncomputable def olsHetCovHC3Star
     (X : Matrix n k ℝ) (y : n → ℝ) : Matrix k k ℝ :=
   olsHetCovLevAdjStar (fun h => ((1 - h)⁻¹) ^ 2) X y
 
+/-- Private proof engine. Bridges the Chapter 7 normalized Gram matrix
+`sampleGram X = n⁻¹ · Xᵀ X` to the Chapter 4 unnormalized typeclass inverse `⅟(Xᵀ X)`:
+on nonsingular designs, `(sampleGram X)⁻¹ = n · ⅟(Xᵀ X)`. Used when reconciling totalized
+sandwich estimators with the finite-sample HC family. -/
 private theorem sampleGram_nonsingInv_eq_card_smul_invOf
     (X : Matrix n k ℝ) [Invertible (Xᵀ * X)] :
     (sampleGram X)⁻¹ = (Fintype.card n : ℝ) • ⅟ (Xᵀ * X) := by
@@ -1221,6 +1225,10 @@ private theorem sampleGram_nonsingInv_eq_card_smul_invOf
   simp [invOf_eq_nonsing_inv]
 
 omit [Fintype k] [DecidableEq k] in
+/-- Private proof engine. Standard outer-product / sandwich identity:
+`∑ᵢ dᵢ · xᵢ xᵢᵀ = Xᵀ · diag(d) · X`. Used to rewrite the row-by-row sum that defines
+`sampleScoreCovLevAdjStar` into the matrix sandwich form needed by
+`olsConditionalVarianceMatrix`. -/
 private theorem sum_smul_vecMulVec_eq_transpose_diag_mul
     (X : Matrix n k ℝ) (d : n → ℝ) [DecidableEq n] :
     (∑ i, d i • Matrix.vecMulVec (X i) (X i)) = Xᵀ * Matrix.diagonal d * X := by
@@ -1232,6 +1240,13 @@ private theorem sum_smul_vecMulVec_eq_transpose_diag_mul
   simp [Matrix.vecMulVec_apply]
   ring
 
+/-- Private proof engine. Generic Star-versus-base bridge: on nonsingular designs, the
+totalized leverage-adjusted sandwich `olsHetCovLevAdjStar weight` equals `n` times the
+Chapter 4 finite-sample sandwich built from the same leverage weights and squared residuals.
+Factors out the algebra shared by the public HC2 and HC3 bridges
+(`olsHetCovHC2Star_eq_smul_olsHuberWhiteHC2VarianceEstimator` and its HC3 counterpart):
+rewrite the score covariance via `sum_smul_vecMulVec_eq_transpose_diag_mul`, then collapse
+the `n · n⁻¹ · n` scaling that arises from `sampleGram_nonsingInv_eq_card_smul_invOf`. -/
 private theorem olsHetCovLevAdjStar_eq_card_smul_base
     (weight : ℝ → ℝ) (X : Matrix n k ℝ) (y : n → ℝ)
     [DecidableEq n] [Invertible (Xᵀ * X)] :
