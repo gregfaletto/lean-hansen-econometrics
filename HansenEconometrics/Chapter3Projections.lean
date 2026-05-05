@@ -10,12 +10,6 @@ open Matrix
 variable {n k l : Type*}
 variable [Fintype n]
 
-/-- Hansen Theorem 3.3.1 helper: the Gram matrix `Xᵀ X` is symmetric. -/
-theorem gram_transpose
-    (X : Matrix n k ℝ) :
-    (Xᵀ * X)ᵀ = Xᵀ * X := by
-  rw [Matrix.transpose_mul, Matrix.transpose_transpose]
-
 variable [Fintype k] [DecidableEq k]
 
 /-- Hansen Section 3.11: the OLS projection / hat matrix `P = X (Xᵀ X)⁻¹ Xᵀ`. -/
@@ -26,14 +20,6 @@ noncomputable def hatMatrix (X : Matrix n k ℝ) [Invertible (Xᵀ * X)] : Matri
 noncomputable def annihilatorMatrix (X : Matrix n k ℝ) [DecidableEq n] [Invertible (Xᵀ * X)] :
     Matrix n n ℝ :=
   (1 : Matrix n n ℝ) - hatMatrix X
-
-/-- Hansen Theorem 3.3.1 helper: the inverse of the symmetric Gram matrix is symmetric. -/
-@[simp]
-theorem inv_gram_transpose
-    (X : Matrix n k ℝ) [Invertible (Xᵀ * X)] :
-    (⅟ (Xᵀ * X))ᵀ = ⅟ (Xᵀ * X) := by
-  simpa [gram_transpose (X := X)] using
-    (Matrix.transpose_invOf (A := Xᵀ * X))
 
 /-- Hansen Theorem 3.3.1: the hat matrix is symmetric. -/
 theorem hatMatrix_transpose

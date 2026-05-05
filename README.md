@@ -57,7 +57,7 @@ Legend:
 | 03 | The Algebra of Least Squares | partial | OLS algebra + projection/annihilator (incl. rank) / FWL coefficient and residual core landed |
 | 04 | Least Squares Regression | partial | OLS/GLS algebra, unbiasedness, covariance identities, Gauss-Markov lower bounds, `s²` unbiasedness, HC2/HC3, and clustered base covariance definitions landed |
 | 05 | Normal Regression | partial | normal-model scaffolding, chi-square distribution wrapper, Gaussian laws for `β̂` and residuals, and exact finite-sample inference layer landed |
-| 06 | A Review of Large Sample Asymptotics | inventoried | likely prerequisite for later asymptotics chapters |
+| 06 | A Review of Large Sample Asymptotics | partial | WLLN, CLT (via Cramér–Wold), CMT in probability, O_p/o_p, Slutsky already backed by Mathlib + AsymptoticUtils.lean; outstanding theorems tracked in #41 |
 | 07 | Asymptotic Theory for Least Squares | partial | Theorem 7.1 totalized/ordinary-on-nonsingular consistency landed; Theorem 7.2 projection-family score CLT plus score-covariance `Ω` wrappers landed; Theorem 7.3 projection-family CLT covers totalized and ordinary-on-nonsingular OLS; Theorems 7.4 and 7.5 totalized variance/covariance consistency landed; vector/Cramér-Wold packaging pending |
 | 08 | Restricted Estimation | inventoried | constrained estimation / minimum distance |
 | 09 | Hypothesis Testing | inventoried | Wald / LM / LR style results |
