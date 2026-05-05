@@ -111,7 +111,7 @@ Conventions:
 | Section 3.14 Pythagorean decomposition | $Y'Y = \hat{Y}'\hat{Y} + \hat{e}'\hat{e}$ | [fitted_residual_pythagorean](../../HansenEconometrics/Chapter3Projections.lean#L259)<br><code>y ⬝ᵥ y = fitted X y ⬝ᵥ fitted X y + residual X y ⬝ᵥ residual X y</code> |
 | Theorem 3.4 partitioned coefficient formulae | $\hat{\beta}_1 = (X_1' M_2 X_1)^{-1} X_1' M_2 Y$ (Eq. 3.37); $\hat{\beta}_2 = (X_2' M_1 X_2)^{-1} X_2' M_1 Y$ (Eq. 3.38) | [fromColsLeftBeta_eq_partitioned_form](../../HansenEconometrics/Chapter3FWL.lean#L277)<br>[fromColsRightBeta_eq_partitioned_form](../../HansenEconometrics/Chapter3FWL.lean#L232) |
 | Theorem 3.5 coefficient equivalence (FWL) | $\hat{\beta}_2 = \hat{\beta}(M_1 X_2, M_1 Y)$ | [fromColsRightBeta_eq_fwlBeta](../../HansenEconometrics/Chapter3FWL.lean#L147)<br><code>fromColsRightBeta X₁ X₂ y = fwlBeta X₁ X₂ y</code> |
-| Theorem 3.5 residual equivalence | $\hat{e}_{\text{full}} = M_{M_1 X_2} M_1 Y$ | [fwl_residual_eq_full_residual](../../HansenEconometrics/Chapter3FWL.lean#L163)<br><code>residual (residualizedRegressors X₁ X₂) (annihilatorMatrix X₁ *ᵥ y) = residual (Matrix.fromCols X₁ X₂) y</code> |
+| Theorem 3.5 residual equivalence | $\hat{e}_{\text{full}} = M_{M_1 X_2} M_1 Y$ | [fwl_residual_eq_full_residual](../../HansenEconometrics/Chapter3FWL.lean#L319)<br><code>residual (residualizedRegressors X₁ X₂) (annihilatorMatrix X₁ *ᵥ y) = residual (Matrix.fromCols X₁ X₂) y</code> |
 
 ## Lean-only bridge results
 
