@@ -6,11 +6,11 @@ import HansenEconometrics.ProbabilityUtils
 /-!
 # Delta-method and smooth-function asymptotic wrappers
 
-This module provides the Chapter 6-facing Delta-method surface.  The main
-distributional theorem is stated in proof-engine form: differentiability supplies
-the deterministic little-o remainder, while the stochastic theorem composes the
-linearized limit with an explicit `oₚ(1)` remainder.  This keeps the public API
-usable without introducing a parallel stochastic-order framework.
+This module provides the Chapter 6-facing Delta-method and smooth-function
+surface.  The Delta-method statement is split into the deterministic
+differentiability remainder and the stochastic Slutsky step, matching Mathlib's
+Fréchet derivative API without introducing a parallel stochastic-order
+framework.
 -/
 
 open MeasureTheory ProbabilityTheory Filter
@@ -75,8 +75,8 @@ section SmoothConsistency
 variable [IsFiniteMeasure μ]
   [PseudoEMetricSpace E] [PseudoEMetricSpace F] [TopologicalSpace.PseudoMetrizableSpace F]
 
-/-- Hansen Theorem 6.9, proof-engine form: smooth-function consistency from
-consistency of the input and continuity at the target. -/
+/-- Hansen Theorem 6.9: smooth-function consistency from input consistency and
+continuity at the target. -/
 theorem smoothFunction_consistency
     {θhat : ℕ → Ω → E} {θ : E} {g : E → F}
     (hθ_meas : ∀ n, AEStronglyMeasurable (θhat n) μ)
@@ -93,7 +93,7 @@ section GaussianSmoothFunction
 variable {k q : Type*} [Fintype k] [Fintype q] [DecidableEq k] [DecidableEq q]
   {S : Matrix k k ℝ} {R : Matrix q k ℝ}
 
-/-- Hansen Theorem 6.10, Gaussian proof-engine form.
+/-- Hansen Theorem 6.10, Gaussian Delta-method wrapper.
 
 The input statistic converges to a centered multivariate Gaussian.  The nonlinear
 statistic is represented as its matrix-linear Delta-method image plus an
