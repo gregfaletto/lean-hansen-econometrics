@@ -56,7 +56,7 @@ Legend:
 | 02 | Conditional Expectation and Projection | partial | conditional expectation, variance, and linear projection algebra completed |
 | 03 | The Algebra of Least Squares | partial | OLS algebra + projection/annihilator (incl. rank) / FWL coefficient and residual core landed |
 | 04 | Least Squares Regression | partial | OLS/GLS algebra, unbiasedness, covariance identities, Gauss-Markov lower bounds, `s²` unbiasedness, HC2/HC3, and clustered base covariance definitions landed |
-| 05 | Normal Regression | partial | normal-model scaffolding, chi-square distribution wrapper, Gaussian laws for `β̂` and residuals, and exact finite-sample inference layer landed |
+| 05 | Normal Regression | partial | multivariate-normal wrappers, normal-model scaffolding, finite-sample Gaussian/chi-square/Student-t/F laws, confidence intervals, and classical test results landed; Kinal moment threshold deferred |
 | 06 | A Review of Large Sample Asymptotics | partial | WLLN, CLT (via Cramér–Wold), CMT in probability, O_p/o_p, Slutsky already backed by Mathlib + AsymptoticUtils.lean; outstanding theorems tracked in #41 |
 | 07 | Asymptotic Theory for Least Squares | partial | Theorem 7.1 totalized/ordinary-on-nonsingular consistency landed; Theorem 7.2 projection-family score CLT plus score-covariance `Ω` wrappers landed; Theorem 7.3 projection-family CLT covers totalized and ordinary-on-nonsingular OLS; Theorems 7.4 and 7.5 totalized variance/covariance consistency landed; vector/Cramér-Wold packaging pending |
 | 08 | Restricted Estimation | inventoried | constrained estimation / minimum distance |
@@ -158,14 +158,21 @@ Reused from `HansenEconometrics/Chapter4LeastSquaresRegression.lean`:
 - finite-sample residual variance estimator definition
 - deterministic linear-model and quadratic-form rewrites of `s²` in terms of the model error
 
+Completed in `HansenEconometrics/MultivariateNormal.lean`:
+- standard-normal finite-moment, mean, and variance wrappers
+- affine-image law for multivariate normals, including the random-variable `HasLaw` form
+- multivariate-normal mean/covariance identities, marginal laws, and scalar jointly-Gaussian
+  independence iff zero covariance
+
 Completed in `HansenEconometrics/ChiSquared.lean`:
 - chi-square distribution defined as a Gamma distribution with shape `k/2` and rate `1/2`
 - basic probability-measure instance for positive degrees of freedom
 - negative-support vanishing lemma inherited from the Gamma density
 
 Planned next within Chapter 5:
+- keep Theorem 5.5 (Kinal 1980) deferred until a later chapter needs the moment-existence threshold
 - extend likelihood / MLE derivations if later chapters need them
-- add background normal-distribution moment theorems only when they become prerequisites
+- add closed-form standard-normal moment formulas only if they become useful downstream
 
 ## Current Chapter 4 progress
 
