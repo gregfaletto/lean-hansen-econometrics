@@ -2,6 +2,9 @@ import HansenEconometrics.Basic
 import HansenEconometrics.LinearAlgebraUtils
 import HansenEconometrics.ProbabilityUtils
 import HansenEconometrics.AsymptoticUtils
+import HansenEconometrics.AsymptoticUtils.StochasticOrder
+import HansenEconometrics.AsymptoticUtils.DeltaMethod
+import HansenEconometrics.AsymptoticUtils.MaxBounds
 
 import HansenEconometrics.Chapter2CondExp
 
