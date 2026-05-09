@@ -77,6 +77,41 @@ structure FeasibleHCLeverageConditions (μ : Measure Ω) [IsProbabilityMeasure �
       (fun n ω => maxLeverageStar (stackRegressors X n ω))
       atTop (fun _ => 0)
 
+namespace FeasibleHCLeverageConditions
+
+/-- Build the HC2/HC3 feasible-condition package from the HC0/HC1 remainder
+package plus the primitive squared-row uniform-integrability max-leverage
+discharge. -/
+theorem ofRemainder_uniformIntegrable_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : SampleMomentAssumption71 μ X e)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    FeasibleHCLeverageConditions μ X e y β where
+  toFeasibleHCRemainderConditions := hc
+  maxLeverage_tendsto :=
+    maxLeverageStar_tendstoInMeasure_zero_of_uniformIntegrable_rowNorm_sq
+      (μ := μ) (X := X) (e := e) h hUI
+
+/-- Build the HC2/HC3 feasible-condition package from the HC0/HC1 remainder
+package plus the iid finite-squared-row-moment max-leverage discharge. -/
+theorem ofRemainder_identDistrib_memLp_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : SampleMomentAssumption71 μ X e)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hRowMem : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ)
+    (hRowIdent : ∀ i,
+      IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ) :
+    FeasibleHCLeverageConditions μ X e y β where
+  toFeasibleHCRemainderConditions := hc
+  maxLeverage_tendsto :=
+    maxLeverageStar_tendstoInMeasure_zero_of_identDistrib_memLp_rowNorm_sq
+      (μ := μ) (X := X) (e := e) h hRowMem hRowIdent
+
+end FeasibleHCLeverageConditions
+
 omit [Fintype k] [DecidableEq k] in
 /-- The ideal HC0 score covariance average of stacked samples is the range-indexed
 sample mean used by the WLLN. -/
