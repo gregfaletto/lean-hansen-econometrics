@@ -259,6 +259,60 @@ theorem TendstoInDistribution.integral_normTrunc_limit_le_of_eventually_integral
     (μ := μ) (ν := ν) (X := X) (Z := Z) hX f
     (normTruncBoundedContinuousFunction_nonneg hR) hfBound
 
+/-- **Hansen Theorem 6.13, integrable-limit norm weak-moment face.**
+
+If `Xₙ ⇒ Z`, the expected norms of `Xₙ` are eventually bounded by `C`, and the
+limit norm is integrable, then the limit-law expected norm is at most `C`. The
+proof applies the norm-truncation bound for every truncation level and then
+uses monotone convergence. -/
+theorem TendstoInDistribution.integral_norm_limit_le_of_eventually_integral_norm_bound
+    {Ω Ω' E : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    [SeminormedAddCommGroup E] [MeasurableSpace E] [OpensMeasurableSpace E]
+    [BorelSpace E] [HasOuterApproxClosed E]
+    {X : ℕ → Ω → E} {Z : Ω' → E}
+    (hX : TendstoInDistribution X atTop Z (fun _ => μ) ν)
+    {C : ℝ}
+    (hBound : ∀ᶠ n in atTop,
+      Integrable (fun ω => ‖X n ω‖) μ ∧ ∫ ω, ‖X n ω‖ ∂μ ≤ C)
+    (hZNorm : Integrable (fun ω => ‖Z ω‖) ν) :
+    ∫ ω, ‖Z ω‖ ∂ν ≤ C := by
+  have htrunc_bound :
+      ∀ n : ℕ, ∫ ω, min ‖Z ω‖ (n : ℝ) ∂ν ≤ C := by
+    intro n
+    have hn_nonneg : 0 ≤ (n : ℝ) := by positivity
+    simpa [normTruncBoundedContinuousFunction_apply] using
+      TendstoInDistribution.integral_normTrunc_limit_le_of_eventually_integral_norm_bound
+        (μ := μ) (ν := ν) (X := X) (Z := Z) hX hn_nonneg hBound
+  have htrunc_tendsto :
+      Tendsto (fun n : ℕ => ∫ ω, min ‖Z ω‖ (n : ℝ) ∂ν) atTop
+        (𝓝 (∫ ω, ‖Z ω‖ ∂ν)) := by
+    refine integral_tendsto_of_tendsto_of_monotone ?_ hZNorm ?_ ?_
+    · intro n
+      refine hZNorm.mono' ?_ ?_
+      · rw [aestronglyMeasurable_iff_aemeasurable]
+        exact hZNorm.aestronglyMeasurable.aemeasurable.min aemeasurable_const
+      · exact ae_of_all ν (fun ω => by
+          have hnonneg : 0 ≤ min ‖Z ω‖ (n : ℝ) :=
+            le_min (norm_nonneg _) (by positivity)
+          rw [Real.norm_of_nonneg hnonneg]
+          exact min_le_left _ _)
+    · exact ae_of_all ν (fun ω => by
+        intro n m hnm
+        exact min_le_min le_rfl (by exact_mod_cast hnm))
+    · exact ae_of_all ν (fun ω => by
+        have hcast : ∀ᶠ n : ℕ in atTop, ‖Z ω‖ ≤ (n : ℝ) :=
+          (tendsto_natCast_atTop_atTop (R := ℝ)).eventually
+            (eventually_ge_atTop (‖Z ω‖))
+        have heq :
+            (fun n : ℕ => min ‖Z ω‖ (n : ℝ)) =ᶠ[atTop] fun _ => ‖Z ω‖ := by
+          filter_upwards [hcast] with n hn
+          exact min_eq_left hn
+        rw [tendsto_congr' heq]
+        exact tendsto_const_nhds)
+  exact le_of_tendsto' htrunc_tendsto htrunc_bound
+
 /-- **Hansen Theorem 6.15, bounded continuous weak-moment face.**
 
 Weak convergence is exactly convergence of expectations for bounded continuous
