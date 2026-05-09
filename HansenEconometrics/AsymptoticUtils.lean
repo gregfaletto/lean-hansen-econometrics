@@ -1087,6 +1087,107 @@ theorem BoundedInProbability.of_eventually_integral_norm_rpow_scaled_bound
             have hpow_ne : (a n) ^ p ≠ 0 := (Real.rpow_pos_of_pos hapos p).ne'
             field_simp [hpow_ne]
 
+/-- Scaled positive-real moments tending to zero imply scaled `oₚ(1)`.
+
+This is the little-`oₚ` Markov-inequality face of Hansen Theorem 6.12: if
+`E|Xₙ|^p / aₙ^p → 0` for a positive deterministic scale `aₙ` and `p > 0`, then
+`aₙ⁻¹ Xₙ →ₚ 0`. -/
+theorem TendstoInMeasure.of_integral_norm_rpow_scaled_tendsto_zero
+    [IsFiniteMeasure μ] {X : ℕ → α → ℝ} {a : ℕ → ℝ} {p : ℝ}
+    (hp : 0 < p)
+    (ha : ∀ᶠ n in atTop, 0 < a n)
+    (hInt : ∀ n, Integrable (fun ω => ‖X n ω‖ ^ p) μ)
+    (hScaled :
+      Tendsto (fun n => (∫ ω, ‖X n ω‖ ^ p ∂μ) / (a n) ^ p) atTop (𝓝 0)) :
+    TendstoInMeasure μ (fun n ω => (a n)⁻¹ * X n ω) atTop (fun _ => 0) := by
+  rw [tendstoInMeasure_iff_dist]
+  intro ε hε
+  rw [ENNReal.tendsto_atTop_zero]
+  intro δ hδ
+  by_cases hδtop : δ = ∞
+  · refine ⟨0, fun n _ => ?_⟩
+    rw [hδtop]
+    exact le_top
+  have hδreal_pos : 0 < δ.toReal := ENNReal.toReal_pos hδ.ne' hδtop
+  let T : ℝ := ε ^ p
+  have hTpos : 0 < T := Real.rpow_pos_of_pos hε p
+  have htarget_pos : 0 < δ.toReal * T := mul_pos hδreal_pos hTpos
+  have hsmall : ∀ᶠ n in atTop,
+      dist ((∫ ω, ‖X n ω‖ ^ p ∂μ) / (a n) ^ p) 0 < δ.toReal * T :=
+    eventually_atTop.2 ((Metric.tendsto_atTop.1 hScaled) (δ.toReal * T) htarget_pos)
+  obtain ⟨N, hN⟩ := eventually_atTop.1 (ha.and hsmall)
+  refine ⟨N, fun n hn => ?_⟩
+  have hapos : 0 < a n := (hN n hn).1
+  have hsmalln :
+      dist ((∫ ω, ‖X n ω‖ ^ p ∂μ) / (a n) ^ p) 0 < δ.toReal * T :=
+    (hN n hn).2
+  have hscaled_eq :
+      ∫ ω, ‖(a n)⁻¹ * X n ω‖ ^ p ∂μ =
+        (∫ ω, ‖X n ω‖ ^ p ∂μ) / (a n) ^ p := by
+    calc
+      ∫ ω, ‖(a n)⁻¹ * X n ω‖ ^ p ∂μ
+          = ∫ ω, ‖(a n)⁻¹‖ ^ p * ‖X n ω‖ ^ p ∂μ := by
+            congr 1
+            ext ω
+            rw [norm_mul, Real.mul_rpow (norm_nonneg _) (norm_nonneg _)]
+      _ = ‖(a n)⁻¹‖ ^ p * ∫ ω, ‖X n ω‖ ^ p ∂μ := by
+            rw [integral_const_mul]
+      _ = (∫ ω, ‖X n ω‖ ^ p ∂μ) / (a n) ^ p := by
+            rw [Real.norm_eq_abs, abs_of_pos (inv_pos.mpr hapos), Real.inv_rpow hapos.le p]
+            ring
+  have hscaled_nonneg :
+      0 ≤ (∫ ω, ‖X n ω‖ ^ p ∂μ) / (a n) ^ p := by
+    rw [← hscaled_eq]
+    exact integral_nonneg_of_ae (ae_of_all μ fun ω =>
+      Real.rpow_nonneg (norm_nonneg ((a n)⁻¹ * X n ω)) p)
+  have hratio_lt :
+      (∫ ω, ‖X n ω‖ ^ p ∂μ) / (a n) ^ p < δ.toReal * T := by
+    have hdist_eq :
+        dist ((∫ ω, ‖X n ω‖ ^ p ∂μ) / (a n) ^ p) 0 =
+          (∫ ω, ‖X n ω‖ ^ p ∂μ) / (a n) ^ p := by
+      rw [Real.dist_eq, sub_zero, abs_of_nonneg hscaled_nonneg]
+    rwa [hdist_eq] at hsmalln
+  have hscaled_lt :
+      ∫ ω, ‖(a n)⁻¹ * X n ω‖ ^ p ∂μ < δ.toReal * T := by
+    rw [hscaled_eq]
+    exact hratio_lt
+  let A : Set α := {ω | ε ≤ dist ((a n)⁻¹ * X n ω) 0}
+  let B : Set α := {ω | T ≤ ‖(a n)⁻¹ * X n ω‖ ^ p}
+  have hcover : A ⊆ B := by
+    intro ω hω
+    have hnorm : ε ≤ ‖(a n)⁻¹ * X n ω‖ := by
+      simpa [A, Real.dist_eq] using hω
+    exact Real.rpow_le_rpow hε.le hnorm hp.le
+  have hint_scaled : Integrable (fun ω => ‖(a n)⁻¹ * X n ω‖ ^ p) μ := by
+    have hEq :
+        (fun ω => ‖(a n)⁻¹ * X n ω‖ ^ p) =
+          fun ω => ‖(a n)⁻¹‖ ^ p * ‖X n ω‖ ^ p := by
+      funext ω
+      rw [norm_mul, Real.mul_rpow (norm_nonneg _) (norm_nonneg _)]
+    rw [hEq]
+    exact (hInt n).const_mul (‖(a n)⁻¹‖ ^ p)
+  have hmarkov :
+      T * μ.real B ≤ ∫ ω, ‖(a n)⁻¹ * X n ω‖ ^ p ∂μ :=
+    mul_meas_ge_le_integral_of_nonneg
+      (ae_of_all μ fun ω => Real.rpow_nonneg (norm_nonneg ((a n)⁻¹ * X n ω)) p)
+      hint_scaled T
+  have hreal_B_lt : μ.real B < δ.toReal := by
+    have hle : μ.real B ≤ (∫ ω, ‖(a n)⁻¹ * X n ω‖ ^ p ∂μ) / T := by
+      exact (le_div_iff₀ hTpos).2 (by
+        calc
+          μ.real B * T = T * μ.real B := by ring
+          _ ≤ ∫ ω, ‖(a n)⁻¹ * X n ω‖ ^ p ∂μ := hmarkov)
+    have hdiv_lt : (∫ ω, ‖(a n)⁻¹ * X n ω‖ ^ p ∂μ) / T < δ.toReal := by
+      exact (div_lt_iff₀ hTpos).2 (by
+        simpa [mul_comm] using hscaled_lt)
+    exact lt_of_le_of_lt hle hdiv_lt
+  have hB_lt : μ B < ENNReal.ofReal δ.toReal := by
+    rw [ENNReal.lt_ofReal_iff_toReal_lt (measure_ne_top μ B)]
+    simpa [measureReal_def] using hreal_B_lt
+  have hA_lt : μ A < ENNReal.ofReal δ.toReal :=
+    lt_of_le_of_lt (measure_mono hcover) hB_lt
+  exact le_of_lt (by simpa [A, ENNReal.ofReal_toReal hδtop] using hA_lt)
+
 /-- Scaled first absolute-moment bounds imply scaled scalar `Oₚ(1)`.
 
 This is the `δ = 1` scaled face of Hansen Theorem 6.12: if the first absolute
