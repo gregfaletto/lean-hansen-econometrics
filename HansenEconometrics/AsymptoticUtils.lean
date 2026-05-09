@@ -104,6 +104,33 @@ theorem tendstoInDistribution_continuous_comp
     TendstoInDistribution (fun n ω => g (X n ω)) atTop (fun ω => g (Z ω)) P ν := by
   simpa [Function.comp_def] using hX.continuous_comp hg
 
+/-- Square-root continuous mapping at zero for nonnegative real-valued sequences.
+
+This avoids any additional measurability side condition by comparing the tail
+events `{sqrt Xₙ ≥ ε}` and `{Xₙ ≥ ε²}` directly. -/
+theorem TendstoInMeasure.sqrt_nonneg_zero_real
+    {X : ℕ → α → ℝ}
+    (hX : TendstoInMeasure μ X atTop (fun _ => 0))
+    (hX_nonneg : ∀ n ω, 0 ≤ X n ω) :
+    TendstoInMeasure μ (fun n ω => Real.sqrt (X n ω)) atTop (fun _ => 0) := by
+  rw [tendstoInMeasure_iff_dist] at hX ⊢
+  intro ε hε
+  have hε2 : 0 < ε ^ 2 := sq_pos_of_pos hε
+  have htail := hX (ε ^ 2) hε2
+  refine tendsto_of_tendsto_of_tendsto_of_le_of_le tendsto_const_nhds htail
+    (fun _ => zero_le _) ?_
+  intro n
+  refine measure_mono ?_
+  intro ω hω
+  have hsqrt : ε ≤ Real.sqrt (X n ω) := by
+    simpa [Real.dist_eq, abs_of_nonneg (Real.sqrt_nonneg _)] using hω
+  have hsquare : ε ^ 2 ≤ (Real.sqrt (X n ω)) ^ 2 := by
+    exact pow_le_pow_left₀ hε.le hsqrt 2
+  have hdist : ε ^ 2 ≤ dist (X n ω) 0 := by
+    rw [Real.sq_sqrt (hX_nonneg n ω)] at hsquare
+    simpa [Real.dist_eq, abs_of_nonneg (hX_nonneg n ω)] using hsquare
+  exact hdist
+
 /-- **Coordinate projection of `TendstoInMeasure`**: if a sequence of `∀ b, X b`-valued
 functions converges in measure, then each coordinate converges in measure.
 

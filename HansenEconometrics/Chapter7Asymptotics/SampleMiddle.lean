@@ -712,6 +712,27 @@ theorem scaledMaxRowNorm_sq_tendstoInMeasure_zero_of_uniformIntegrable_norm_sq
             simp [scaledMaxNNNorm]
   simpa [abs_of_nonneg hleft_nonneg, abs_of_nonneg hright_nonneg] using hle
 
+omit [DecidableEq k] in
+/-- **Hansen Theorem 7.16/7.17, root row-rate discharge.**
+
+Uniform integrability of squared row norms implies the root-form
+`sqrt(n⁻¹ max_i ‖X_i‖²) = oₚ(1)`, the row-norm factor used in the residual
+uniformity rate and the unscaled leverage consequence. -/
+theorem sqrt_scaledMaxRowNorm_sq_tendstoInMeasure_zero_of_uniformIntegrable_norm_sq
+    {μ : Measure Ω}
+    {X : ℕ → Ω → (k → ℝ)}
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Real.sqrt
+          ((Fintype.card (Fin n) : ℝ)⁻¹ *
+            maxRowNorm (stackRegressors X n ω) ^ 2))
+      atTop (fun _ => 0) := by
+  exact TendstoInMeasure.sqrt_nonneg_zero_real
+    (scaledMaxRowNorm_sq_tendstoInMeasure_zero_of_uniformIntegrable_norm_sq
+      (μ := μ) (X := X) hUI)
+    (by intro n ω; positivity)
+
 /-- **Hansen Theorem 7.17, max-leverage rate packaging.**
 
 Once the Chapter 6 maximum-row-norm rate supplies
