@@ -2474,6 +2474,24 @@ theorem olsHetCovStar_tendstoInMeasure_of_feasibleHCRemainderConditions
     hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
     hc.crossWeight_bounded hc.quadWeight_bounded
 
+/-- **Hansen Theorem 7.6, feasible HC0 sandwich under compact robust moments.**
+
+This endpoint uses the combined robust feasible-HC moment package, discharging
+both the robust covariance assumptions and the feasible HC0 remainder package. -/
+theorem olsHetCovStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHetCovStar
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => heteroAsymCov μ X e) :=
+  olsHetCovStar_tendstoInMeasure_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions.toSampleHC0Assumption76 β
+    hm.toFeasibleHCRemainderConditions
+
 /-- AEMeasurability of the totalized feasible HC0 sandwich estimator from
 component measurability. -/
 theorem olsHetCovStar_stack_aestronglyMeasurable_components
@@ -2631,6 +2649,24 @@ theorem linMap_olsHC0CovStar_tendstoInMeasure_of_feasibleHCRemainderConditions
     hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
     hc.crossWeight_bounded hc.quadWeight_bounded
 
+/-- **Hansen Theorem 7.10, HC0 covariance for fixed linear functions under compact robust
+moments.** -/
+theorem linMap_olsHC0CovStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q]
+    (β : k → ℝ) (R : Matrix q k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        R * olsHetCovStar
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)
+      atTop (fun _ => R * heteroAsymCov μ X e * Rᵀ) :=
+  linMap_olsHC0CovStar_tendstoInMeasure_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions.toSampleHC0Assumption76 β R
+    hm.toFeasibleHCRemainderConditions
+
 /-- **Hansen §7.11, packaged HC0 standard errors for fixed linear functions.** -/
 theorem olsHC0LinSEStar_tendstoInMeasure_of_feasibleHCRemainderConditions
     {μ : Measure Ω} [IsProbabilityMeasure μ]
@@ -2784,6 +2820,21 @@ theorem olsHetCovHC1Star_tendstoInMeasure_of_feasibleHCRemainderConditions
     hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
     hc.crossWeight_bounded hc.quadWeight_bounded
 
+/-- **Hansen Theorem 7.7, HC1 sandwich under compact robust moments.** -/
+theorem olsHetCovHC1Star_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHetCovHC1Star
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => heteroAsymCov μ X e) :=
+  olsHetCovHC1Star_tendstoInMeasure_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions.toSampleHC0Assumption76 β
+    hm.toFeasibleHCRemainderConditions
+
 /-- AEMeasurability of the totalized HC1 sandwich estimator from component
 measurability. -/
 theorem olsHC1CovarianceStar_stack_aestronglyMeasurable_components
@@ -2909,6 +2960,24 @@ theorem linMap_olsHC1CovStar_tendstoInMeasure_of_feasibleHCRemainderConditions
     (μ := μ) (X := X) (e := e) (y := y) h β R
     hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
     hc.crossWeight_bounded hc.quadWeight_bounded
+
+/-- **Hansen Theorem 7.10, HC1 covariance for fixed linear functions under compact robust
+moments.** -/
+theorem linMap_olsHC1CovStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q]
+    (β : k → ℝ) (R : Matrix q k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        R * olsHetCovHC1Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)
+      atTop (fun _ => R * heteroAsymCov μ X e * Rᵀ) :=
+  linMap_olsHC1CovStar_tendstoInMeasure_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions.toSampleHC0Assumption76 β R
+    hm.toFeasibleHCRemainderConditions
 
 /-- **Hansen §7.11, packaged HC1 standard errors for fixed linear functions.** -/
 theorem olsHC1LinSEStar_tendstoInMeasure_of_feasibleHCRemainderConditions
@@ -3326,6 +3395,20 @@ theorem olsHetCovHC2Star_tendstoInMeasure_of_feasibleHCLeverageConditions
     hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
     hc.crossWeight_bounded hc.quadWeight_bounded hc.maxLeverage_tendsto
 
+/-- **Hansen Theorem 7.7, HC2 sandwich under compact robust moments.** -/
+theorem olsHetCovHC2Star_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHetCovHC2Star
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => heteroAsymCov μ X e) :=
+  olsHetCovHC2Star_tendstoInMeasure_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β hm.toFeasibleHCLeverageConditions
+
 /-- **Hansen Theorem 7.7, HC3 sandwich under packaged leverage conditions.**
 
 This is the packaged HC3 wrapper: the feasible HC0 remainder controls are
@@ -3344,6 +3427,20 @@ theorem olsHetCovHC3Star_tendstoInMeasure_of_feasibleHCLeverageConditions
     (μ := μ) (X := X) (e := e) (y := y) h β
     hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
     hc.crossWeight_bounded hc.quadWeight_bounded hc.maxLeverage_tendsto
+
+/-- **Hansen Theorem 7.7, HC3 sandwich under compact robust moments.** -/
+theorem olsHetCovHC3Star_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHetCovHC3Star
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => heteroAsymCov μ X e) :=
+  olsHetCovHC3Star_tendstoInMeasure_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β hm.toFeasibleHCLeverageConditions
 
 /-- HC2 covariance for fixed linear functions from maximal leverage. -/
 theorem linMap_olsHC2CovStar_tendstoInMeasure_of_bddWts_components_maxLev
@@ -3435,6 +3532,23 @@ theorem linMap_olsHC2CovStar_tendstoInMeasure_of_feasibleHCLeverageConditions
     hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
     hc.crossWeight_bounded hc.quadWeight_bounded hc.maxLeverage_tendsto
 
+/-- **Hansen Theorem 7.10, HC2 covariance for fixed linear functions under compact robust
+moments.** -/
+theorem linMap_olsHC2CovStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q]
+    (β : k → ℝ) (R : Matrix q k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        R * olsHetCovHC2Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)
+      atTop (fun _ => R * heteroAsymCov μ X e * Rᵀ) :=
+  linMap_olsHC2CovStar_tendstoInMeasure_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R hm.toFeasibleHCLeverageConditions
+
 /-- **Hansen Theorem 7.10, packaged HC3 covariance for fixed linear functions.** -/
 theorem linMap_olsHC3CovStar_tendstoInMeasure_of_feasibleHCLeverageConditions
     {μ : Measure Ω} [IsProbabilityMeasure μ]
@@ -3452,6 +3566,23 @@ theorem linMap_olsHC3CovStar_tendstoInMeasure_of_feasibleHCLeverageConditions
     (μ := μ) (X := X) (e := e) (y := y) h.toSampleHC0Assumption76 β R
     hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
     hc.crossWeight_bounded hc.quadWeight_bounded hc.maxLeverage_tendsto
+
+/-- **Hansen Theorem 7.10, HC3 covariance for fixed linear functions under compact robust
+moments.** -/
+theorem linMap_olsHC3CovStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q]
+    (β : k → ℝ) (R : Matrix q k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        R * olsHetCovHC3Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)
+      atTop (fun _ => R * heteroAsymCov μ X e * Rᵀ) :=
+  linMap_olsHC3CovStar_tendstoInMeasure_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R hm.toFeasibleHCLeverageConditions
 
 /-- **Hansen §7.11, packaged HC2 standard errors for fixed linear functions.** -/
 theorem olsHC2LinSEStar_tendstoInMeasure_of_feasibleHCLeverageConditions
