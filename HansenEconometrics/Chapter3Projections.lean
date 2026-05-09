@@ -363,6 +363,37 @@ theorem predictionInfluence_eq_abs_leverage_mul_leaveOneOutResidual
   unfold predictionInfluence
   rw [fitted_sub_leaveOneOutPrediction_eq_leverage_mul_residual]
 
+/-- Hansen Section 3.21: maximum absolute change in leave-one-out predicted
+values across observations. -/
+noncomputable def maxPredictionInfluence
+    (X : Matrix n k ℝ) (y : n → ℝ) [Invertible (Xᵀ * X)]
+    (hloo : ∀ i : n, Invertible (leaveOneOutGram X i)) [Nonempty n] : ℝ :=
+  Finset.univ.sup' Finset.univ_nonempty (fun i : n => by
+    letI := hloo i
+    exact predictionInfluence X y i)
+
+/-- Hansen Section 3.21: the same maximum influence diagnostic written as
+`max_i |hᵢᵢ ẽᵢ|`. -/
+noncomputable def maxLeveragePredictionErrorInfluence
+    (X : Matrix n k ℝ) (y : n → ℝ) [Invertible (Xᵀ * X)]
+    (hloo : ∀ i : n, Invertible (leaveOneOutGram X i)) [Nonempty n] : ℝ :=
+  Finset.univ.sup' Finset.univ_nonempty (fun i : n => by
+    letI := hloo i
+    exact |leverageValue X i * leaveOneOutResidual X y i|)
+
+/-- Hansen Section 3.21: the maximum prediction-change diagnostic equals
+`max_i |hᵢᵢ ẽᵢ|`. -/
+theorem maxPredictionInfluence_eq_maxLeveragePredictionErrorInfluence
+    (X : Matrix n k ℝ) (y : n → ℝ) [Invertible (Xᵀ * X)]
+    (hloo : ∀ i : n, Invertible (leaveOneOutGram X i)) [Nonempty n] :
+    maxPredictionInfluence X y hloo = maxLeveragePredictionErrorInfluence X y hloo := by
+  unfold maxPredictionInfluence maxLeveragePredictionErrorInfluence
+  apply Finset.sup'_congr
+  · rfl
+  · intro i _
+    letI := hloo i
+    exact predictionInfluence_eq_abs_leverage_mul_leaveOneOutResidual X y i
+
 /-- Hansen Exercise 3.7: the annihilator kills the hat matrix on the left. -/
 theorem annihilator_mul_hatMatrix
     (X : Matrix n k ℝ) [DecidableEq n] [Invertible (Xᵀ * X)] :
