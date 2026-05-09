@@ -115,6 +115,90 @@ structure FeasibleHCWeightWLLNConditions (μ : Measure Ω) [IsProbabilityMeasure
       (fun ω => X i ω l * X i ω m * X i ω a * X i ω b)
       (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ μ
 
+/-- Joint-observation sufficient condition package for the scalar WLLN layer
+used in feasible HC covariance proofs.
+
+The independence and identical-distribution assumptions are stated once for the
+joint observations `(Xᵢ, eᵢ)`. The integrability fields are still scalar because
+they are the exact summands consumed by the existing WLLN constructors. -/
+structure FeasibleHCJointWLLNConditions (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (X : ℕ → Ω → (k → ℝ)) (e y : ℕ → Ω → ℝ) (β : k → ℝ) where
+  /-- Linear-model decomposition of the observed outcome. -/
+  model : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω
+  /-- Component measurability of the regressor sequence. -/
+  x_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (X i) μ
+  /-- Component measurability of the structural-error sequence. -/
+  e_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (e i) μ
+  /-- Pairwise independence of the joint observations `(Xᵢ, eᵢ)`. -/
+  joint_pairwise_indep : Pairwise ((· ⟂ᵢ[μ] ·) on
+    (fun i ω => (X i ω, e i ω)))
+  /-- Identical distribution of the joint observations against the baseline row. -/
+  joint_identDistrib : ∀ i,
+    IdentDistrib (fun ω => (X i ω, e i ω))
+      (fun ω => (X 0 ω, e 0 ω)) μ μ
+  /-- Integrability of each baseline third-moment scalar summand. -/
+  crossWeight_integrable : ∀ a b l : k, Integrable
+    (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ
+  /-- Integrability of each baseline fourth-moment scalar summand. -/
+  quadWeight_integrable : ∀ a b l m : k, Integrable
+    (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ
+
+omit [Fintype k] [DecidableEq k] in
+private lemma measurable_hcCrossWeightScalar (a b l : k) :
+    Measurable (fun z : (k → ℝ) × ℝ =>
+      2 * z.2 * z.1 l * z.1 a * z.1 b) := by
+  exact (((measurable_const.mul measurable_snd).mul
+    ((measurable_pi_apply l).comp measurable_fst)).mul
+    ((measurable_pi_apply a).comp measurable_fst)).mul
+    ((measurable_pi_apply b).comp measurable_fst)
+
+omit [Fintype k] [DecidableEq k] in
+private lemma measurable_hcQuadWeightScalar (a b l m : k) :
+    Measurable (fun z : (k → ℝ) × ℝ =>
+      z.1 l * z.1 m * z.1 a * z.1 b) := by
+  exact ((((measurable_pi_apply l).comp measurable_fst).mul
+    ((measurable_pi_apply m).comp measurable_fst)).mul
+    ((measurable_pi_apply a).comp measurable_fst)).mul
+    ((measurable_pi_apply b).comp measurable_fst)
+
+namespace FeasibleHCJointWLLNConditions
+
+omit [DecidableEq k] in
+/-- Joint-observation independence and identical distribution imply the
+scalar-WLLN condition package for feasible HC third/fourth weights. -/
+theorem toFeasibleHCWeightWLLNConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hj : FeasibleHCJointWLLNConditions μ X e y β) :
+    FeasibleHCWeightWLLNConditions μ X e y β where
+  model := hj.model
+  x_aestronglyMeasurable := hj.x_aestronglyMeasurable
+  e_aestronglyMeasurable := hj.e_aestronglyMeasurable
+  crossWeight_integrable := hj.crossWeight_integrable
+  crossWeight_pairwise_indep := by
+    intro a b l i j hij
+    exact IndepFun.comp (hj.joint_pairwise_indep hij)
+      (measurable_hcCrossWeightScalar a b l)
+      (measurable_hcCrossWeightScalar a b l)
+  crossWeight_identDistrib := by
+    intro a b l i
+    have h := (hj.joint_identDistrib i).comp
+      (measurable_hcCrossWeightScalar a b l)
+    simpa [Function.comp] using h
+  quadWeight_integrable := hj.quadWeight_integrable
+  quadWeight_pairwise_indep := by
+    intro a b l m i j hij
+    exact IndepFun.comp (hj.joint_pairwise_indep hij)
+      (measurable_hcQuadWeightScalar a b l m)
+      (measurable_hcQuadWeightScalar a b l m)
+  quadWeight_identDistrib := by
+    intro a b l m i
+    have h := (hj.joint_identDistrib i).comp
+      (measurable_hcQuadWeightScalar a b l m)
+    simpa [Function.comp] using h
+
+end FeasibleHCJointWLLNConditions
+
 namespace FeasibleHCRemainderConditions
 
 omit [Fintype k] [DecidableEq k] in
@@ -252,6 +336,20 @@ theorem toFeasibleHCRemainderConditions
     hw.quadWeight_integrable hw.quadWeight_pairwise_indep hw.quadWeight_identDistrib
 
 end FeasibleHCWeightWLLNConditions
+
+namespace FeasibleHCJointWLLNConditions
+
+omit [DecidableEq k] in
+/-- Joint-observation conditions directly discharge the feasible HC0/HC1
+bounded-weight remainder package. -/
+theorem toFeasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hj : FeasibleHCJointWLLNConditions μ X e y β) :
+    FeasibleHCRemainderConditions μ X e y β :=
+  hj.toFeasibleHCWeightWLLNConditions.toFeasibleHCRemainderConditions
+
+end FeasibleHCJointWLLNConditions
 
 namespace FeasibleHCLeverageConditions
 
@@ -441,6 +539,62 @@ theorem toFeasibleHCLeverageConditions_robust_identDistrib_memLp_rowNorm_sq
     h hw.toFeasibleHCRemainderConditions hRowMem hRowIdent
 
 end FeasibleHCWeightWLLNConditions
+
+namespace FeasibleHCJointWLLNConditions
+
+/-- Build the HC2/HC3 feasible-condition package from joint-observation WLLN
+conditions plus the squared-row uniform-integrability max-leverage discharge. -/
+theorem toFeasibleHCLeverageConditions_uniformIntegrable_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hj : FeasibleHCJointWLLNConditions μ X e y β)
+    (h : SampleMomentAssumption71 μ X e)
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  hj.toFeasibleHCWeightWLLNConditions
+    |>.toFeasibleHCLeverageConditions_uniformIntegrable_rowNorm_sq h hUI
+
+/-- Build the HC2/HC3 feasible-condition package from joint-observation WLLN
+conditions plus the iid finite-squared-row-moment max-leverage discharge. -/
+theorem toFeasibleHCLeverageConditions_identDistrib_memLp_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hj : FeasibleHCJointWLLNConditions μ X e y β)
+    (h : SampleMomentAssumption71 μ X e)
+    (hRowMem : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ)
+    (hRowIdent : ∀ i,
+      IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  hj.toFeasibleHCWeightWLLNConditions
+    |>.toFeasibleHCLeverageConditions_identDistrib_memLp_rowNorm_sq h hRowMem hRowIdent
+
+/-- Robust-covariance-package version of
+`toFeasibleHCLeverageConditions_uniformIntegrable_rowNorm_sq`. -/
+theorem toFeasibleHCLeverageConditions_robust_uniformIntegrable_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hj : FeasibleHCJointWLLNConditions μ X e y β)
+    (h : RobustCovarianceConsistencyConditions μ X e)
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  hj.toFeasibleHCWeightWLLNConditions
+    |>.toFeasibleHCLeverageConditions_robust_uniformIntegrable_rowNorm_sq h hUI
+
+/-- Robust-covariance-package version of
+`toFeasibleHCLeverageConditions_identDistrib_memLp_rowNorm_sq`. -/
+theorem toFeasibleHCLeverageConditions_robust_identDistrib_memLp_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hj : FeasibleHCJointWLLNConditions μ X e y β)
+    (h : RobustCovarianceConsistencyConditions μ X e)
+    (hRowMem : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ)
+    (hRowIdent : ∀ i,
+      IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  hj.toFeasibleHCWeightWLLNConditions
+    |>.toFeasibleHCLeverageConditions_robust_identDistrib_memLp_rowNorm_sq h hRowMem hRowIdent
+
+end FeasibleHCJointWLLNConditions
 
 omit [Fintype k] [DecidableEq k] in
 /-- The ideal HC0 score covariance average of stacked samples is the range-indexed
