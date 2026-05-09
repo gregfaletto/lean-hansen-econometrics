@@ -240,6 +240,28 @@ noncomputable def covVec (μ : Measure Ω) (X : Ω → k → ℝ) (Y : Ω → �
 noncomputable def covMat (μ : Measure Ω) (X : Ω → k → ℝ) : Matrix k k ℝ :=
   fun i j => cov[fun ω => X ω i, fun ω => X ω j; μ]
 
+/-- Identically distributed finite-dimensional vectors have matching coordinate covariances. -/
+theorem identDistrib_covariance_apply_eq
+    {Ω' k : Type*} [MeasurableSpace Ω']
+    {ν : Measure Ω'} {X : Ω → k → ℝ} {Y : Ω' → k → ℝ}
+    (h : IdentDistrib X Y μ ν) (a b : k) :
+    cov[fun ω => X ω a, fun ω => X ω b; μ] =
+      cov[fun ω => Y ω a, fun ω => Y ω b; ν] := by
+  have ha : μ[fun ω => X ω a] = ν[fun ω => Y ω a] := by
+    exact (h.comp (by fun_prop : Measurable fun v : k → ℝ => v a)).integral_eq
+  have hb : μ[fun ω => X ω b] = ν[fun ω => Y ω b] := by
+    exact (h.comp (by fun_prop : Measurable fun v : k → ℝ => v b)).integral_eq
+  have hcenter : IdentDistrib
+      (fun ω => (X ω a - μ[fun ω => X ω a]) * (X ω b - μ[fun ω => X ω b]))
+      (fun ω => (Y ω a - ν[fun ω => Y ω a]) * (Y ω b - ν[fun ω => Y ω b])) μ ν := by
+    have hpair := h.comp (by fun_prop : Measurable fun v : k → ℝ => (v a, v b))
+    convert hpair.comp (by
+      fun_prop : Measurable fun p : ℝ × ℝ =>
+        (p.1 - μ[fun ω => X ω a]) * (p.2 - μ[fun ω => X ω b])) using 1
+    ext ω
+    simp [ha, hb]
+  simpa [ProbabilityTheory.covariance] using hcenter.integral_eq
+
 /-- Integrating a linear form equals applying that linear form to the vector mean. -/
 theorem integral_dotProduct_eq_meanVec_dotProduct
     (X : Ω → k → ℝ) (b : k → ℝ)

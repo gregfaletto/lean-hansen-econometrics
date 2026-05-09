@@ -404,6 +404,23 @@ theorem iidSampleMean_covMat_eq_inv_card_smul
           dsimp [c, covMat]
           field_simp [hcard]
 
+/-- IID-facing wrapper for `iidSampleMean_covMat_eq_inv_card_smul`.
+
+Vector identical distribution supplies the common one-draw covariance matrix,
+while the independence assumption is kept at the coordinate level needed by the
+covariance calculation. -/
+theorem iidSampleMean_covMat_eq_inv_card_smul_of_identDistrib
+    [IsProbabilityMeasure μ] [Fintype ι] [Nonempty ι]
+    {Z : ι → Ω → k → ℝ} (j : ι)
+    (hZ : ∀ i a, MemLp (fun ω => Z i ω a) 2 μ)
+    (hindep : ∀ a b, Pairwise (fun i l =>
+      (fun ω => Z i ω a) ⟂ᵢ[μ] (fun ω => Z l ω b)))
+    (hident : ∀ i, IdentDistrib (Z i) (Z j) μ μ) :
+    covMat μ (fun ω a => (Fintype.card ι : ℝ)⁻¹ * ∑ i, Z i ω a) =
+      (Fintype.card ι : ℝ)⁻¹ • covMat μ (Z j) :=
+  iidSampleMean_covMat_eq_inv_card_smul (μ := μ) (j := j) hZ hindep
+    (fun i a b => identDistrib_covariance_apply_eq (hident i) a b)
+
 end BestUnbiased
 
 section ArrayCLT
