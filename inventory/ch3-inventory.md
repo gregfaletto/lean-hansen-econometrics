@@ -41,8 +41,8 @@ and the `M P = P M = 0` Exercise 3.7 identities.
 14. prove `⟪Ŷ, ê⟫ = 0`
 15. derive finite-sample Pythagorean / sum-of-squares decomposition
 
-Status: vector decomposition, fitted/residual orthogonality, and dot-product Pythagorean identity landed.
-The centered analysis-of-variance formula and `R²` identities are still pending.
+Status: vector decomposition, fitted/residual orthogonality, dot-product Pythagorean identity,
+centered analysis-of-variance, and `R²` identity landed.
 
 ### Layer 4: partitioned regression / FWL
 16. partition regressors as `[X₁ X₂]`
@@ -56,8 +56,7 @@ normal equations, Theorem 3.4 partitioned coefficient formulae, and the sequenti
 Theorem 3.5 coefficient and residual equivalence now landed.
 
 ## Immediate target
-Backfill the centered analysis-of-variance formula and `R²` identities, then continue forward to
-leverage and leave-one-out results.
+Continue forward to leverage and leave-one-out results.
 
 ## Source text
 - `textbook/ch03/ch3_excerpt.txt` is a text extract of `chapters/03-the-algebra-of-least-squares.pdf`,
@@ -111,6 +110,9 @@ Conventions:
 | Equation (3.23) residual representation | $\hat{e} = M Y$ | [residual_eq_annihilator_mul_y](../../HansenEconometrics/Chapter3Projections.lean#L240)<br><code>residual X y = annihilatorMatrix X *ᵥ y</code> |
 | Section 3.14 fitted values and residuals are orthogonal | $\hat{Y}' \hat{e} = 0$ | [fitted_dot_residual](../../HansenEconometrics/Chapter3Projections.lean#L247)<br><code>fitted X y ⬝ᵥ residual X y = 0</code> |
 | Section 3.14 Pythagorean decomposition | $Y'Y = \hat{Y}'\hat{Y} + \hat{e}'\hat{e}$ | [fitted_residual_pythagorean](../../HansenEconometrics/Chapter3Projections.lean#L257)<br><code>y ⬝ᵥ y = fitted X y ⬝ᵥ fitted X y + residual X y ⬝ᵥ residual X y</code> |
+| Section 3.14 centered fitted/residual orthogonality | $(\hat{Y}-\bar{Y}\iota)'\hat{e}=0$ when `X` contains an intercept | [centered_fitted_dot_residual](../../HansenEconometrics/Chapter3Projections.lean#L304)<br><code>centeredAtSampleMean y (fitted X y) ⬝ᵥ residual X y = 0</code> |
+| Section 3.14 analysis-of-variance formula | $\sum_i(Y_i-\bar{Y})^2=\sum_i(\hat{Y}_i-\bar{Y})^2+\sum_i\hat{e}_i^2$ | [centered_anova_decomposition](../../HansenEconometrics/Chapter3Projections.lean#L330)<br><code>totalSumSquares y = explainedSumSquares X y + residualSumSquares X y</code> |
+| Section 3.14 coefficient of determination | $R^2=\mathrm{ESS}/\mathrm{TSS}=1-\mathrm{RSS}/\mathrm{TSS}$ | [rSquared](../../HansenEconometrics/Chapter3Projections.lean#L291)<br>[rSquared_eq_one_sub_residualSumSquares_div_totalSumSquares](../../HansenEconometrics/Chapter3Projections.lean#L341)<br><code>rSquared X y = 1 - residualSumSquares X y / totalSumSquares y</code> |
 | Theorem 3.4 partitioned coefficient formulae | $\hat{\beta}_1=(X_1' M_2 X_1)^{-1} X_1' M_2Y$, $\hat{\beta}_2=(X_2' M_1 X_2)^{-1} X_2' M_1Y$ | [partitionedLeftBetaFormula](../../HansenEconometrics/Chapter3FWL.lean#L83)<br>[partitionedRightBetaFormula](../../HansenEconometrics/Chapter3FWL.lean#L75)<br>[fromColsBeta_eq_partitionedBetaFormulas](../../HansenEconometrics/Chapter3FWL.lean#L328)<br><code>fromColsLeftBeta X₁ X₂ y = partitionedLeftBetaFormula X₁ X₂ y ∧ fromColsRightBeta X₁ X₂ y = partitionedRightBetaFormula X₁ X₂ y</code> |
 | Theorem 3.5 coefficient equivalence | $\hat{\beta}_2 = (X_2' M_1 X_2)^{-1} X_2' M_1 Y$ | [fromColsRightBeta_eq_fwlBeta](../../HansenEconometrics/Chapter3FWL.lean#L209)<br><code>fromColsRightBeta X₁ X₂ y = fwlBeta X₁ X₂ y</code> |
 | Theorem 3.5 residual equivalence | $\hat{e}_{\text{full}} = M_{M_1 X_2} M_1 Y$ | [fwl_residual_eq_full_residual](../../HansenEconometrics/Chapter3FWL.lean#L342)<br><code>residual (residualizedRegressors X₁ X₂) (annihilatorMatrix X₁ *ᵥ y) = residual (Matrix.fromCols X₁ X₂) y</code> |

@@ -265,4 +265,92 @@ theorem fitted_residual_pythagorean
       rw [dotProduct_comm (residual X y) (fitted X y), fitted_dot_residual]
       simp
 
+/-- Sample mean of a finite real vector. -/
+noncomputable def sampleMean (y : n → ℝ) : ℝ :=
+  (Fintype.card n : ℝ)⁻¹ * ∑ i, y i
+
+/-- Center a vector around the sample mean of a reference vector. -/
+noncomputable def centeredAtSampleMean (y z : n → ℝ) : n → ℝ :=
+  z - sampleMean y • (1 : n → ℝ)
+
+/-- Hansen Section 3.14: total sum of squares around the sample mean. -/
+noncomputable def totalSumSquares (y : n → ℝ) : ℝ :=
+  centeredAtSampleMean y y ⬝ᵥ centeredAtSampleMean y y
+
+/-- Hansen Section 3.14: explained sum of squares around the sample mean of `y`. -/
+noncomputable def explainedSumSquares
+    (X : Matrix n k ℝ) (y : n → ℝ) [Invertible (Xᵀ * X)] : ℝ :=
+  centeredAtSampleMean y (fitted X y) ⬝ᵥ centeredAtSampleMean y (fitted X y)
+
+/-- Hansen Section 3.14: residual sum of squares. -/
+noncomputable def residualSumSquares
+    (X : Matrix n k ℝ) (y : n → ℝ) [Invertible (Xᵀ * X)] : ℝ :=
+  residual X y ⬝ᵥ residual X y
+
+/-- Hansen Section 3.14: coefficient of determination. -/
+noncomputable def rSquared
+    (X : Matrix n k ℝ) (y : n → ℝ) [Invertible (Xᵀ * X)] : ℝ :=
+  explainedSumSquares X y / totalSumSquares y
+
+/-- Pythagorean identity for any orthogonal vector decomposition. -/
+theorem dotProduct_add_self_eq_of_orthogonal
+    (u v : n → ℝ) (huv : u ⬝ᵥ v = 0) :
+    (u + v) ⬝ᵥ (u + v) = u ⬝ᵥ u + v ⬝ᵥ v := by
+  rw [add_dotProduct, dotProduct_add, dotProduct_add]
+  rw [huv, dotProduct_comm v u, huv]
+  simp
+
+/-- Hansen Section 3.14: with an intercept, centered fitted values are orthogonal to residuals. -/
+theorem centered_fitted_dot_residual
+    (X : Matrix n k ℝ) (y : n → ℝ) [Invertible (Xᵀ * X)]
+    {c : k → ℝ} (hc : X *ᵥ c = 1) :
+    centeredAtSampleMean y (fitted X y) ⬝ᵥ residual X y = 0 := by
+  have hsum := residual_sum_zero_of_one_mem_colspan X y hc
+  have hone : (1 : n → ℝ) ⬝ᵥ residual X y = 0 := by
+    rw [dotProduct_comm, dotProduct_one, hsum]
+  have hconst : (sampleMean y • (1 : n → ℝ)) ⬝ᵥ residual X y = 0 := by
+    rw [smul_dotProduct, hone, smul_zero]
+  unfold centeredAtSampleMean
+  rw [sub_dotProduct, fitted_dot_residual, hconst]
+  simp
+
+/-- Centering the fitted-plus-residual decomposition around the sample mean of `y`. -/
+theorem centeredAtSampleMean_eq_centered_fitted_add_residual
+    (X : Matrix n k ℝ) (y : n → ℝ) [Invertible (Xᵀ * X)] :
+    centeredAtSampleMean y y = centeredAtSampleMean y (fitted X y) + residual X y := by
+  ext i
+  have hi := congrFun (fitted_add_residual X y) i
+  unfold centeredAtSampleMean
+  simp only [Pi.sub_apply, Pi.add_apply, Pi.smul_apply, Pi.one_apply, smul_eq_mul]
+  rw [← hi]
+  simp only [Pi.add_apply]
+  ring_nf
+
+/-- Hansen Section 3.14: centered analysis-of-variance decomposition for OLS with an intercept. -/
+theorem centered_anova_decomposition
+    (X : Matrix n k ℝ) (y : n → ℝ) [Invertible (Xᵀ * X)]
+    {c : k → ℝ} (hc : X *ᵥ c = 1) :
+    totalSumSquares y = explainedSumSquares X y + residualSumSquares X y := by
+  unfold totalSumSquares explainedSumSquares residualSumSquares
+  rw [centeredAtSampleMean_eq_centered_fitted_add_residual X y]
+  exact dotProduct_add_self_eq_of_orthogonal
+    (centeredAtSampleMean y (fitted X y)) (residual X y)
+    (centered_fitted_dot_residual X y hc)
+
+/-- Hansen Section 3.14: `R²` can be written as one minus the residual share of TSS. -/
+theorem rSquared_eq_one_sub_residualSumSquares_div_totalSumSquares
+    (X : Matrix n k ℝ) (y : n → ℝ) [Invertible (Xᵀ * X)]
+    {c : k → ℝ} (hc : X *ᵥ c = 1)
+    (hTSS : totalSumSquares y ≠ 0) :
+    rSquared X y = 1 - residualSumSquares X y / totalSumSquares y := by
+  unfold rSquared
+  have hdecomp := centered_anova_decomposition X y hc
+  have hdiv :
+      explainedSumSquares X y / totalSumSquares y =
+        (totalSumSquares y - residualSumSquares X y) / totalSumSquares y := by
+    rw [hdecomp]
+    ring
+  rw [hdiv]
+  field_simp [hTSS]
+
 end HansenEconometrics
