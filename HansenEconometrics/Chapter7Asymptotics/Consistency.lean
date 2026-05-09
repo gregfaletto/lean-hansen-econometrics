@@ -1211,6 +1211,35 @@ theorem olsBetaOrZero_stack_tendstoInMeasure_beta
     olsBetaStar_stack_tendstoInMeasure_beta
       (μ := μ) (X := X) (e := e) (y := y) β h hmodel
 
+/-- **Theorem 7.1 for literal ordinary OLS under sample-Gram invertibility.**
+
+When every realized stacked sample Gram is invertible, the textbook `olsBeta`
+estimator is available pointwise and agrees with `olsBetaOrZero`, so the
+ordinary-wrapper consistency theorem transfers to the dependent ordinary-OLS
+surface. -/
+theorem olsBeta_stack_tendstoInMeasure_beta_of_invertible
+    {μ : Measure Ω} [IsFiniteMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ} (β : k → ℝ)
+    (hInv : ∀ n ω,
+      Invertible ((stackRegressors X n ω)ᵀ * stackRegressors X n ω))
+    (h : LeastSquaresConsistencyConditions μ X e)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        letI : Invertible ((stackRegressors X n ω)ᵀ * stackRegressors X n ω) :=
+          hInv n ω
+        olsBeta (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => β) := by
+  refine TendstoInMeasure.congr' ?_ EventuallyEq.rfl
+    (olsBetaOrZero_stack_tendstoInMeasure_beta
+      (μ := μ) (X := X) (e := e) (y := y) β h hmodel)
+  filter_upwards with n
+  exact ae_of_all μ (fun ω => by
+    letI : Invertible ((stackRegressors X n ω)ᵀ * stackRegressors X n ω) :=
+      hInv n ω
+    exact olsBetaOrZero_eq_olsBeta
+      (stackRegressors X n ω) (stackOutcomes y n ω))
+
 /-- AEMeasurability of the ordinary-on-nonsingular OLS wrapper. -/
 theorem olsBetaOrZero_stack_aestronglyMeasurable
     {μ : Measure Ω} [IsFiniteMeasure μ]

@@ -619,6 +619,43 @@ theorem olsBetaOrZero_vector_tendstoInDistribution_multivariateGaussian
     (scoreVector_sampleCrossMoment_tendstoInDistribution_multivariateGaussian
       (μ := μ) (X := X) (e := e) h)
 
+/-- **Hansen Theorem 7.3 for literal ordinary OLS under sample-Gram invertibility.**
+
+When every realized stacked sample Gram is invertible, the textbook `olsBeta`
+estimator is available pointwise and agrees with `olsBetaOrZero`, so the
+ordinary-wrapper vector asymptotic-normality theorem transfers to the dependent
+ordinary-OLS surface. -/
+theorem olsBeta_vector_tendstoInDistribution_multivariateGaussian_of_invertible
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : ScoreCLTConditions μ X e) (β : k → ℝ)
+    (hInv : ∀ n ω,
+      Invertible ((stackRegressors X n ω)ᵀ * stackRegressors X n ω))
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        Real.sqrt (n : ℝ) •
+          ((letI : Invertible
+              ((stackRegressors X n ω)ᵀ * stackRegressors X n ω) := hInv n ω
+            olsBeta (stackRegressors X n ω) (stackOutcomes y n ω)) - β))
+      atTop
+      (fun z : EuclideanSpace ℝ k => (popGram μ X)⁻¹ *ᵥ z.ofLp)
+      (fun _ => μ)
+      (multivariateGaussian 0 (scoreCovMat μ X e)) := by
+  have hOrZero := olsBetaOrZero_vector_tendstoInDistribution_multivariateGaussian
+    (μ := μ) (X := X) (e := e) (y := y) h β hmodel
+  refine TendstoInDistribution.congr ?_ EventuallyEq.rfl hOrZero
+  intro n
+  exact ae_of_all μ (fun ω => by
+    letI : Invertible ((stackRegressors X n ω)ᵀ * stackRegressors X n ω) :=
+      hInv n ω
+    change
+      Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β) =
+        Real.sqrt (n : ℝ) •
+          (olsBeta (stackRegressors X n ω) (stackOutcomes y n ω) - β)
+    rw [olsBetaOrZero_eq_olsBeta])
+
 /-- **Hansen Theorem 7.16/7.3 bridge, ordinary-wrapper estimator.**
 
 The ordinary-on-nonsingular wrapper has the same bounded scaled coefficient
