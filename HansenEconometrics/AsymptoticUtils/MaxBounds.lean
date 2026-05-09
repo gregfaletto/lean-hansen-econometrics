@@ -43,6 +43,32 @@ theorem uniformIntegrable_tail_eLpNorm_one
     (UniformIntegrable.spec (μ := μ) (f := Z)
       (p := (1 : ℝ≥0∞)) (by simp) (by simp) hZ hε)
 
+/-- Tail `L¹` control gives Mathlib's probability-theory uniform integrability.
+
+This is the converse of `uniformIntegrable_tail_eLpNorm_one`, stated as a
+chapter-facing Definition 6.4 bridge. -/
+theorem uniformIntegrable_one_of_tail_eLpNorm
+    [IsFiniteMeasure μ] {Z : ℕ → Ω → ℝ}
+    (hZ : ∀ i, AEStronglyMeasurable (Z i) μ)
+    (hTail : ∀ ε : ℝ, 0 < ε → ∃ C : ℝ≥0,
+      ∀ i : ℕ,
+        eLpNorm ({ω | C ≤ ‖Z i ω‖₊}.indicator (Z i)) 1 μ ≤ ENNReal.ofReal ε) :
+    UniformIntegrable Z 1 μ := by
+  exact uniformIntegrable_of (μ := μ) (f := Z) (p := (1 : ℝ≥0∞))
+    (by simp) (by simp) hZ hTail
+
+/-- Two-sided tail characterization of `L¹` uniform integrability for real
+sequences, with measurability supplied explicitly for the converse direction. -/
+theorem uniformIntegrable_one_iff_tail_eLpNorm
+    [IsFiniteMeasure μ] {Z : ℕ → Ω → ℝ}
+    (hZ : ∀ i, AEStronglyMeasurable (Z i) μ) :
+    UniformIntegrable Z 1 μ ↔
+      ∀ ε : ℝ, 0 < ε → ∃ C : ℝ≥0,
+        ∀ i : ℕ,
+          eLpNorm ({ω | C ≤ ‖Z i ω‖₊}.indicator (Z i)) 1 μ ≤ ENNReal.ofReal ε :=
+  ⟨fun hUI ε hε => uniformIntegrable_tail_eLpNorm_one (ε := ε) hUI hε,
+    fun hTail => uniformIntegrable_one_of_tail_eLpNorm hZ hTail⟩
+
 omit [MeasurableSpace Ω] in
 private theorem max_norm_scaled_event_subset_tailUnion
     {Z : ℕ → Ω → ℝ} {ε : ℝ} (hε : 0 < ε) {C : ℝ≥0} {n : ℕ}
