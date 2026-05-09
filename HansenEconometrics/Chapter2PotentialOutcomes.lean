@@ -1,3 +1,4 @@
+import Mathlib.Probability.Independence.Conditional
 import HansenEconometrics.Chapter2CondExp
 
 /-!
@@ -82,6 +83,100 @@ def TreatmentMeanIndependentOn
     (μ : Measure Ω) (Y0 Y1 : Ω → ℝ) (D : Ω → Bool) (X : Ω → β) : Prop :=
   condExpOn μ Y0 (fun ω => (D ω, X ω)) =ᵐ[μ] condExpOn μ Y0 X ∧
     condExpOn μ Y1 (fun ω => (D ω, X ω)) =ᵐ[μ] condExpOn μ Y1 X
+
+/-- Hansen Definition 2.9, variable-facing conditional independence assumption.
+
+This package records the conditional independence of treatment and each potential outcome after
+conditioning on covariates, together with the measurability and integrability hypotheses needed to
+turn that conditional-independence statement into the mean-independence bridge used by the CATE
+theorems below. -/
+structure PotentialOutcomeCIAOn
+    [StandardBorelSpace Ω] (μ : Measure Ω) [IsFiniteMeasure μ]
+    (Y0 Y1 : Ω → ℝ) (D : Ω → Bool) (X : Ω → β) : Prop where
+  /-- Covariates are measurable. -/
+  x_measurable : Measurable X
+  /-- Treatment is measurable. -/
+  d_measurable : Measurable D
+  /-- Untreated potential outcome is measurable. -/
+  y0_measurable : Measurable Y0
+  /-- Treated potential outcome is measurable. -/
+  y1_measurable : Measurable Y1
+  /-- Untreated potential outcome is integrable. -/
+  y0_integrable : Integrable Y0 μ
+  /-- Treated potential outcome is integrable. -/
+  y1_integrable : Integrable Y1 μ
+  /-- Treatment and the untreated potential outcome are conditionally independent given `X`. -/
+  condIndep_y0 : D ⟂ᵢ[X, x_measurable; μ] Y0
+  /-- Treatment and the treated potential outcome are conditionally independent given `X`. -/
+  condIndep_y1 : D ⟂ᵢ[X, x_measurable; μ] Y1
+
+omit [MeasurableSpace Ω] in
+theorem conditioningSpace_pair_comm
+    {D : Ω → Bool} {X : Ω → β} :
+    conditioningSpace (fun ω => (D ω, X ω)) =
+      conditioningSpace (fun ω => (X ω, D ω)) := by
+  unfold conditioningSpace
+  change MeasurableSpace.comap (fun ω => (D ω, X ω))
+      ((inferInstance : MeasurableSpace Bool).prod (inferInstance : MeasurableSpace β)) =
+    MeasurableSpace.comap (fun ω => (X ω, D ω))
+      ((inferInstance : MeasurableSpace β).prod (inferInstance : MeasurableSpace Bool))
+  rw [MeasurableSpace.comap_prodMk, MeasurableSpace.comap_prodMk, sup_comm]
+
+private theorem condExpOn_covariate_treatment_eq_of_condIndep
+    [StandardBorelSpace Ω] [IsFiniteMeasure μ]
+    {Y : Ω → ℝ} {D : Ω → Bool} {X : Ω → β}
+    (hX : Measurable X) (hD : Measurable D) (hYmeas : Measurable Y)
+    (hYint : Integrable Y μ)
+    (hcond : D ⟂ᵢ[X, hX; μ] Y) :
+    condExpOn μ Y (fun ω => (X ω, D ω)) =ᵐ[μ] condExpOn μ Y X := by
+  have hpair : Measurable (fun ω => (X ω, D ω)) := hX.prod hD
+  have hkernel_map :
+      condDistrib Y (fun ω => (X ω, D ω)) μ =ᵐ[μ.map (fun ω => (X ω, D ω))]
+        (condDistrib Y X μ).prodMkRight Bool := by
+    exact (condIndepFun_iff_condDistrib_prod_ae_eq_prodMkRight
+      (f := Y) (g := D) (k := X) hYmeas hD hX).mp hcond
+  have hkernel :
+      ∀ᵐ ω ∂μ, condDistrib Y (fun ω => (X ω, D ω)) μ (X ω, D ω) =
+        (condDistrib Y X μ).prodMkRight Bool (X ω, D ω) :=
+    ae_of_ae_map hpair.aemeasurable hkernel_map
+  have hpair_ce :
+      condExpOn μ Y (fun ω => (X ω, D ω)) =ᵐ[μ]
+        fun ω => ∫ y, y ∂condDistrib Y (fun ω => (X ω, D ω)) μ (X ω, D ω) := by
+    simpa [condExpOn, conditioningSpace] using
+      (condExp_ae_eq_integral_condDistrib'
+        (X := fun ω => (X ω, D ω)) (Y := Y) (μ := μ) hpair hYint)
+  have hX_ce :
+      condExpOn μ Y X =ᵐ[μ]
+        fun ω => ∫ y, y ∂condDistrib Y X μ (X ω) := by
+    simpa [condExpOn, conditioningSpace] using
+      (condExp_ae_eq_integral_condDistrib'
+        (X := X) (Y := Y) (μ := μ) hX hYint)
+  have hintegral :
+      (fun ω => ∫ y, y ∂condDistrib Y (fun ω => (X ω, D ω)) μ (X ω, D ω)) =ᵐ[μ]
+        fun ω => ∫ y, y ∂condDistrib Y X μ (X ω) := by
+    filter_upwards [hkernel] with ω hω
+    rw [hω]
+    rfl
+  exact hpair_ce.trans (hintegral.trans hX_ce.symm)
+
+/-- Conditional independence of treatment and each potential outcome given `X` implies the
+mean-independence bridge used by the variable-facing CATE theorems. -/
+theorem PotentialOutcomeCIAOn.toTreatmentMeanIndependentOn
+    [StandardBorelSpace Ω] [IsFiniteMeasure μ]
+    {Y0 Y1 : Ω → ℝ} {D : Ω → Bool} {X : Ω → β}
+    (hcia : PotentialOutcomeCIAOn μ Y0 Y1 D X) :
+    TreatmentMeanIndependentOn μ Y0 Y1 D X := by
+  constructor
+  · have hXD := condExpOn_covariate_treatment_eq_of_condIndep
+      (μ := μ) (Y := Y0) (D := D) (X := X)
+      hcia.x_measurable hcia.d_measurable hcia.y0_measurable hcia.y0_integrable
+      hcia.condIndep_y0
+    simpa [condExpOn, conditioningSpace_pair_comm] using hXD
+  · have hXD := condExpOn_covariate_treatment_eq_of_condIndep
+      (μ := μ) (Y := Y1) (D := D) (X := X)
+      hcia.x_measurable hcia.d_measurable hcia.y1_measurable hcia.y1_integrable
+      hcia.condIndep_y1
+    simpa [condExpOn, conditioningSpace_pair_comm] using hXD
 
 /-- The average treatment effect is the difference in the means of the two potential outcomes.
 Hansen writes this quantity as `ACE`. -/
@@ -179,6 +274,41 @@ theorem conditionalAverageTreatmentEffectOn_treatment_covariates_eq_of_meanIndep
         (μ := μ) hmean).trans <|
         (conditionalAverageTreatmentEffectOn_eq_conditionalPotentialOutcomeContrastOn
           (μ := μ) (X := X) hY1 hY0).symm
+
+/-- CIA-facing version of the variable-conditioned potential-outcome contrast theorem.
+Conditional independence of treatment and potential outcomes given covariates implies that adding
+treatment to the conditioning variables does not change the potential-outcome contrast. -/
+theorem conditionalPotentialOutcomeContrastOn_treatment_covariates_eq_of_CIA
+    [StandardBorelSpace Ω] [IsFiniteMeasure μ]
+    {Y0 Y1 : Ω → ℝ} {D : Ω → Bool} {X : Ω → β}
+    (hcia : PotentialOutcomeCIAOn μ Y0 Y1 D X) :
+    conditionalPotentialOutcomeContrastOn μ Y0 Y1 (fun ω => (D ω, X ω)) =ᵐ[μ]
+      conditionalPotentialOutcomeContrastOn μ Y0 Y1 X :=
+  conditionalPotentialOutcomeContrastOn_treatment_covariates_eq_of_meanIndependent
+    (μ := μ) hcia.toTreatmentMeanIndependentOn
+
+/-- CIA-facing version of Hansen Theorem 2.12 at the variable/a.e. layer. Under conditional
+independence of treatment and potential outcomes given covariates, the treatment-and-covariate
+potential-outcome contrast equals the conditional average treatment effect. -/
+theorem conditionalPotentialOutcomeContrastOn_treatment_covariates_eq_cate_of_CIA
+    [StandardBorelSpace Ω] [IsFiniteMeasure μ]
+    {Y0 Y1 : Ω → ℝ} {D : Ω → Bool} {X : Ω → β}
+    (hcia : PotentialOutcomeCIAOn μ Y0 Y1 D X) :
+    conditionalPotentialOutcomeContrastOn μ Y0 Y1 (fun ω => (D ω, X ω)) =ᵐ[μ]
+      conditionalAverageTreatmentEffectOn μ Y0 Y1 X :=
+  conditionalPotentialOutcomeContrastOn_treatment_covariates_eq_cate_of_meanIndependent
+    (μ := μ) hcia.toTreatmentMeanIndependentOn hcia.y1_integrable hcia.y0_integrable
+
+/-- Direct CIA-facing CATE bridge for Hansen Theorem 2.12: under conditional independence,
+conditioning the treatment effect on `(D, X)` gives the same CATE as conditioning on `X` alone. -/
+theorem conditionalAverageTreatmentEffectOn_treatment_covariates_eq_of_CIA
+    [StandardBorelSpace Ω] [IsFiniteMeasure μ]
+    {Y0 Y1 : Ω → ℝ} {D : Ω → Bool} {X : Ω → β}
+    (hcia : PotentialOutcomeCIAOn μ Y0 Y1 D X) :
+    conditionalAverageTreatmentEffectOn μ Y0 Y1 (fun ω => (D ω, X ω)) =ᵐ[μ]
+      conditionalAverageTreatmentEffectOn μ Y0 Y1 X :=
+  conditionalAverageTreatmentEffectOn_treatment_covariates_eq_of_meanIndependent
+    (μ := μ) hcia.toTreatmentMeanIndependentOn hcia.y1_integrable hcia.y0_integrable
 
 end Probability
 

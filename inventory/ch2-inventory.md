@@ -28,9 +28,9 @@ Current Lean coverage:
 - conditional variance / total variance package
 - best predictor theorem
 - population linear projection algebra through Theorems 2.9 and 2.10
-- initial potential-outcomes API for Section 2.30:
-  observed outcomes, individual/average/conditional treatment effects, and a mean-independence bridge
-  toward Theorem 2.12
+- potential-outcomes API for Section 2.30:
+  observed outcomes, individual/average/conditional treatment effects, a Mathlib `CondIndepFun` CIA
+  package, and variable-facing CATE bridges for Theorem 2.12
 
 Current strategy:
 - prove the strongest sigma-algebra or abstract statement first
@@ -38,8 +38,8 @@ Current strategy:
 - reuse Mathlib conditional-expectation and `L²` projection infrastructure where possible
 
 Next likely Chapter 2 targets:
-- strengthen the potential-outcomes layer from the mean-independence bridge to a full CIA theorem
-  using Mathlib conditional independence or regular conditional distributions
+- decide whether the pointwise density notation `ACE(x)` or a literal observed-regression derivative
+  `m(1,x)-m(0,x)` interface is worth adding on top of the current a.e. variable-facing CATE theorem
 - decide whether any remaining Chapter 2 results are worth formalizing before moving on
 
 ## Proof Architecture
@@ -99,7 +99,10 @@ Then prove:
 - **D2.6/D2.7** `ATE = E[Y(1)] - E[Y(0)]`
 - **D2.8** `CATE(X) = E[Y(1) | X] - E[Y(0) | X]`
 - `ATE = E[CATE(X)]` by the tower property
-- a mean-independence bridge toward **T2.12**:
+- a Mathlib conditional-independence package for **D2.9/CIA**:
+  if `D` is conditionally independent of each potential outcome given `X`, then the mean-independence
+  bridge follows by the conditional-distribution characterization
+- variable-facing **T2.12** bridges:
   if conditioning additionally on treatment does not change the potential-outcome conditional means,
   then the `(D, X)` potential-outcome contrast equals the CATE
 
@@ -278,12 +281,14 @@ Links:
 | $ACE = E[Y(1)-Y(0)]$ | <code>averageTreatmentEffect μ Y0 Y1</code> |
 | $ACE(X) = E[Y(1)-Y(0) \mid X]$ | <code>conditionalAverageTreatmentEffectOn μ Y0 Y1 X</code> |
 | CIA mean-independence consequence | <code>TreatmentMeanIndependentOn μ Y0 Y1 D X</code> |
+| Variable-facing CIA package | <code>PotentialOutcomeCIAOn μ Y0 Y1 D X</code> |
 
 Notes:
 - Hansen calls the population quantity the average causal effect, `ACE`. The Lean API uses the more
   common causal-inference name `averageTreatmentEffect`.
-- The current Lean layer is variable-facing and a.e.-based. It does not yet formalize the pointwise
-  density notation `ACE(x)` or the full CIA-to-mean-independence implication.
+- The current Lean layer is variable-facing and a.e.-based. It proves the CIA-to-mean-independence
+  implication through Mathlib's `CondIndepFun`/`condDistrib` layer, but it does not yet formalize the
+  pointwise density notation `ACE(x)`.
 
 ### T2.12 Conditional Average Causal Effects
 
@@ -296,11 +301,13 @@ Links:
 | $ACE = \int ACE(x) f(x)\,dx$ | <code>averageTreatmentEffect μ Y0 Y1 = ∫ ω, conditionalAverageTreatmentEffectOn μ Y0 Y1 X ω ∂μ</code> |
 | Under the mean-independence consequence of CIA, the treatment-and-covariate potential-outcome contrast equals CATE | <code>conditionalPotentialOutcomeContrastOn μ Y0 Y1 (fun ω => (D ω, X ω)) =ᵐ[μ] conditionalAverageTreatmentEffectOn μ Y0 Y1 X</code> |
 | Under the mean-independence consequence of CIA, CATE conditioned on treatment and covariates equals CATE conditioned on covariates | <code>conditionalAverageTreatmentEffectOn μ Y0 Y1 (fun ω => (D ω, X ω)) =ᵐ[μ] conditionalAverageTreatmentEffectOn μ Y0 Y1 X</code> |
+| Under CIA, the treatment-and-covariate potential-outcome contrast equals CATE | <code>conditionalPotentialOutcomeContrastOn_treatment_covariates_eq_cate_of_CIA</code> |
+| Under CIA, CATE conditioned on treatment and covariates equals CATE conditioned on covariates | <code>conditionalAverageTreatmentEffectOn_treatment_covariates_eq_of_CIA</code> |
 
 Notes:
-- This is a first formal bridge toward Theorem 2.12, not the final theorem as written in Hansen.
-- The final pointwise theorem should probably use Mathlib's `CondIndepFun`/`condDistrib` layer and
-  explicit standard-Borel, integrability, and overlap assumptions.
+- The theorem is still variable-facing and a.e.-based rather than a pointwise density statement.
+- The literal observed-regression derivative interface `m(1,x)-m(0,x)` remains a possible wrapper if a
+  downstream chapter needs that exact notation.
 
 ## Lean-only Bridge Results
 
@@ -340,3 +347,9 @@ Hansen's notation and the Lean formalization.
   mean-independence bridge from conditioning on `(D, X)` to the CATE.
 - [`conditionalAverageTreatmentEffectOn_treatment_covariates_eq_of_meanIndependent`](../HansenEconometrics/Chapter2PotentialOutcomes.lean):
   direct CATE bridge from conditioning on `(D, X)` to conditioning on `X`.
+- [`PotentialOutcomeCIAOn.toTreatmentMeanIndependentOn`](../HansenEconometrics/Chapter2PotentialOutcomes.lean):
+  discharges the mean-independence bridge from conditional independence of treatment and potential
+  outcomes given covariates, using Mathlib's conditional-distribution characterization.
+- [`conditionalPotentialOutcomeContrastOn_treatment_covariates_eq_cate_of_CIA`](../HansenEconometrics/Chapter2PotentialOutcomes.lean) and
+  [`conditionalAverageTreatmentEffectOn_treatment_covariates_eq_of_CIA`](../HansenEconometrics/Chapter2PotentialOutcomes.lean):
+  CIA-facing variable/a.e. CATE bridges for Hansen Theorem 2.12.
