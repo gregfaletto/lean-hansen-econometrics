@@ -2297,6 +2297,195 @@ theorem linMap_olsHC3WaldStatOrZero_tendstoInDistribution_chiSquared
       h β R hmodel hX_meas he_meas hCrossWeight hQuadWeight
       hMax hV_posDef
 
+/-- Packaged HC0 multivariate Wald statistic for totalized OLS.
+
+This is the 7.13 robust-Wald wrapper with the feasible HC residual-remainder
+conditions bundled in `FeasibleHCRemainderConditions`. -/
+theorem linMap_olsHC0WaldStatStar_tendstoInDistribution_chiSquared_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix (Fin r) k ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC0WaldStatStar_tendstoInDistribution_chiSquared
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    h β R hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hV_posDef
+
+set_option linter.style.longLine false in
+/-- Packaged HC0 multivariate Wald statistic for ordinary OLS. -/
+theorem linMap_olsHC0WaldStatOrZero_tendstoInDistribution_chiSquared_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix (Fin r) k ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC0WaldStatOrZero_tendstoInDistribution_chiSquared
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    h β R hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hV_posDef
+
+/-- Packaged HC1 multivariate Wald statistic for totalized OLS. -/
+theorem linMap_olsHC1WaldStatStar_tendstoInDistribution_chiSquared_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix (Fin r) k ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC1Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC1WaldStatStar_tendstoInDistribution_chiSquared
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    h β R hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hV_posDef
+
+set_option linter.style.longLine false in
+/-- Packaged HC1 multivariate Wald statistic for ordinary OLS. -/
+theorem linMap_olsHC1WaldStatOrZero_tendstoInDistribution_chiSquared_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix (Fin r) k ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC1Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC1WaldStatOrZero_tendstoInDistribution_chiSquared
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    h β R hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hV_posDef
+
+/-- Packaged HC2 multivariate Wald statistic for totalized OLS. -/
+theorem linMap_olsHC2WaldStatStar_tendstoInDistribution_chiSquared_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix (Fin r) k ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC2Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC2WaldStatStar_tendstoInDistribution_chiSquared
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    h β R hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hc.maxLeverage_tendsto hV_posDef
+
+/-- Packaged HC2 multivariate Wald statistic for ordinary OLS. -/
+theorem linMap_olsHC2WaldStatOrZero_tendstoInDistribution_chiSquared_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix (Fin r) k ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC2Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC2WaldStatOrZero_tendstoInDistribution_chiSquared
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    h β R hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hc.maxLeverage_tendsto hV_posDef
+
+/-- Packaged HC3 multivariate Wald statistic for totalized OLS. -/
+theorem linMap_olsHC3WaldStatStar_tendstoInDistribution_chiSquared_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix (Fin r) k ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC3Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC3WaldStatStar_tendstoInDistribution_chiSquared
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    h β R hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hc.maxLeverage_tendsto hV_posDef
+
+/-- Packaged HC3 multivariate Wald statistic for ordinary OLS. -/
+theorem linMap_olsHC3WaldStatOrZero_tendstoInDistribution_chiSquared_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix (Fin r) k ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC3Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC3WaldStatOrZero_tendstoInDistribution_chiSquared
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    h β R hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hc.maxLeverage_tendsto hV_posDef
+
 end Assumption72
 
 end HansenEconometrics
