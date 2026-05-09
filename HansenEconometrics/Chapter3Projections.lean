@@ -155,14 +155,58 @@ theorem rank_annihilatorMatrix_add
   exact_mod_cast show ((annihilatorMatrix X).rank : ℝ) + (Fintype.card k : ℝ)
     = (Fintype.card n : ℝ) by linarith
 
+/-- Hansen Section 3.12: the rank of the annihilator matrix is `n - k`. -/
+theorem rank_annihilatorMatrix
+    (X : Matrix n k ℝ) [DecidableEq n] [Invertible (Xᵀ * X)] :
+    (annihilatorMatrix X).rank = Fintype.card n - Fintype.card k :=
+  Nat.eq_sub_of_add_eq (rank_annihilatorMatrix_add X)
+
 /-- The rank of the hat matrix equals the number of regressors. -/
 theorem rank_hatMatrix
-    (X : Matrix n k ℝ) [DecidableEq n] [Invertible (Xᵀ * X)] :
+    (X : Matrix n k ℝ) [Invertible (Xᵀ * X)] :
     (hatMatrix X).rank = Fintype.card k := by
   have h := rank_eq_natCast_trace_of_isHermitian_idempotent
     (hatMatrix_isHermitian X) (hatMatrix_idempotent X)
   rw [hatMatrix_trace] at h
   exact_mod_cast h
+
+/-- Hansen Theorem 3.3.4: every eigenvalue of the hat matrix is `0` or `1`. -/
+theorem hatMatrix_eigenvalues_zero_or_one
+    (X : Matrix n k ℝ) [DecidableEq n] [Invertible (Xᵀ * X)] :
+    ∀ i : n,
+      (hatMatrix_isHermitian X).eigenvalues i = 0 ∨
+        (hatMatrix_isHermitian X).eigenvalues i = 1 :=
+  eigenvalues_zero_or_one_of_isHermitian_idempotent
+    (hatMatrix_isHermitian X) (hatMatrix_idempotent X)
+
+/-- Hansen Theorem 3.3.4: exactly `k` hat-matrix eigenvalues are equal to `1`. -/
+theorem hatMatrix_card_eigenvalues_eq_one
+    (X : Matrix n k ℝ) [DecidableEq n] [Invertible (Xᵀ * X)] :
+    Fintype.card {i : n // (hatMatrix_isHermitian X).eigenvalues i = 1} =
+      Fintype.card k := by
+  have h := rank_eq_card_eigenvalues_eq_one_of_isHermitian_idempotent
+    (hatMatrix_isHermitian X) (hatMatrix_idempotent X)
+  rw [rank_hatMatrix X] at h
+  exact h.symm
+
+/-- Hansen Section 3.12: every eigenvalue of the annihilator matrix is `0` or `1`. -/
+theorem annihilatorMatrix_eigenvalues_zero_or_one
+    (X : Matrix n k ℝ) [DecidableEq n] [Invertible (Xᵀ * X)] :
+    ∀ i : n,
+      (annihilatorMatrix_isHermitian X).eigenvalues i = 0 ∨
+        (annihilatorMatrix_isHermitian X).eigenvalues i = 1 :=
+  eigenvalues_zero_or_one_of_isHermitian_idempotent
+    (annihilatorMatrix_isHermitian X) (annihilatorMatrix_idempotent X)
+
+/-- Hansen Section 3.12: exactly `n - k` annihilator-matrix eigenvalues are equal to `1`. -/
+theorem annihilatorMatrix_card_eigenvalues_eq_one
+    (X : Matrix n k ℝ) [DecidableEq n] [Invertible (Xᵀ * X)] :
+    Fintype.card {i : n // (annihilatorMatrix_isHermitian X).eigenvalues i = 1} =
+      Fintype.card n - Fintype.card k := by
+  have h := rank_eq_card_eigenvalues_eq_one_of_isHermitian_idempotent
+    (annihilatorMatrix_isHermitian X) (annihilatorMatrix_idempotent X)
+  rw [rank_annihilatorMatrix X] at h
+  exact h.symm
 
 /-- Hansen Section 3.11: fitted values are the hat matrix applied to the data vector. -/
 theorem fitted_eq_hat_mul_y
