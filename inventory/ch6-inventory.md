@@ -96,6 +96,7 @@ Conventions:
 These reusable Lean bridges support Chapter 6 and later asymptotic chapters, but do not have a one-to-one Hansen textbook statement in the crosswalk above.
 
 - [cramerWold_tendstoInDistribution](../HansenEconometrics/AsymptoticUtils.lean#L160) — Cramér–Wold device for `TendstoInDistribution` over an inner-product space, used to lift Mathlib's one-dimensional CLT to multivariate CLTs.
+- [vectorCLT_tendstoInDistribution_multivariateGaussian_of_projections](../HansenEconometrics/Chapter6Asymptotics.lean) — chapter-facing finite-dimensional Cramér–Wold endpoint: scalar projection CLTs into the matching multivariate Gaussian projection imply vector convergence to that Gaussian law.
 - [tendstoInMeasure_continuousAt_const_comp](../HansenEconometrics/AsymptoticUtils.lean#L70) — CMT-at-a-point specialization, allowing pointwise rather than global continuity.
 - [tendstoInMeasure_pi](../HansenEconometrics/AsymptoticUtils.lean#L104) — coordinatewise convergence implies joint convergence over a finite-dimensional product, independently useful as matrix-CMT scaffolding.
 - Structured CMT corollaries: [tendstoInMeasure_matrix_inv](../HansenEconometrics/AsymptoticUtils.lean#L223), [tendstoInMeasure_matrix_mul](../HansenEconometrics/AsymptoticUtils.lean#L325), [tendstoInMeasure_mulVec](../HansenEconometrics/AsymptoticUtils.lean#L304), [tendstoInMeasure_add](../HansenEconometrics/AsymptoticUtils.lean#L284), and [tendstoInMeasure_prodMk](../HansenEconometrics/AsymptoticUtils.lean#L252).

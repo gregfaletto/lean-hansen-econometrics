@@ -64,6 +64,47 @@ theorem covMat_posSemidef
     rw [hvar] at hnonneg
     simpa using hnonneg
 
+/-- **Chapter 6 vector CLT reduction by Cramér-Wold.**
+
+If every fixed scalar projection of a finite-dimensional statistic converges to
+the matching scalar projection of a centered multivariate Gaussian, then the
+whole statistic converges to that multivariate Gaussian. This is the
+chapter-facing endpoint used by iid and future triangular-array CLT wrappers. -/
+theorem vectorCLT_tendstoInDistribution_multivariateGaussian_of_projections
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {T : ℕ → Ω → k → ℝ} {S : Matrix k k ℝ}
+    (hT : ∀ n, AEMeasurable (T n) μ)
+    (hproj : ∀ a : k → ℝ,
+      TendstoInDistribution
+        (fun n ω => T n ω ⬝ᵥ a)
+        atTop
+        (fun z : EuclideanSpace ℝ k => z.ofLp ⬝ᵥ a)
+        (fun _ => μ)
+        (multivariateGaussian 0 S)) :
+    TendstoInDistribution
+      (fun n ω => WithLp.toLp 2 (T n ω))
+      atTop
+      (fun z : EuclideanSpace ℝ k => z)
+      (fun _ => μ)
+      (multivariateGaussian 0 S) := by
+  refine cramerWold_tendstoInDistribution ?_ (by fun_prop) ?_
+  · intro n
+    exact (PiLp.continuous_toLp 2 (fun _ : k => ℝ)).measurable.comp_aemeasurable (hT n)
+  · intro t
+    let a : k → ℝ := t.ofLp
+    have hscalar := hproj a
+    refine TendstoInDistribution.congr ?_ ?_ hscalar
+    · intro n
+      exact ae_of_all μ (fun ω => by
+        change T n ω ⬝ᵥ a =
+          inner ℝ t (WithLp.toLp 2 (T n ω))
+        simpa [a] using (EuclideanSpace.inner_toLp_toLp (𝕜 := ℝ) (ι := k)
+          t.ofLp (T n ω)).symm)
+    · exact ae_of_all (multivariateGaussian 0 S) (fun z => by
+        change z.ofLp ⬝ᵥ a = inner ℝ t z
+        simpa [a] using (EuclideanSpace.inner_toLp_toLp (𝕜 := ℝ) (ι := k)
+          t.ofLp z.ofLp).symm)
+
 /-- **Hansen Theorem 6.3, scalar iid CLT wrapper.**
 
 For iid real random variables with finite second moment, the centered sample
