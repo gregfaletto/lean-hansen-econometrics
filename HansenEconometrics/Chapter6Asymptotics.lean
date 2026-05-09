@@ -333,6 +333,77 @@ theorem iidSampleMean_variance_eq_inv_card_mul
           dsimp [c]
           field_simp [hcard]
 
+/-- **Hansen Theorem 6.11, covariance-matrix sample-mean sharpness face.**
+
+For finite-dimensional square-integrable observations whose coordinates are
+pairwise independent across distinct observations and whose one-draw covariance
+matrix is common across observations, the covariance matrix of the sample mean
+is exactly `1 / n` times that one-draw covariance matrix. This is the
+matrix-valued version of the sample-mean sharpness identity around Hansen's
+best-unbiased-estimation theorem. -/
+theorem iidSampleMean_covMat_eq_inv_card_smul
+    [IsProbabilityMeasure μ] [Fintype ι] [Nonempty ι]
+    {Z : ι → Ω → k → ℝ} (j : ι)
+    (hZ : ∀ i a, MemLp (fun ω => Z i ω a) 2 μ)
+    (hindep : ∀ a b, Pairwise (fun i l =>
+      (fun ω => Z i ω a) ⟂ᵢ[μ] (fun ω => Z l ω b)))
+    (hcov : ∀ i a b,
+      cov[fun ω => Z i ω a, fun ω => Z i ω b; μ] =
+        cov[fun ω => Z j ω a, fun ω => Z j ω b; μ]) :
+    covMat μ (fun ω a => (Fintype.card ι : ℝ)⁻¹ * ∑ i, Z i ω a) =
+      (Fintype.card ι : ℝ)⁻¹ • covMat μ (Z j) := by
+  classical
+  ext a b
+  let c : ℝ := (Fintype.card ι : ℝ)⁻¹
+  have hsumcov :
+      (∑ i : ι, ∑ l : ι, cov[fun ω => Z i ω a, fun ω => Z l ω b; μ]) =
+        (Fintype.card ι : ℝ) *
+          cov[fun ω => Z j ω a, fun ω => Z j ω b; μ] := by
+    calc
+      (∑ i : ι, ∑ l : ι, cov[fun ω => Z i ω a, fun ω => Z l ω b; μ])
+          = ∑ i : ι, cov[fun ω => Z i ω a, fun ω => Z i ω b; μ] := by
+            refine Finset.sum_congr rfl ?_
+            intro i _
+            rw [Finset.sum_eq_single i]
+            · intro l _ hli
+              exact (hindep a b (Ne.symm hli)).covariance_eq_zero (hZ i a) (hZ l b)
+            · intro hi
+              simp at hi
+      _ = ∑ _i : ι, cov[fun ω => Z j ω a, fun ω => Z j ω b; μ] := by
+            refine Finset.sum_congr rfl ?_
+            intro i _
+            exact hcov i a b
+      _ = (Fintype.card ι : ℝ) *
+            cov[fun ω => Z j ω a, fun ω => Z j ω b; μ] := by
+            simp
+  have hsum :
+      cov[fun ω => ∑ i : ι, Z i ω a, fun ω => ∑ i : ι, Z i ω b; μ] =
+        (Fintype.card ι : ℝ) *
+          cov[fun ω => Z j ω a, fun ω => Z j ω b; μ] := by
+    rw [ProbabilityTheory.covariance_fun_sum_fun_sum]
+    · exact hsumcov
+    · intro i
+      exact hZ i a
+    · intro i
+      exact hZ i b
+  calc
+    covMat μ (fun ω a => (Fintype.card ι : ℝ)⁻¹ * ∑ i, Z i ω a) a b
+        = c ^ 2 *
+            cov[fun ω => ∑ i : ι, Z i ω a, fun ω => ∑ i : ι, Z i ω b; μ] := by
+          dsimp [covMat, c]
+          rw [ProbabilityTheory.covariance_const_mul_left,
+            ProbabilityTheory.covariance_const_mul_right]
+          ring
+    _ = c ^ 2 *
+          ((Fintype.card ι : ℝ) *
+            cov[fun ω => Z j ω a, fun ω => Z j ω b; μ]) := by
+          rw [hsum]
+    _ = ((Fintype.card ι : ℝ)⁻¹ • covMat μ (Z j)) a b := by
+          have hcard : (Fintype.card ι : ℝ) ≠ 0 := by
+            exact_mod_cast Fintype.card_ne_zero
+          dsimp [c, covMat]
+          field_simp [hcard]
+
 end BestUnbiased
 
 section ArrayCLT
