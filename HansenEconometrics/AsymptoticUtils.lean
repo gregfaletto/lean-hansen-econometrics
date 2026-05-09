@@ -104,6 +104,86 @@ theorem tendstoInDistribution_continuous_comp
     TendstoInDistribution (fun n ω => g (X n ω)) atTop (fun ω => g (Z ω)) P ν := by
   simpa [Function.comp_def] using hX.continuous_comp hg
 
+/-- **Portmanteau lower-bound wrapper for bounded continuous moments.**
+
+If `Xₙ ⇒ Z`, then every nonnegative bounded continuous test function has
+limit-law expectation bounded by the liminf of the sequence expectations. This
+is the weak-convergence-facing core behind Hansen Theorems 6.13 and 6.15; the
+unbounded norm and uniform-integrability wrappers build on this Portmanteau
+direction. -/
+theorem TendstoInDistribution.integral_boundedContinuous_nonneg_le_liminf
+    {Ω Ω' E : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    [TopologicalSpace E] [MeasurableSpace E] [OpensMeasurableSpace E]
+    [HasOuterApproxClosed E]
+    {X : ℕ → Ω → E} {Z : Ω' → E}
+    (hX : TendstoInDistribution X atTop Z (fun _ => μ) ν)
+    (f : BoundedContinuousFunction E ℝ) (hf_nonneg : 0 ≤ f) :
+    ∫ ω, f (Z ω) ∂ν ≤
+      atTop.liminf (fun n => ∫ ω, f (X n ω) ∂μ) := by
+  let law : ℕ → ProbabilityMeasure E := fun n =>
+    ⟨μ.map (X n), Measure.isProbabilityMeasure_map (hX.forall_aemeasurable n)⟩
+  let lawZ : ProbabilityMeasure E :=
+    ⟨ν.map Z, Measure.isProbabilityMeasure_map hX.aemeasurable_limit⟩
+  have hlaw : Tendsto law atTop (𝓝 lawZ) := by
+    simpa [law, lawZ] using hX.tendsto
+  haveI : ∀ n, IsProbabilityMeasure (μ.map (X n)) :=
+    fun n => Measure.isProbabilityMeasure_map (hX.forall_aemeasurable n)
+  have hopens : ∀ G : Set E, IsOpen G →
+      (ν.map Z) G ≤ atTop.liminf (fun n => (μ.map (X n)) G) := by
+    intro G hG
+    simpa [law, lawZ] using
+      (ProbabilityMeasure.le_liminf_measure_open_of_tendsto
+        (μs_lim := hlaw) (G_open := hG))
+  have hlower :
+      ∫ x, f x ∂(ν.map Z) ≤
+        atTop.liminf (fun n => ∫ x, f x ∂(μ.map (X n))) :=
+    integral_le_liminf_integral_of_forall_isOpen_measure_le_liminf_measure
+      (μ := ν.map Z) (μs := fun n => μ.map (X n))
+      (f := f) hf_nonneg hopens
+  have hlimit :
+      ∫ x, f x ∂(ν.map Z) = ∫ ω, f (Z ω) ∂ν := by
+    rw [integral_map hX.aemeasurable_limit (by fun_prop)]
+  have hseq :
+      (fun n => ∫ x, f x ∂(μ.map (X n))) =
+        fun n => ∫ ω, f (X n ω) ∂μ := by
+    funext n
+    rw [integral_map (hX.forall_aemeasurable n) (by fun_prop)]
+  simpa [hlimit, hseq] using hlower
+
+/-- **Hansen Theorem 6.13, bounded continuous weak-moment face.**
+
+If `Xₙ ⇒ Z` and the expectations of a nonnegative bounded continuous transform
+are eventually bounded by `C`, then the limit-law expectation of the same
+transform is bounded by `C`. This is the direct bounded-continuous Portmanteau
+face of bounded first moments passing to the weak limit. -/
+theorem TendstoInDistribution.integral_boundedContinuous_nonneg_limit_le_of_eventually_bound
+    {Ω Ω' E : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    [TopologicalSpace E] [MeasurableSpace E] [OpensMeasurableSpace E]
+    [HasOuterApproxClosed E]
+    {X : ℕ → Ω → E} {Z : Ω' → E}
+    (hX : TendstoInDistribution X atTop Z (fun _ => μ) ν)
+    (f : BoundedContinuousFunction E ℝ) (hf_nonneg : 0 ≤ f) {C : ℝ}
+    (hBound : ∀ᶠ n in atTop, ∫ ω, f (X n ω) ∂μ ≤ C) :
+    ∫ ω, f (Z ω) ∂ν ≤ C := by
+  have hlower :=
+    TendstoInDistribution.integral_boundedContinuous_nonneg_le_liminf
+      (μ := μ) (ν := ν) (X := X) (Z := Z) hX f hf_nonneg
+  have hliminf_le :
+      atTop.liminf (fun n => ∫ ω, f (X n ω) ∂μ) ≤ C := by
+    have hbelow : atTop.IsBoundedUnder (fun x y : ℝ => x ≥ y)
+        (fun n => ∫ ω, f (X n ω) ∂μ) :=
+      isBoundedUnder_of_eventually_ge
+        (Eventually.of_forall fun n => integral_nonneg (fun ω => hf_nonneg (X n ω)))
+    refine liminf_le_of_le hbelow ?_
+    intro b hb
+    obtain ⟨N, hN⟩ := eventually_atTop.1 (hb.and hBound)
+    exact ((hN N le_rfl).1).trans ((hN N le_rfl).2)
+  exact hlower.trans hliminf_le
+
 /-- Square-root continuous mapping at zero for nonnegative real-valued sequences.
 
 This avoids any additional measurability side condition by comparing the tail
