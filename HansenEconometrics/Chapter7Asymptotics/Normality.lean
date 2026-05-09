@@ -1,5 +1,6 @@
 import Mathlib.Probability.CentralLimitTheorem
 import HansenEconometrics.AsymptoticUtils
+import HansenEconometrics.AsymptoticUtils.DeltaMethod
 import HansenEconometrics.ProbabilityUtils
 import HansenEconometrics.ChiSquared
 import HansenEconometrics.Chapter7Asymptotics.Consistency
@@ -425,6 +426,131 @@ theorem olsBetaOrZero_vector_tendstoInDistribution_multivariateGaussian
     h.toSampleMomentAssumption71 β hmodel
     (scoreVector_sampleCrossMoment_tendstoInDistribution_multivariateGaussian
       (μ := μ) (X := X) (e := e) h)
+
+/-- **Hansen Theorem 7.9, nonlinear Delta-method wrapper for totalized OLS.**
+
+This is the Chapter 7-facing nonlinear packaging now that the Chapter 6
+Delta-method/law-relabeling layer is available.  If `Yₙ` is the scaled nonlinear
+statistic and it differs from the derivative image of
+`√n(β̂*ₙ - β)` by `oₚ(1)`, then `Yₙ` has the named Gaussian law of that derivative
+image.  Concrete transforms `r(β̂ₙ)` discharge `hrem` from the usual
+Fréchet-derivative remainder. -/
+theorem nonlinearFunction_olsBetaStar_delta_tendstoInDistribution_gaussian
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q] [DecidableEq q]
+    (h : ScoreCLTConditions μ X e) (β : k → ℝ)
+    (R : Matrix q k ℝ)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    {Y : ℕ → Ω → EuclideanSpace ℝ q}
+    (hY_meas : ∀ n, AEMeasurable (Y n) μ)
+    (hrem :
+      TendstoInMeasure μ
+        (fun n ω =>
+          Y n ω -
+            matrixContinuousLinearMap R
+              (WithLp.toLp 2
+                (Real.sqrt (n : ℝ) •
+                  (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))))
+        atTop (fun _ => 0))
+    (hLimitLaw :
+      HasLaw
+        (fun z : EuclideanSpace ℝ k =>
+          matrixContinuousLinearMap R
+            (WithLp.toLp 2 ((popGram μ X)⁻¹ *ᵥ z.ofLp)))
+        (multivariateGaussian 0 (R * heteroAsymCov μ X e * Rᵀ))
+        (multivariateGaussian 0 (scoreCovMat μ X e))) :
+    TendstoInDistribution Y atTop
+      (fun z : EuclideanSpace ℝ q => z)
+      (fun _ => μ)
+      (multivariateGaussian 0 (R * heteroAsymCov μ X e * Rᵀ)) := by
+  let T : ℕ → Ω → EuclideanSpace ℝ k := fun n ω =>
+    WithLp.toLp 2
+      (Real.sqrt (n : ℝ) •
+        (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))
+  have hbeta_raw := olsBetaStar_vector_tendstoInDistribution_multivariateGaussian
+    (μ := μ) (X := X) (e := e) (y := y) h β hmodel
+  have hbeta_euclid :
+      TendstoInDistribution T atTop
+        (fun z : EuclideanSpace ℝ k =>
+          WithLp.toLp 2 ((popGram μ X)⁻¹ *ᵥ z.ofLp))
+        (fun _ => μ)
+        (multivariateGaussian 0 (scoreCovMat μ X e)) := by
+    have hmap := hbeta_raw.continuous_comp
+      (PiLp.continuous_toLp 2 (fun _ : k => ℝ))
+    simpa [T, Function.comp_def] using hmap
+  have hlin :
+      TendstoInDistribution
+        (fun n => matrixContinuousLinearMap R ∘ T n)
+        atTop
+        (matrixContinuousLinearMap R ∘
+          fun z : EuclideanSpace ℝ k =>
+            WithLp.toLp 2 ((popGram μ X)⁻¹ *ᵥ z.ofLp))
+        (fun _ => μ)
+        (multivariateGaussian 0 (scoreCovMat μ X e)) :=
+    hbeta_euclid.continuous_comp (matrixContinuousLinearMap R).continuous
+  have htarget :
+      TendstoInDistribution
+        (fun n ω => matrixContinuousLinearMap R (T n ω))
+        atTop
+        (fun z : EuclideanSpace ℝ q => z)
+        (fun _ => μ)
+        (multivariateGaussian 0 (R * heteroAsymCov μ X e * Rᵀ)) := by
+    simpa [Function.comp_def] using
+      tendstoInDistribution_id_of_hasLaw_limit
+        (E := EuclideanSpace ℝ q) hlin hLimitLaw
+  exact tendstoInDistribution_of_tendstoInMeasure_sub
+    (X := fun n ω => matrixContinuousLinearMap R (T n ω))
+    (Y := Y)
+    (Z := fun z : EuclideanSpace ℝ q => z)
+    htarget hrem hY_meas
+
+/-- **Hansen Theorem 7.9, nonlinear Delta-method wrapper for ordinary OLS.**
+
+Ordinary-wrapper version of
+`nonlinearFunction_olsBetaStar_delta_tendstoInDistribution_gaussian`. -/
+theorem nonlinearFunction_olsBetaOrZero_delta_tendstoInDistribution_gaussian
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q] [DecidableEq q]
+    (h : ScoreCLTConditions μ X e) (β : k → ℝ)
+    (R : Matrix q k ℝ)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    {Y : ℕ → Ω → EuclideanSpace ℝ q}
+    (hY_meas : ∀ n, AEMeasurable (Y n) μ)
+    (hrem :
+      TendstoInMeasure μ
+        (fun n ω =>
+          Y n ω -
+            matrixContinuousLinearMap R
+              (WithLp.toLp 2
+                (Real.sqrt (n : ℝ) •
+                  (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β))))
+        atTop (fun _ => 0))
+    (hLimitLaw :
+      HasLaw
+        (fun z : EuclideanSpace ℝ k =>
+          matrixContinuousLinearMap R
+            (WithLp.toLp 2 ((popGram μ X)⁻¹ *ᵥ z.ofLp)))
+        (multivariateGaussian 0 (R * heteroAsymCov μ X e * Rᵀ))
+        (multivariateGaussian 0 (scoreCovMat μ X e))) :
+    TendstoInDistribution Y atTop
+      (fun z : EuclideanSpace ℝ q => z)
+      (fun _ => μ)
+      (multivariateGaussian 0 (R * heteroAsymCov μ X e * Rᵀ)) := by
+  have hrem_star :
+      TendstoInMeasure μ
+        (fun n ω =>
+          Y n ω -
+            matrixContinuousLinearMap R
+              (WithLp.toLp 2
+                (Real.sqrt (n : ℝ) •
+                  (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))))
+        atTop (fun _ => 0) := by
+    simpa using hrem
+  exact nonlinearFunction_olsBetaStar_delta_tendstoInDistribution_gaussian
+    (μ := μ) (X := X) (e := e) (y := y) h β R hmodel
+    hY_meas hrem_star hLimitLaw
 
 /-- **Scaled-score coordinate boundedness from Theorem 7.2.**
 
