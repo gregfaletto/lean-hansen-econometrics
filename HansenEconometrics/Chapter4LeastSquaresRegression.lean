@@ -490,8 +490,11 @@ theorem gaussMarkov_variance_gap_posSemidef
       simp
     have h1' : Aᵀ * (X * (Xᵀ * X)⁻¹) = (Xᵀ * X)⁻¹ := by
       simpa using h1
-    simp [Matrix.transpose_transpose, Matrix.mul_assoc, hXA]
-    rw [h1', h2']
+    simp only [transpose_transpose, invOf_eq_nonsing_inv]
+    rw [h1']
+    rw [Matrix.mul_assoc ((Xᵀ * X)⁻¹) Xᵀ A, hXA, Matrix.mul_one]
+    rw [Matrix.mul_assoc ((Xᵀ * X)⁻¹) Xᵀ (X * (Xᵀ * X)⁻¹)]
+    rw [h2']
     abel_nf
   have hpsd : (C * Cᵀ).PosSemidef := by
     simpa [Matrix.conjTranspose, Matrix.transpose_transpose] using
