@@ -51,14 +51,13 @@ The centered analysis-of-variance formula and `R²` identities are still pending
 19. prove FWL residual equivalence
 
 Status: partitioned normal-equation projections, residualized regressors `M₁ X₂`, FWL residualized
-normal equations, and the sequential residual-maker result
+normal equations, Theorem 3.4 partitioned coefficient formulae, and the sequential residual-maker result
 `M_{M₁X₂} M₁ [X₁ X₂] = 0` landed in `HansenEconometrics/Chapter3FWL.lean`.
-Theorem 3.5 coefficient and residual equivalence now landed. Theorem 3.4 partitioned
-coefficient formulae are still pending.
+Theorem 3.5 coefficient and residual equivalence now landed.
 
 ## Immediate target
-Backfill Theorem 3.4 partitioned coefficient formulae, then continue forward to leverage and
-leave-one-out results.
+Backfill the centered analysis-of-variance formula and `R²` identities, then continue forward to
+leverage and leave-one-out results.
 
 ## Source text
 - `textbook/ch03/ch3_excerpt.txt` is a text extract of `chapters/03-the-algebra-of-least-squares.pdf`,
@@ -112,9 +111,9 @@ Conventions:
 | Equation (3.23) residual representation | $\hat{e} = M Y$ | [residual_eq_annihilator_mul_y](../../HansenEconometrics/Chapter3Projections.lean#L240)<br><code>residual X y = annihilatorMatrix X *ᵥ y</code> |
 | Section 3.14 fitted values and residuals are orthogonal | $\hat{Y}' \hat{e} = 0$ | [fitted_dot_residual](../../HansenEconometrics/Chapter3Projections.lean#L247)<br><code>fitted X y ⬝ᵥ residual X y = 0</code> |
 | Section 3.14 Pythagorean decomposition | $Y'Y = \hat{Y}'\hat{Y} + \hat{e}'\hat{e}$ | [fitted_residual_pythagorean](../../HansenEconometrics/Chapter3Projections.lean#L257)<br><code>y ⬝ᵥ y = fitted X y ⬝ᵥ fitted X y + residual X y ⬝ᵥ residual X y</code> |
-| Theorem 3.4 partitioned coefficient formulae | $\hat{\beta}_1,\hat{\beta}_2$ as functions of partitioned moments |  |
-| Theorem 3.5 coefficient equivalence | $\hat{\beta}_2 = (X_2' M_1 X_2)^{-1} X_2' M_1 Y$ | [fromColsRightBeta_eq_fwlBeta](../../HansenEconometrics/Chapter3FWL.lean#L147)<br><code>fromColsRightBeta X₁ X₂ y = fwlBeta X₁ X₂ y</code> |
-| Theorem 3.5 residual equivalence | $\hat{e}_{\text{full}} = M_{M_1 X_2} M_1 Y$ | [fwl_residual_eq_full_residual](../../HansenEconometrics/Chapter3FWL.lean#L163)<br><code>residual (residualizedRegressors X₁ X₂) (annihilatorMatrix X₁ *ᵥ y) = residual (Matrix.fromCols X₁ X₂) y</code> |
+| Theorem 3.4 partitioned coefficient formulae | $\hat{\beta}_1=(X_1' M_2 X_1)^{-1} X_1' M_2Y$, $\hat{\beta}_2=(X_2' M_1 X_2)^{-1} X_2' M_1Y$ | [partitionedLeftBetaFormula](../../HansenEconometrics/Chapter3FWL.lean#L83)<br>[partitionedRightBetaFormula](../../HansenEconometrics/Chapter3FWL.lean#L75)<br>[fromColsBeta_eq_partitionedBetaFormulas](../../HansenEconometrics/Chapter3FWL.lean#L328)<br><code>fromColsLeftBeta X₁ X₂ y = partitionedLeftBetaFormula X₁ X₂ y ∧ fromColsRightBeta X₁ X₂ y = partitionedRightBetaFormula X₁ X₂ y</code> |
+| Theorem 3.5 coefficient equivalence | $\hat{\beta}_2 = (X_2' M_1 X_2)^{-1} X_2' M_1 Y$ | [fromColsRightBeta_eq_fwlBeta](../../HansenEconometrics/Chapter3FWL.lean#L209)<br><code>fromColsRightBeta X₁ X₂ y = fwlBeta X₁ X₂ y</code> |
+| Theorem 3.5 residual equivalence | $\hat{e}_{\text{full}} = M_{M_1 X_2} M_1 Y$ | [fwl_residual_eq_full_residual](../../HansenEconometrics/Chapter3FWL.lean#L342)<br><code>residual (residualizedRegressors X₁ X₂) (annihilatorMatrix X₁ *ᵥ y) = residual (Matrix.fromCols X₁ X₂) y</code> |
 
 ## Lean-only bridge results
 
@@ -131,9 +130,7 @@ not surfaced here.
 
 ## Notes
 
-- Theorem 3.4 is still intentionally blank: it is one of the main remaining Chapter 3
-  theorem labels not yet wrapped in the current Lean layer. Theorem 3.1 is fully landed
-  (existence half via `sumSquaredErrors_olsBeta_le` / `olsBeta_isMinOn`; uniqueness via
-  `olsBeta_eq_of_minimizer`).
+- Theorem 3.1 is fully landed (existence half via `sumSquaredErrors_olsBeta_le` /
+  `olsBeta_isMinOn`; uniqueness via `olsBeta_eq_of_minimizer`).
 - Several Lean helper results in the projection file are stronger than the textbook labels because
   they package reusable matrix facts such as rank, Hermitian structure, and eigenvalue counts.
