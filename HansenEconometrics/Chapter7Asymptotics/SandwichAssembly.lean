@@ -183,6 +183,49 @@ structure RobustFeasibleHCMomentConditions (μ : Measure Ω) [IsProbabilityMeasu
   /-- Finite first moment for squared row norms, used by the iid max-leverage discharge. -/
   rowNorm_sq_memLp : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ
 
+/-- IID joint-observation sufficient-condition package for robust feasible HC0--HC3 inference.
+
+This package records primitive independence and identical-distribution assumptions
+for the observations `(Xᵢ, eᵢ)` and derives the transformed condition bundles used
+by the existing Chapter 7 covariance and inference theorems. It is intentionally
+a sufficient iid layer: moment, nonsingularity, orthogonality, and high-moment
+fields remain explicit rather than hidden behind a minimal textbook assumption. -/
+structure IidRobustFeasibleHCMomentConditions (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (X : ℕ → Ω → (k → ℝ)) (e y : ℕ → Ω → ℝ) (β : k → ℝ) where
+  /-- Linear-model decomposition of the observed outcome. -/
+  model : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω
+  /-- Component measurability of the regressor sequence. -/
+  x_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (X i) μ
+  /-- Component measurability of the structural-error sequence. -/
+  e_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (e i) μ
+  /-- Full independence of the joint observations `(Xᵢ, eᵢ)`. -/
+  joint_iIndep : iIndepFun (fun i ω => (X i ω, e i ω)) μ
+  /-- Identical distribution of the joint observations against the baseline row. -/
+  joint_identDistrib : ∀ i,
+    IdentDistrib (fun ω => (X i ω, e i ω))
+      (fun ω => (X 0 ω, e 0 ω)) μ μ
+  /-- Integrability of the one-row regressor outer product. -/
+  int_outer : Integrable (fun ω => Matrix.vecMulVec (X 0 ω) (X 0 ω)) μ
+  /-- Integrability of the one-row score vector `e₀X₀`. -/
+  int_cross : Integrable (fun ω => e 0 ω • X 0 ω) μ
+  /-- Population Gram matrix `Q := E[X₀X₀ᵀ]` is nonsingular. -/
+  Q_nonsing : IsUnit (μ[fun ω => Matrix.vecMulVec (X 0 ω) (X 0 ω)]).det
+  /-- Population orthogonality `E[e₀X₀] = 0`. -/
+  orthogonality : μ[fun ω => e 0 ω • X 0 ω] = 0
+  /-- Square integrability of every scalar projection of the score vector. -/
+  memLp_cross_projection :
+    ∀ a : k → ℝ, MemLp (fun ω => (e 0 ω • X 0 ω) ⬝ᵥ a) 2 μ
+  /-- Integrability of the true-error score outer product. -/
+  int_score_outer :
+    Integrable (fun ω => Matrix.vecMulVec (e 0 ω • X 0 ω) (e 0 ω • X 0 ω)) μ
+  /-- Compact third-moment domination for feasible-HC cross weights. -/
+  absError_rowNorm_cubed_integrable :
+    Integrable (fun ω => |e 0 ω| * ‖X 0 ω‖ ^ 3) μ
+  /-- Compact fourth-row-moment domination for feasible-HC quadratic weights. -/
+  rowNorm_fourth_integrable : Integrable (fun ω => ‖X 0 ω‖ ^ 4) μ
+  /-- Finite first moment for squared row norms, used by the iid max-leverage discharge. -/
+  rowNorm_sq_memLp : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ
+
 omit [Fintype k] [DecidableEq k] in
 private lemma measurable_hcCrossWeightScalar (a b l : k) :
     Measurable (fun z : (k → ℝ) × ℝ =>
@@ -205,6 +248,26 @@ omit [DecidableEq k] in
 private lemma measurable_rowNormSq_fst :
     Measurable (fun z : (k → ℝ) × ℝ => ‖z.1‖ ^ 2) := by
   exact ((continuous_norm.comp continuous_fst).measurable).pow_const 2
+
+omit [DecidableEq k] in
+private lemma measurable_jointOuter :
+    Measurable (fun z : (k → ℝ) × ℝ => Matrix.vecMulVec z.1 z.1) := by
+  exact (Continuous.matrix_vecMulVec continuous_fst continuous_fst).measurable
+
+omit [Fintype k] [DecidableEq k] in
+private lemma measurable_jointCross :
+    Measurable (fun z : (k → ℝ) × ℝ => z.2 • z.1) := by
+  rw [measurable_pi_iff]
+  intro i
+  simpa using measurable_snd.mul ((measurable_pi_apply i).comp measurable_fst)
+
+omit [DecidableEq k] in
+private lemma measurable_jointScoreOuter :
+    Measurable (fun z : (k → ℝ) × ℝ =>
+      Matrix.vecMulVec (z.2 • z.1) (z.2 • z.1)) := by
+  have hscore : Continuous (fun z : (k → ℝ) × ℝ => z.2 • z.1) :=
+    continuous_snd.smul continuous_fst
+  exact (Continuous.matrix_vecMulVec hscore hscore).measurable
 
 omit [DecidableEq k] in
 private theorem hcCrossWeight_integrable_of_absError_rowNorm_cubed
@@ -272,6 +335,154 @@ private theorem hcQuadWeight_integrable_of_rowNorm_fourth
     _ ≤ ‖X 0 ω‖ * ‖X 0 ω‖ * ‖X 0 ω‖ * ‖X 0 ω‖ := by
       gcongr
     _ = ‖X 0 ω‖ ^ 4 := by ring
+
+namespace IidRobustFeasibleHCMomentConditions
+
+/-- IID joint observations imply pairwise independence of the regressor outer
+products used by the least-squares consistency package. -/
+private theorem outer_pairwise_indep
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    Pairwise ((· ⟂ᵢ[μ] ·) on
+      (fun i ω => Matrix.vecMulVec (X i ω) (X i ω))) := by
+  have hindep : iIndepFun
+      (fun i ω => Matrix.vecMulVec (X i ω) (X i ω)) μ := by
+    simpa [Function.comp] using
+      h.joint_iIndep.comp (fun _ z => Matrix.vecMulVec z.1 z.1)
+        (fun _ => measurable_jointOuter)
+  intro i j hij
+  exact hindep.indepFun hij
+
+/-- IID joint observations imply pairwise independence of the score vectors
+used by the least-squares consistency package. -/
+private theorem cross_pairwise_indep
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    Pairwise ((· ⟂ᵢ[μ] ·) on (fun i ω => e i ω • X i ω)) := by
+  have hindep : iIndepFun (fun i ω => e i ω • X i ω) μ := by
+    simpa [Function.comp] using
+      h.joint_iIndep.comp (fun _ z => z.2 • z.1)
+        (fun _ => measurable_jointCross)
+  intro i j hij
+  exact hindep.indepFun hij
+
+/-- IID joint observations imply full independence of the score-vector
+sequence used by the score CLT package. -/
+private theorem cross_iIndep
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    iIndepFun (fun i ω => e i ω • X i ω) μ := by
+  simpa [Function.comp] using
+    h.joint_iIndep.comp (fun _ z => z.2 • z.1)
+      (fun _ => measurable_jointCross)
+
+/-- IID joint observations imply pairwise independence of true-error score
+outer products used by the robust covariance package. -/
+private theorem score_outer_pairwise_indep
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    Pairwise ((· ⟂ᵢ[μ] ·) on
+      (fun i ω => Matrix.vecMulVec (e i ω • X i ω) (e i ω • X i ω))) := by
+  have hindep : iIndepFun
+      (fun i ω => Matrix.vecMulVec (e i ω • X i ω) (e i ω • X i ω)) μ := by
+    simpa [Function.comp] using
+      h.joint_iIndep.comp
+        (fun _ z => Matrix.vecMulVec (z.2 • z.1) (z.2 • z.1))
+        (fun _ => measurable_jointScoreOuter)
+  intro i j hij
+  exact hindep.indepFun hij
+
+/-- IID joint observations imply pairwise independence of the joint
+observations, as required by the feasible-HC WLLN package. -/
+private theorem joint_pairwise_indep
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    Pairwise ((· ⟂ᵢ[μ] ·) on (fun i ω => (X i ω, e i ω))) := by
+  intro i j hij
+  exact h.joint_iIndep.indepFun hij
+
+/-- The iid joint-observation package discharges the least-squares consistency
+condition package by mapping iid observations through the relevant row moments. -/
+theorem toLeastSquaresConsistencyConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    LeastSquaresConsistencyConditions μ X e where
+  indep_outer := outer_pairwise_indep h
+  indep_cross := cross_pairwise_indep h
+  ident_outer := by
+    intro i
+    have hi := (h.joint_identDistrib i).comp measurable_jointOuter
+    simpa [Function.comp] using hi
+  ident_cross := by
+    intro i
+    have hi := (h.joint_identDistrib i).comp measurable_jointCross
+    simpa [Function.comp] using hi
+  int_outer := h.int_outer
+  int_cross := h.int_cross
+  Q_nonsing := h.Q_nonsing
+  orthogonality := h.orthogonality
+
+/-- The iid joint-observation package discharges the score-CLT condition
+package once scalar score-projection square-integrability is supplied. -/
+theorem toScoreCLTConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    ScoreCLTConditions μ X e where
+  toLeastSquaresConsistencyConditions := h.toLeastSquaresConsistencyConditions
+  iIndep_cross := cross_iIndep h
+  memLp_cross_projection := h.memLp_cross_projection
+
+/-- The iid joint-observation package discharges the robust covariance
+condition package. -/
+theorem toRobustCovarianceConsistencyConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    RobustCovarianceConsistencyConditions μ X e where
+  toScoreCLTConditions := h.toScoreCLTConditions
+  indep_score_outer := score_outer_pairwise_indep h
+  ident_score_outer := by
+    intro i
+    have hi := (h.joint_identDistrib i).comp measurable_jointScoreOuter
+    simpa [Function.comp] using hi
+  int_score_outer := h.int_score_outer
+
+/-- The iid joint-observation package discharges the compact feasible-HC moment
+WLLN package. -/
+theorem toFeasibleHCMomentWLLNConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    FeasibleHCMomentWLLNConditions μ X e y β where
+  model := h.model
+  x_aestronglyMeasurable := h.x_aestronglyMeasurable
+  e_aestronglyMeasurable := h.e_aestronglyMeasurable
+  joint_pairwise_indep := joint_pairwise_indep h
+  joint_identDistrib := h.joint_identDistrib
+  absError_rowNorm_cubed_integrable := h.absError_rowNorm_cubed_integrable
+  rowNorm_fourth_integrable := h.rowNorm_fourth_integrable
+
+/-- The iid joint-observation package discharges the combined robust feasible-HC
+moment package used by the compact HC0--HC3 covariance and inference endpoints. -/
+theorem toRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    RobustFeasibleHCMomentConditions μ X e y β where
+  toRobustCovarianceConsistencyConditions :=
+    IidRobustFeasibleHCMomentConditions.toRobustCovarianceConsistencyConditions h
+  toFeasibleHCMomentWLLNConditions :=
+    IidRobustFeasibleHCMomentConditions.toFeasibleHCMomentWLLNConditions h
+  rowNorm_sq_memLp := h.rowNorm_sq_memLp
+
+end IidRobustFeasibleHCMomentConditions
 
 namespace FeasibleHCJointWLLNConditions
 
