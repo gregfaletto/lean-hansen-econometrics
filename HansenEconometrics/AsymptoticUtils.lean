@@ -184,6 +184,41 @@ theorem TendstoInDistribution.integral_boundedContinuous_nonneg_limit_le_of_even
     exact ((hN N le_rfl).1).trans ((hN N le_rfl).2)
   exact hlower.trans hliminf_le
 
+/-- **Hansen Theorem 6.15, bounded continuous weak-moment face.**
+
+Weak convergence is exactly convergence of expectations for bounded continuous
+test functions. This records the theorem-facing integral version for random
+variables: if `Xₙ ⇒ Z`, then `∫ f(Xₙ) → ∫ f(Z)` for every bounded continuous
+real transform `f`. The unbounded/UI moment theorem needs an additional
+truncation layer on top of this bounded-continuous core. -/
+theorem TendstoInDistribution.integral_boundedContinuous_tendsto
+    {Ω Ω' E : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    [TopologicalSpace E] [MeasurableSpace E] [OpensMeasurableSpace E]
+    {X : ℕ → Ω → E} {Z : Ω' → E}
+    (hX : TendstoInDistribution X atTop Z (fun _ => μ) ν)
+    (f : BoundedContinuousFunction E ℝ) :
+    Tendsto (fun n => ∫ ω, f (X n ω) ∂μ) atTop
+      (𝓝 (∫ ω, f (Z ω) ∂ν)) := by
+  have hmap :
+      Tendsto (fun n => ∫ x, f x ∂(μ.map (X n))) atTop
+        (𝓝 (∫ x, f x ∂(ν.map Z))) := by
+    let lawZ : ProbabilityMeasure E :=
+      ⟨ν.map Z, Measure.isProbabilityMeasure_map hX.aemeasurable_limit⟩
+    have hcont :=
+      (ProbabilityMeasure.continuous_integral_boundedContinuousFunction f).tendsto lawZ
+    simpa [lawZ] using hcont.comp hX.tendsto
+  have hlimit :
+      ∫ x, f x ∂(ν.map Z) = ∫ ω, f (Z ω) ∂ν := by
+    rw [integral_map hX.aemeasurable_limit (by fun_prop)]
+  have hseq :
+      (fun n => ∫ x, f x ∂(μ.map (X n))) =
+        fun n => ∫ ω, f (X n ω) ∂μ := by
+    funext n
+    rw [integral_map (hX.forall_aemeasurable n) (by fun_prop)]
+  simpa [hlimit, hseq] using hmap
+
 /-- Square-root continuous mapping at zero for nonnegative real-valued sequences.
 
 This avoids any additional measurability side condition by comparing the tail
