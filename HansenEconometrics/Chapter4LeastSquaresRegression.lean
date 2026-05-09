@@ -243,6 +243,43 @@ noncomputable def olsClusteredVarianceEstimator
     (∑ g, Matrix.vecMulVec (s g) (s g)) *
     ⅟ (Xᵀ * X)
 
+/-- Singleton clusters reduce the clustered sandwich to HC0. -/
+theorem olsClusteredVarianceEstimator_singleton
+    (X : Matrix n k ℝ) (y : n → ℝ)
+    [DecidableEq n] [Invertible (Xᵀ * X)] :
+    olsClusteredVarianceEstimator X y (fun i : n => i) =
+      olsHuberWhiteVarianceEstimator X y := by
+  have hmiddle :
+      (∑ g, Matrix.vecMulVec
+        (fun a : k => ∑ i, (if i = g then residual X y i * X i a else 0))
+        (fun a : k => ∑ i, (if i = g then residual X y i * X i a else 0))) =
+        Xᵀ * Matrix.diagonal (fun i => residual X y i ^ 2) * X := by
+    ext a b
+    calc
+      (∑ g, Matrix.vecMulVec
+        (fun a : k => ∑ i, (if i = g then residual X y i * X i a else 0))
+        (fun a : k => ∑ i, (if i = g then residual X y i * X i a else 0))) a b =
+          ∑ g, (residual X y g * X g a) * (residual X y g * X g b) := by
+            rw [Matrix.sum_apply]
+            simp [Matrix.vecMulVec_apply]
+      _ = ∑ g, X g a * residual X y g ^ 2 * X g b := by
+            refine Finset.sum_congr rfl ?_
+            intro g _
+            ring
+      _ = (Xᵀ * Matrix.diagonal (fun i => residual X y i ^ 2) * X) a b := by
+            simp [Matrix.mul_apply, Matrix.transpose_apply, Matrix.diagonal, mul_left_comm,
+              mul_comm]
+  unfold olsClusteredVarianceEstimator olsHuberWhiteVarianceEstimator olsConditionalVarianceMatrix
+  change ⅟ (Xᵀ * X) *
+      (∑ g, Matrix.vecMulVec
+        (fun a : k => ∑ i, (if i = g then residual X y i * X i a else 0))
+        (fun a : k => ∑ i, (if i = g then residual X y i * X i a else 0))) *
+        ⅟ (Xᵀ * X) =
+      ⅟ (Xᵀ * X) * Xᵀ * Matrix.diagonal (fun i => residual X y i ^ 2) * X *
+        ⅟ (Xᵀ * X)
+  rw [hmiddle]
+  simp [Matrix.mul_assoc]
+
 /-- In the linear model, HC2 uses annihilator-transformed errors. -/
 theorem olsHuberWhiteHC2VarianceEstimator_linear_model
     (X : Matrix n k ℝ) (β : k → ℝ) (e : n → ℝ)
