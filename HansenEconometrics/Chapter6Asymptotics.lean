@@ -276,6 +276,65 @@ theorem iidVectorCLT_tendstoInDistribution_multivariateGaussian
 
 end IidCLT
 
+section BestUnbiased
+
+variable {Ω ι : Type*} {mΩ : MeasurableSpace Ω} {μ : Measure Ω}
+
+/-- **Hansen Theorem 6.11, sample-mean sharpness face.**
+
+For pairwise independent identically distributed square-integrable scalar
+observations, the variance of the finite-sample average is `1 / n` times the
+variance of one draw. This formalizes the sharp sample-mean variance identity
+around Hansen's best-unbiased-estimation theorem; the full lower bound for
+arbitrary unbiased estimators is a separate efficiency statement. -/
+theorem iidSampleMean_variance_eq_inv_card_mul
+    [IsProbabilityMeasure μ] [Fintype ι] [Nonempty ι]
+    {Z : ι → Ω → ℝ} (j : ι)
+    (hZ : ∀ i, MemLp (Z i) 2 μ)
+    (hindep : Pairwise (fun i j => Z i ⟂ᵢ[μ] Z j))
+    (hident : ∀ i, IdentDistrib (Z i) (Z j) μ μ) :
+    Var[fun ω => (Fintype.card ι : ℝ)⁻¹ * ∑ i, Z i ω; μ] =
+      (Fintype.card ι : ℝ)⁻¹ * Var[Z j; μ] := by
+  classical
+  let c : ℝ := (Fintype.card ι : ℝ)⁻¹
+  have hpair : Set.Pairwise (↑(Finset.univ : Finset ι) : Set ι)
+      (fun i j => Z i ⟂ᵢ[μ] Z j) := by
+    intro i _ j _ hij
+    exact hindep hij
+  have hvarsum := ProbabilityTheory.IndepFun.variance_sum
+    (μ := μ) (X := Z) (s := Finset.univ)
+    (fun i _ => hZ i) hpair
+  have hsumvar :
+      (∑ i, Var[Z i; μ]) = (Fintype.card ι : ℝ) * Var[Z j; μ] := by
+    calc
+      (∑ i, Var[Z i; μ]) = ∑ _i : ι, Var[Z j; μ] := by
+        refine Finset.sum_congr rfl ?_
+        intro i _
+        exact (hident i).variance_eq
+      _ = (Fintype.card ι : ℝ) * Var[Z j; μ] := by
+        simp
+  have hsample_eq :
+      (fun ω => (Fintype.card ι : ℝ)⁻¹ * ∑ i, Z i ω) =
+        fun ω => c * (∑ i, Z i) ω := by
+    ext ω
+    simp [c]
+  rw [hsample_eq]
+  calc
+    Var[fun ω => c * (∑ i, Z i) ω; μ]
+        = c ^ 2 * Var[(∑ i, Z i); μ] := by
+          rw [ProbabilityTheory.variance_const_mul]
+    _ = c ^ 2 * (∑ i, Var[Z i; μ]) := by
+          rw [hvarsum]
+    _ = c ^ 2 * ((Fintype.card ι : ℝ) * Var[Z j; μ]) := by
+          rw [hsumvar]
+    _ = (Fintype.card ι : ℝ)⁻¹ * Var[Z j; μ] := by
+          have hcard : (Fintype.card ι : ℝ) ≠ 0 := by
+            exact_mod_cast Fintype.card_ne_zero
+          dsimp [c]
+          field_simp [hcard]
+
+end BestUnbiased
+
 section ArrayCLT
 
 variable {Ω : Type*} {mΩ : MeasurableSpace Ω}
