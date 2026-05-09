@@ -1,4 +1,5 @@
 import Mathlib.Analysis.Calculus.FDeriv.Basic
+import Mathlib.Analysis.Calculus.FDeriv.Pow
 import HansenEconometrics.AsymptoticUtils
 import HansenEconometrics.AsymptoticUtils.StochasticOrder
 import HansenEconometrics.ProbabilityUtils
@@ -38,6 +39,85 @@ theorem deltaMethod_remainder_isLittleO
   hg.isLittleO
 
 end DeterministicRemainder
+
+section ConcreteTransforms
+
+/-- Scalar square derivative, packaged as a Fréchet derivative.
+
+This is the deterministic derivative for the common scalar nonlinear transform
+`x ↦ x²` used by Delta-method examples. -/
+theorem scalarSquare_hasFDerivAt (θ : ℝ) :
+    HasFDerivAt (fun x : ℝ => x ^ 2)
+      (((2 : ℝ) * θ) • (ContinuousLinearMap.id ℝ ℝ)) θ := by
+  simpa [two_nsmul, pow_one] using
+    (hasFDerivAt_pow (𝕜 := ℝ) (𝔸 := ℝ) 2 (x := θ))
+
+/-- Scalar square Delta-method remainder.
+
+After subtracting the derivative image `(2θ)(x - θ)`, the square transform has a
+little-o remainder relative to the scalar displacement. -/
+theorem scalarSquare_deltaMethod_remainder_isLittleO (θ : ℝ) :
+    (fun x : ℝ =>
+      x ^ 2 - θ ^ 2 -
+        (((2 : ℝ) * θ) • (ContinuousLinearMap.id ℝ ℝ)) (x - θ))
+        =o[𝓝 θ] (fun x => x - θ) :=
+  deltaMethod_remainder_isLittleO (scalarSquare_hasFDerivAt θ)
+
+variable {k : Type*} [Fintype k]
+
+set_option linter.unusedFintypeInType false in
+/-- Coordinate-square derivative for a finite-dimensional parameter vector.
+
+For a fixed coordinate `j`, the derivative of `β ↦ β_j²` is the coordinate
+projection multiplied by `2 β_j`. -/
+theorem coordinateSquare_hasFDerivAt (j : k) (β : k → ℝ) :
+    HasFDerivAt (fun b : k → ℝ => (b j) ^ 2)
+      (((2 : ℝ) * β j) •
+        (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) j)) β := by
+  have hsq := scalarSquare_hasFDerivAt (β j)
+  simpa [ContinuousLinearMap.comp_def, Function.comp_def] using
+    hsq.comp β
+      (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) j).hasFDerivAt
+
+/-- Coordinate-square Delta-method remainder.
+
+This is the transform-specific Fréchet remainder for the nonlinear coefficient
+map `β ↦ β_j²`. -/
+theorem coordinateSquare_deltaMethod_remainder_isLittleO (j : k) (β : k → ℝ) :
+    (fun b : k → ℝ =>
+      (b j) ^ 2 - (β j) ^ 2 -
+        (((2 : ℝ) * β j) •
+          (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) j))
+          (b - β))
+        =o[𝓝 β] (fun b => b - β) :=
+  deltaMethod_remainder_isLittleO (coordinateSquare_hasFDerivAt j β)
+
+set_option linter.unusedFintypeInType false in
+/-- One-dimensional vector-valued coordinate-square derivative.
+
+This is the finite-dimensional shape used when Chapter 7 states a nonlinear
+parameter map as an `R¹`-valued transform. -/
+theorem coordinateSquareVector_hasFDerivAt (j : k) (β : k → ℝ) :
+    HasFDerivAt (fun b : k → ℝ => fun _ : Fin 1 => (b j) ^ 2)
+      (ContinuousLinearMap.pi fun _ : Fin 1 =>
+        (((2 : ℝ) * β j) •
+          (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) j))) β := by
+  rw [hasFDerivAt_pi]
+  intro _
+  simpa using coordinateSquare_hasFDerivAt j β
+
+/-- One-dimensional vector-valued coordinate-square Delta-method remainder. -/
+theorem coordinateSquareVector_deltaMethod_remainder_isLittleO (j : k) (β : k → ℝ) :
+    (fun b : k → ℝ =>
+      (fun _ : Fin 1 => (b j) ^ 2) - (fun _ : Fin 1 => (β j) ^ 2) -
+        (ContinuousLinearMap.pi fun _ : Fin 1 =>
+          (((2 : ℝ) * β j) •
+            (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) j)))
+          (b - β))
+        =o[𝓝 β] (fun b => b - β) :=
+  deltaMethod_remainder_isLittleO (coordinateSquareVector_hasFDerivAt j β)
+
+end ConcreteTransforms
 
 section DeltaDistribution
 
