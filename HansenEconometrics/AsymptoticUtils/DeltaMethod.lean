@@ -117,6 +117,45 @@ theorem coordinateSquareVector_deltaMethod_remainder_isLittleO (j : k) (β : k �
         =o[𝓝 β] (fun b => b - β) :=
   deltaMethod_remainder_isLittleO (coordinateSquareVector_hasFDerivAt j β)
 
+/-- Matrix row for the derivative of the coordinate-square transform `β ↦ β_j²`.
+
+The single row has coefficient `2 β_j` in coordinate `j` and zero elsewhere. -/
+def coordinateSquareDerivativeMatrix {k : Type*} [DecidableEq k]
+    (j : k) (β : k → ℝ) : Matrix (Fin 1) k ℝ :=
+  fun _ => Pi.single j ((2 : ℝ) * β j)
+
+/-- Applying the coordinate-square derivative row is scalar multiplication of
+the selected coordinate. -/
+theorem coordinateSquareDerivativeMatrix_mulVec {k : Type*} [Fintype k] [DecidableEq k]
+    (j : k) (β v : k → ℝ) :
+    (coordinateSquareDerivativeMatrix j β *ᵥ v) 0 = ((2 : ℝ) * β j) * v j := by
+  simp [coordinateSquareDerivativeMatrix, Matrix.mulVec]
+
+/-- Euclidean-space application form of `coordinateSquareDerivativeMatrix_mulVec`. -/
+theorem matrixContinuousLinearMap_coordinateSquareDerivativeMatrix_apply
+    {k : Type*} [Fintype k] [DecidableEq k]
+    (j : k) (β : k → ℝ) (v : EuclideanSpace ℝ k) :
+    (matrixContinuousLinearMap (coordinateSquareDerivativeMatrix j β) v).ofLp 0 =
+      ((2 : ℝ) * β j) * v.ofLp j := by
+  simp [coordinateSquareDerivativeMatrix, matrixContinuousLinearMap_apply, Matrix.mulVec]
+
+/-- Gaussian image law for the coordinate-square derivative row.
+
+This is the concrete derivative-image law used by one-dimensional nonlinear
+Delta-method examples such as `β_j²`. -/
+theorem coordinateSquareDerivativeMatrix_hasLaw_multivariateGaussian_zero
+    {k : Type*} [Fintype k] [DecidableEq k]
+    {S : Matrix k k ℝ} (hS : S.PosSemidef) (j : k) (β : k → ℝ) :
+    HasLaw
+      (fun z : EuclideanSpace ℝ k =>
+        matrixContinuousLinearMap (coordinateSquareDerivativeMatrix j β) z)
+      (multivariateGaussian 0
+        (coordinateSquareDerivativeMatrix j β * S * (coordinateSquareDerivativeMatrix j β)ᵀ))
+      (multivariateGaussian 0 S) := by
+  simpa using
+    hasLaw_multivariateGaussian_zero_linearMap (n := k) (q := Fin 1) hS
+      (coordinateSquareDerivativeMatrix j β)
+
 end ConcreteTransforms
 
 section DeltaDistribution
