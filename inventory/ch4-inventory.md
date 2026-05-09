@@ -66,13 +66,12 @@ homoskedastic unbiasedness, HC0/HC1/HC2/HC3 covariance estimators, and a minimal
 sandwich definition with a linear-model rewrite. The scalar HC leverage-weight ordering
 `1 ≤ (1-h)⁻¹ ≤ ((1-h)⁻¹)^2` is also formalized on the nonsaturated range `0 ≤ h < 1`,
 and the corresponding HC0/HC2/HC3 covariance-matrix ordering is proved in positive-semidefinite
-order. HC2's homoskedastic conditional-expectation identity is now lifted to the
-covariance-matrix level; HC3's corresponding inflated diagonal expectation is formalized too.
+order. HC2 and HC3 conditional-expectation identities are now lifted to the covariance-matrix
+level under both homoskedastic and diagonal heteroskedastic conditional second moments.
 
 ## Deferred / won't do for now
 For the current pass we are intentionally not pushing Chapter 4 to applied-completeness.
 The following are explicitly deferred unless they become prerequisite later:
-- heteroskedastic HC2/HC3 exact finite-sample expectation refinements
 - clustered covariance asymptotics and partition/Finpartition infrastructure
 - HC4 and other leverage-adjustment families
 
@@ -118,8 +117,8 @@ Conventions:
 | Method-of-moments residual variance `σ̂²` | $\hat{\sigma}^2 = n^{-1}\sum_i \hat e_i^2$ and, under diagonal heteroskedastic conditional second moments, $\mathbb{E}[\hat{\sigma}^2 \mid X] = n^{-1}\operatorname{tr}(MD)$ | [olsSigmaSqHat](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean), [olsSigmaSqHat_linear_model_quadratic_form](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean), and [ols_condExp_sigmaSqHat_eq_inv_card_trace_diagonal](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean) |
 | Residual variance estimator `s²` | $s^2 = (n-k)^{-1}\sum_i \hat e_i^2$ | [olsResidualVarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L309), [olsResidualSumSquares](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L316), [olsResidualVarianceEstimator_linear_model_quadratic_form](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L379) |
 | `s²` conditional and unconditional unbiasedness | $\mathbb{E}[s^2 \mid X] = \sigma^2$ and $\mathbb{E}[s^2] = \sigma^2$ under homoskedastic conditional second moments | [ols_condExp_residualVarianceEstimator_eq_sigmaSq](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L858), [ols_integral_residualVarianceEstimator_eq_sigmaSq](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L908) |
-| HC2 covariance estimator | $\hat V_{HC2} = (X'X)^{-1} X'\operatorname{diag}((1-h_{ii})^{-1}\hat e_i^2)X(X'X)^{-1}$ | [olsHuberWhiteHC2VarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L130), [olsHuberWhiteHC2VarianceEstimator_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L247), and homoskedastic matrix conditional expectation [condExp_olsHuberWhiteHC2VarianceEstimator_eq_homoskedastic](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L728) |
-| HC3 covariance estimator | $\hat V_{HC3} = (X'X)^{-1} X'\operatorname{diag}((1-h_{ii})^{-2}\hat e_i^2)X(X'X)^{-1}$ | [olsHuberWhiteHC3VarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L138), [olsHuberWhiteHC3VarianceEstimator_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L257), and homoskedastic inflated-expectation bridge [condExp_olsHuberWhiteHC3VarianceEstimator_eq_homoskedastic_inflated](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L761) |
+| HC2 covariance estimator | $\hat V_{HC2} = (X'X)^{-1} X'\operatorname{diag}((1-h_{ii})^{-1}\hat e_i^2)X(X'X)^{-1}$ | [olsHuberWhiteHC2VarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L130), [olsHuberWhiteHC2VarianceEstimator_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L247), homoskedastic matrix conditional expectation [condExp_olsHuberWhiteHC2VarianceEstimator_eq_homoskedastic](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L826), and diagonal heteroskedastic expectation [condExp_olsHuberWhiteHC2VarianceEstimator_eq_diagonal](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L891) |
+| HC3 covariance estimator | $\hat V_{HC3} = (X'X)^{-1} X'\operatorname{diag}((1-h_{ii})^{-2}\hat e_i^2)X(X'X)^{-1}$ | [olsHuberWhiteHC3VarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L138), [olsHuberWhiteHC3VarianceEstimator_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L257), homoskedastic inflated-expectation bridge [condExp_olsHuberWhiteHC3VarianceEstimator_eq_homoskedastic_inflated](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L859), and diagonal heteroskedastic expectation [condExp_olsHuberWhiteHC3VarianceEstimator_eq_diagonal](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L925) |
 | Clustered covariance estimator | cluster-level score sandwich | [olsClusteredVarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L236), [olsClusteredVarianceEstimator_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L289) |
 
 ## Lean-only bridge results
@@ -132,13 +131,15 @@ Conventions:
 - [olsHuberWhiteVarianceEstimator_le_HC2_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L197): finite-sample HC2 dominates HC0 in PSD order on the nonsaturated leverage range.
 - [olsHuberWhiteHC2VarianceEstimator_le_HC3_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L218): finite-sample HC3 dominates HC2 in PSD order on the nonsaturated leverage range.
 - [condExp_annihilator_row_sq_eq_homoskedastic](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L530): row-level homoskedastic residual-shrinkage identity `E[(Me)_i^2 | X] = σ²(1-h_{ii})`.
-- [condExp_HC2_adjusted_annihilator_row_sq_eq_sigmaSq](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L576): HC2's scalar leverage adjustment is conditionally unbiased for `σ²`.
-- [condExp_HC3_adjusted_annihilator_row_sq_eq_sigmaSq_mul_inv](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L607): HC3 leaves one inverse-leverage factor in the homoskedastic row expectation.
-- [condExp_olsConditionalVarianceMatrix_diagonal_eq](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L641): diagonal-entry conditional expectations lift to the deterministic covariance sandwich.
+- [condExp_annihilator_row_sq_eq_diagonal](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L576): row-level diagonal heteroskedastic residual expectation.
+- [condExp_HC2_adjusted_annihilator_row_sq_eq_sigmaSq](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L621): HC2's scalar leverage adjustment is conditionally unbiased for `σ²`.
+- [condExp_HC2_adjusted_annihilator_row_sq_eq_diagonal](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L643): exact HC2 row expectation under diagonal heteroskedasticity.
+- [condExp_HC3_adjusted_annihilator_row_sq_eq_sigmaSq_mul_inv](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L681): HC3 leaves one inverse-leverage factor in the homoskedastic row expectation.
+- [condExp_HC3_adjusted_annihilator_row_sq_eq_diagonal](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L705): exact HC3 row expectation under diagonal heteroskedasticity.
+- [condExp_olsConditionalVarianceMatrix_diagonal_eq](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L739): diagonal-entry conditional expectations lift to the deterministic covariance sandwich.
 
 ## Notes
 
 - Chapter 4 has strong deterministic and conditional-expectation coverage already, so this file is
   mostly a map from Hansen's notation into the matrix-valued Lean API.
-- The remaining covariance-estimator gaps are heteroskedastic HC2/HC3 expectation refinements and
-  clustered/asymptotic refinements.
+- The remaining covariance-estimator gaps are clustered/asymptotic refinements.
