@@ -2686,6 +2686,24 @@ theorem olsHC0LinSEStar_tendstoInMeasure_of_feasibleHCRemainderConditions
     hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
     hc.crossWeight_bounded hc.quadWeight_bounded
 
+/-- **Hansen §7.11, HC0 standard errors under compact robust moments.** -/
+theorem olsHC0LinSEStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Finite q]
+    (β : k → ℝ) (R : Matrix q k ℝ) (j : q)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Real.sqrt ((R * olsHetCovStar
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) j j))
+      atTop (fun _ =>
+        Real.sqrt ((R * heteroAsymCov μ X e * Rᵀ) j j)) :=
+  olsHC0LinSEStar_tendstoInMeasure_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions.toSampleHC0Assumption76 β R j
+    hm.toFeasibleHCRemainderConditions
+
 /-- The HC1 finite-sample degrees-of-freedom multiplier `n / (n - k)` tends to `1`. -/
 theorem hc1FiniteSampleScale_tendsto_one (k : Type*) [Fintype k] :
     Tendsto
@@ -2997,6 +3015,24 @@ theorem olsHC1LinSEStar_tendstoInMeasure_of_feasibleHCRemainderConditions
     (μ := μ) (X := X) (e := e) (y := y) h β R j
     hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
     hc.crossWeight_bounded hc.quadWeight_bounded
+
+/-- **Hansen §7.11, HC1 standard errors under compact robust moments.** -/
+theorem olsHC1LinSEStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Finite q]
+    (β : k → ℝ) (R : Matrix q k ℝ) (j : q)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Real.sqrt ((R * olsHetCovHC1Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) j j))
+      atTop (fun _ =>
+        Real.sqrt ((R * heteroAsymCov μ X e * Rᵀ) j j)) :=
+  olsHC1LinSEStar_tendstoInMeasure_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions.toSampleHC0Assumption76 β R j
+    hm.toFeasibleHCRemainderConditions
 
 /-- **Generic leverage-adjusted sandwich assembly.**
 
@@ -3614,6 +3650,23 @@ theorem olsHC2LinSEStar_tendstoInMeasure_of_feasibleHCLeverageConditions
     (V := heteroAsymCov μ X e)
     hV_meas hV
 
+/-- **Hansen §7.11, HC2 standard errors under compact robust moments.** -/
+theorem olsHC2LinSEStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Finite q]
+    (β : k → ℝ) (R : Matrix q k ℝ) (j : q)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Real.sqrt ((R * olsHetCovHC2Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) j j))
+      atTop (fun _ =>
+        Real.sqrt ((R * heteroAsymCov μ X e * Rᵀ) j j)) :=
+  olsHC2LinSEStar_tendstoInMeasure_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R j hm.toFeasibleHCLeverageConditions
+
 /-- **Hansen §7.11, packaged HC3 standard errors for fixed linear functions.** -/
 theorem olsHC3LinSEStar_tendstoInMeasure_of_feasibleHCLeverageConditions
     {μ : Measure Ω} [IsProbabilityMeasure μ]
@@ -3643,6 +3696,23 @@ theorem olsHC3LinSEStar_tendstoInMeasure_of_feasibleHCLeverageConditions
         (stackRegressors X n ω) (stackOutcomes y n ω))
     (V := heteroAsymCov μ X e)
     hV_meas hV
+
+/-- **Hansen §7.11, HC3 standard errors under compact robust moments.** -/
+theorem olsHC3LinSEStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Finite q]
+    (β : k → ℝ) (R : Matrix q k ℝ) (j : q)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Real.sqrt ((R * olsHetCovHC3Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) j j))
+      atTop (fun _ =>
+        Real.sqrt ((R * heteroAsymCov μ X e * Rᵀ) j j)) :=
+  olsHC3LinSEStar_tendstoInMeasure_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R j hm.toFeasibleHCLeverageConditions
 
 end Assumption72
 
