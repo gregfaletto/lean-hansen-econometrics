@@ -30,7 +30,8 @@ Current Lean coverage:
 - population linear projection algebra through Theorems 2.9 and 2.10
 - potential-outcomes API for Section 2.30:
   observed outcomes, individual/average/conditional treatment effects, a Mathlib `CondIndepFun` CIA
-  package, and variable-facing CATE bridges for Theorem 2.12
+  package, variable-facing CATE bridges for Theorem 2.12, and branchwise observed-regression
+  wrappers for conditioning on `(D, X)`
 
 Current strategy:
 - prove the strongest sigma-algebra or abstract statement first
@@ -38,8 +39,10 @@ Current strategy:
 - reuse Mathlib conditional-expectation and `L²` projection infrastructure where possible
 
 Next likely Chapter 2 targets:
-- decide whether the pointwise density notation `ACE(x)` or a literal observed-regression derivative
-  `m(1,x)-m(0,x)` interface is worth adding on top of the current a.e. variable-facing CATE theorem
+- decide whether the pointwise density notation `ACE(x)` is worth adding on top of the current a.e.
+  variable-facing CATE theorem
+- decide whether a literal two-evaluation `m(1,x)-m(0,x)` surface is worth adding beyond the current
+  branchwise observed-regression wrapper
 - decide whether any remaining Chapter 2 results are worth formalizing before moving on
 
 ## Proof Architecture
@@ -105,6 +108,9 @@ Then prove:
 - variable-facing **T2.12** bridges:
   if conditioning additionally on treatment does not change the potential-outcome conditional means,
   then the `(D, X)` potential-outcome contrast equals the CATE
+- observed-regression branch identities:
+  `E[Y | D, X]` equals the treated potential-outcome conditional mean on treated units and the
+  untreated potential-outcome conditional mean on untreated units, with a CIA-facing wrapper
 
 ## Textbook-numbered Results
 
@@ -282,6 +288,7 @@ Links:
 | $ACE(X) = E[Y(1)-Y(0) \mid X]$ | <code>conditionalAverageTreatmentEffectOn μ Y0 Y1 X</code> |
 | CIA mean-independence consequence | <code>TreatmentMeanIndependentOn μ Y0 Y1 D X</code> |
 | Variable-facing CIA package | <code>PotentialOutcomeCIAOn μ Y0 Y1 D X</code> |
+| Observed-outcome regression on treatment and covariates | <code>condExpOn μ (observedOutcome D Y0 Y1) (fun ω => (D ω, X ω))</code> |
 
 Notes:
 - Hansen calls the population quantity the average causal effect, `ACE`. The Lean API uses the more
@@ -301,13 +308,16 @@ Links:
 | $ACE = \int ACE(x) f(x)\,dx$ | <code>averageTreatmentEffect μ Y0 Y1 = ∫ ω, conditionalAverageTreatmentEffectOn μ Y0 Y1 X ω ∂μ</code> |
 | Under the mean-independence consequence of CIA, the treatment-and-covariate potential-outcome contrast equals CATE | <code>conditionalPotentialOutcomeContrastOn μ Y0 Y1 (fun ω => (D ω, X ω)) =ᵐ[μ] conditionalAverageTreatmentEffectOn μ Y0 Y1 X</code> |
 | Under the mean-independence consequence of CIA, CATE conditioned on treatment and covariates equals CATE conditioned on covariates | <code>conditionalAverageTreatmentEffectOn μ Y0 Y1 (fun ω => (D ω, X ω)) =ᵐ[μ] conditionalAverageTreatmentEffectOn μ Y0 Y1 X</code> |
+| Observed-outcome regression on `(D, X)` splits by treatment branch into the corresponding potential-outcome conditional mean | <code>condExpOn_observedOutcome_treatment_covariates_eq_branch</code> |
+| Under CIA, observed-outcome regression on `(D, X)` uses the `X`-conditioned potential-outcome mean on each treatment branch | <code>condExpOn_observedOutcome_treatment_covariates_eq_branch_of_CIA</code> |
 | Under CIA, the treatment-and-covariate potential-outcome contrast equals CATE | <code>conditionalPotentialOutcomeContrastOn_treatment_covariates_eq_cate_of_CIA</code> |
 | Under CIA, CATE conditioned on treatment and covariates equals CATE conditioned on covariates | <code>conditionalAverageTreatmentEffectOn_treatment_covariates_eq_of_CIA</code> |
 
 Notes:
 - The theorem is still variable-facing and a.e.-based rather than a pointwise density statement.
-- The literal observed-regression derivative interface `m(1,x)-m(0,x)` remains a possible wrapper if a
-  downstream chapter needs that exact notation.
+- The current observed-regression interface is branchwise at observed units. A literal
+  two-evaluation surface `m(1,x)-m(0,x)` remains possible if a downstream chapter needs that exact
+  notation.
 
 ## Lean-only Bridge Results
 
@@ -347,9 +357,16 @@ Hansen's notation and the Lean formalization.
   mean-independence bridge from conditioning on `(D, X)` to the CATE.
 - [`conditionalAverageTreatmentEffectOn_treatment_covariates_eq_of_meanIndependent`](../HansenEconometrics/Chapter2PotentialOutcomes.lean):
   direct CATE bridge from conditioning on `(D, X)` to conditioning on `X`.
+- [`condExpOn_observedOutcome_treatment_covariates_eq_branch`](../HansenEconometrics/Chapter2PotentialOutcomes.lean):
+  branchwise observed-regression decomposition for `E[Y | D, X]`.
+- [`condExpOn_observedOutcome_treatment_covariates_eq_branch_of_meanIndependent`](../HansenEconometrics/Chapter2PotentialOutcomes.lean):
+  mean-independence bridge from the observed regression on `(D, X)` to `X`-conditioned
+  potential-outcome means.
 - [`PotentialOutcomeCIAOn.toTreatmentMeanIndependentOn`](../HansenEconometrics/Chapter2PotentialOutcomes.lean):
   discharges the mean-independence bridge from conditional independence of treatment and potential
   outcomes given covariates, using Mathlib's conditional-distribution characterization.
 - [`conditionalPotentialOutcomeContrastOn_treatment_covariates_eq_cate_of_CIA`](../HansenEconometrics/Chapter2PotentialOutcomes.lean) and
   [`conditionalAverageTreatmentEffectOn_treatment_covariates_eq_of_CIA`](../HansenEconometrics/Chapter2PotentialOutcomes.lean):
   CIA-facing variable/a.e. CATE bridges for Hansen Theorem 2.12.
+- [`condExpOn_observedOutcome_treatment_covariates_eq_branch_of_CIA`](../HansenEconometrics/Chapter2PotentialOutcomes.lean):
+  CIA-facing observed-regression bridge for Hansen Theorem 2.12.

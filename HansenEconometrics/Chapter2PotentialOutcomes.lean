@@ -1,3 +1,4 @@
+import Mathlib.MeasureTheory.Function.ConditionalExpectation.Indicator
 import Mathlib.Probability.Independence.Conditional
 import HansenEconometrics.Chapter2CondExp
 
@@ -83,6 +84,26 @@ def TreatmentMeanIndependentOn
     (μ : Measure Ω) (Y0 Y1 : Ω → ℝ) (D : Ω → Bool) (X : Ω → β) : Prop :=
   condExpOn μ Y0 (fun ω => (D ω, X ω)) =ᵐ[μ] condExpOn μ Y0 X ∧
     condExpOn μ Y1 (fun ω => (D ω, X ω)) =ᵐ[μ] condExpOn μ Y1 X
+
+omit [MeasurableSpace Ω] in
+private theorem treatmentSet_measurable_conditioningSpace_pair
+    {D : Ω → Bool} {X : Ω → β} :
+    MeasurableSet[conditioningSpace (fun ω => (D ω, X ω))] {ω | D ω = true} := by
+  have hD_le : conditioningSpace D ≤ conditioningSpace (fun ω => (D ω, X ω)) := by
+    exact conditioningSpace_le_of_factor
+      (X₁ := D) (X₂ := fun ω => (D ω, X ω)) (f := Prod.fst) measurable_fst rfl
+  exact hD_le _ ((Measurable.of_comap_le le_rfl) (measurableSet_singleton true))
+
+omit [MeasurableSpace Ω] in
+private theorem observedOutcome_eq_indicator_add_compl
+    {D : Ω → Bool} {Y0 Y1 : Ω → ℝ} :
+    observedOutcome D Y0 Y1 =
+      fun ω => ({ω | D ω = true}.indicator Y1) ω +
+        ({ω | D ω = true}ᶜ.indicator Y0) ω := by
+  funext ω
+  by_cases hD : D ω = true
+  · simp [observedOutcome, hD]
+  · simp [observedOutcome, hD]
 
 /-- Hansen Definition 2.9, variable-facing conditional independence assumption.
 
@@ -206,6 +227,92 @@ theorem conditionalAverageTreatmentEffectOn_eq_conditionalPotentialOutcomeContra
       conditionalPotentialOutcomeContrastOn μ Y0 Y1 X := by
   simpa [conditionalPotentialOutcomeContrastOn] using
     conditionalAverageTreatmentEffectOn_eq_sub (μ := μ) (X := X) hY1 hY0
+
+/-- The observed-outcome conditional mean given treatment and covariates splits into the
+corresponding potential-outcome conditional mean on each treatment branch. This is the
+variable/a.e. regression-surface form behind Hansen's notation `m(d, x) = E[Y | D = d, X = x]`. -/
+theorem condExpOn_observedOutcome_treatment_covariates_eq_branch
+    {Y0 Y1 : Ω → ℝ} {D : Ω → Bool} {X : Ω → β}
+    (hD : Measurable D) (hY1 : Integrable Y1 μ) (hY0 : Integrable Y0 μ) :
+    condExpOn μ (observedOutcome D Y0 Y1) (fun ω => (D ω, X ω)) =ᵐ[μ]
+      fun ω =>
+        if D ω then
+          condExpOn μ Y1 (fun ω => (D ω, X ω)) ω
+        else
+          condExpOn μ Y0 (fun ω => (D ω, X ω)) ω := by
+  let Z : Ω → Bool × β := fun ω => (D ω, X ω)
+  let s : Set Ω := {ω | D ω = true}
+  have hs : MeasurableSet s := hD (measurableSet_singleton true)
+  let mZ := conditioningSpace Z
+  have hs_m : MeasurableSet[mZ] s := by
+    simpa [mZ, Z, s] using
+      (treatmentSet_measurable_conditioningSpace_pair (D := D) (X := X))
+  have hY1_ind : Integrable (s.indicator Y1) μ := hY1.indicator hs
+  have hY0_ind : Integrable (sᶜ.indicator Y0) μ := hY0.indicator hs.compl
+  have hadd :
+      μ[(fun ω => s.indicator Y1 ω + sᶜ.indicator Y0 ω) | mZ] =ᵐ[μ]
+        μ[s.indicator Y1 | mZ] + μ[sᶜ.indicator Y0 | mZ] := by
+    simpa using
+      (MeasureTheory.condExp_add
+        (μ := μ) (f := s.indicator Y1) (g := sᶜ.indicator Y0) hY1_ind hY0_ind mZ)
+  have htreated :
+      μ[s.indicator Y1 | mZ] =ᵐ[μ] s.indicator (μ[Y1 | mZ]) :=
+    MeasureTheory.condExp_indicator (μ := μ) (m := mZ) (f := Y1) (s := s) hY1 hs_m
+  have huntreated :
+      μ[sᶜ.indicator Y0 | mZ] =ᵐ[μ] sᶜ.indicator (μ[Y0 | mZ]) :=
+    MeasureTheory.condExp_indicator
+      (μ := μ) (m := mZ) (f := Y0) (s := sᶜ) hY0 hs_m.compl
+  have hbranch :
+      μ[(fun ω => s.indicator Y1 ω + sᶜ.indicator Y0 ω) | mZ] =ᵐ[μ]
+        fun ω => if D ω then μ[Y1 | mZ] ω else μ[Y0 | mZ] ω := by
+    filter_upwards [hadd, htreated, huntreated] with ω haddω htreatedω huntreatedω
+    rw [haddω]
+    change μ[s.indicator Y1 | mZ] ω + μ[sᶜ.indicator Y0 | mZ] ω =
+      if D ω then μ[Y1 | mZ] ω else μ[Y0 | mZ] ω
+    rw [htreatedω, huntreatedω]
+    by_cases hDω : D ω = true
+    · simp [s, hDω]
+    · simp [s, hDω]
+  simpa [condExpOn, Z, mZ, s, observedOutcome_eq_indicator_add_compl] using hbranch
+
+/-- Under the mean-independence consequence of CIA, the observed-outcome regression on treatment
+and covariates uses the `X`-conditioned treated potential-outcome mean on treated units and the
+`X`-conditioned untreated potential-outcome mean on untreated units. -/
+theorem condExpOn_observedOutcome_treatment_covariates_eq_branch_of_meanIndependent
+    {Y0 Y1 : Ω → ℝ} {D : Ω → Bool} {X : Ω → β}
+    (hmean : TreatmentMeanIndependentOn μ Y0 Y1 D X)
+    (hD : Measurable D) (hY1 : Integrable Y1 μ) (hY0 : Integrable Y0 μ) :
+    condExpOn μ (observedOutcome D Y0 Y1) (fun ω => (D ω, X ω)) =ᵐ[μ]
+      fun ω =>
+        if D ω then
+          potentialOutcomeMeanOn μ Y1 X ω
+        else
+          potentialOutcomeMeanOn μ Y0 X ω := by
+  have hbranch :=
+    condExpOn_observedOutcome_treatment_covariates_eq_branch
+      (μ := μ) (Y0 := Y0) (Y1 := Y1) (D := D) (X := X) hD hY1 hY0
+  filter_upwards [hbranch, hmean.2, hmean.1] with ω hobs hY1_eq hY0_eq
+  rw [hobs]
+  by_cases hDω : D ω = true
+  · simp [potentialOutcomeMeanOn, hDω, hY1_eq]
+  · simp [potentialOutcomeMeanOn, hDω, hY0_eq]
+
+/-- CIA-facing observed-regression bridge for Hansen Theorem 2.12. Conditional independence of
+treatment and potential outcomes given covariates identifies the observed-outcome regression on
+`(D, X)` with the corresponding branch of the `X`-conditioned potential-outcome means. -/
+theorem condExpOn_observedOutcome_treatment_covariates_eq_branch_of_CIA
+    [StandardBorelSpace Ω] [IsFiniteMeasure μ]
+    {Y0 Y1 : Ω → ℝ} {D : Ω → Bool} {X : Ω → β}
+    (hcia : PotentialOutcomeCIAOn μ Y0 Y1 D X) :
+    condExpOn μ (observedOutcome D Y0 Y1) (fun ω => (D ω, X ω)) =ᵐ[μ]
+      fun ω =>
+        if D ω then
+          potentialOutcomeMeanOn μ Y1 X ω
+        else
+          potentialOutcomeMeanOn μ Y0 X ω :=
+  condExpOn_observedOutcome_treatment_covariates_eq_branch_of_meanIndependent
+    (μ := μ) hcia.toTreatmentMeanIndependentOn hcia.d_measurable
+    hcia.y1_integrable hcia.y0_integrable
 
 /-- The average treatment effect is the mean of the CATE. Hansen writes this as the identity
 `ACE = ∫ ACE(x) f(x) dx`; this is the potential-outcomes version of the tower property. -/

@@ -53,7 +53,7 @@ Legend:
 | ch | title | status | notes |
 |---:|---|---|---|
 | 01 | Introduction | not started | text extracted and inventoried; mostly exposition |
-| 02 | Conditional Expectation and Projection | partial | conditional expectation, variance, linear projection algebra, and variable-facing potential-outcomes/CIA CATE wrappers completed |
+| 02 | Conditional Expectation and Projection | partial | conditional expectation, variance, linear projection algebra, and variable-facing potential-outcomes/CIA CATE plus observed-regression wrappers completed |
 | 03 | The Algebra of Least Squares | partial | OLS algebra + projection/annihilator (incl. rank), leverage identities/bounds, reduced-Gram and literal row-deleted leave-one-out formulas, influence diagnostics, and FWL coefficient/residual core landed |
 | 04 | Least Squares Regression | partial | OLS/GLS algebra, unbiasedness, covariance identities, Gauss-Markov lower bounds, `s²` unbiasedness, HC2/HC3, and clustered covariance definitions/finite-sample adjustment landed |
 | 05 | Normal Regression | partial | multivariate-normal wrappers, normal-model scaffolding, finite-sample Gaussian/chi-square/Student-t/F laws, confidence intervals, and classical test results landed; Kinal moment threshold deferred |
@@ -87,7 +87,8 @@ Legend:
 Completed in `HansenEconometrics/Chapter2CondExp.lean`,
 `HansenEconometrics/Chapter2Variance.lean`,
 `HansenEconometrics/ProbabilityUtils.lean`,
-and `HansenEconometrics/Chapter2LinearProjection.lean`:
+`HansenEconometrics/Chapter2LinearProjection.lean`,
+and `HansenEconometrics/Chapter2PotentialOutcomes.lean`:
 - reusable helper definitions `conditioningSpace`, `XMeasurable`, `condExpOn`, `cefErrorOn`,
   `condVarOn`, and `residualVarOn`
 - coordinatewise conditional-expectation / integral bridge lemmas for finite-dimensional random
@@ -110,6 +111,9 @@ and `HansenEconometrics/Chapter2LinearProjection.lean`:
 - population normal equations and orthogonality for the best linear projection
 - uniqueness from the population normal equations
 - quadratic projection criterion simplification at the projection coefficient
+- potential-outcomes definitions for observed outcome, treatment effect, ATE, and CATE
+- CIA package via Mathlib conditional independence and conditional distributions
+- branchwise observed-regression bridge for `E[Y | D, X]` under mean independence / CIA
 
 Planned next within Chapter 2:
 - additional best-linear-predictor corollaries beyond the current conditional-mean result
