@@ -108,11 +108,58 @@ theorem hatMatrix_trace
     _ = Fintype.card k := by
           rw [Matrix.trace_one]
 
+/-- Hansen equation (3.40): the `i`th leverage value is the `i`th diagonal
+entry of the hat matrix. -/
+noncomputable def leverageValue
+    (X : Matrix n k ℝ) [Invertible (Xᵀ * X)] (i : n) : ℝ :=
+  hatMatrix X i i
+
+/-- Hansen equation (3.40): leverage as the row quadratic form
+`xᵢ'(X'X)⁻¹xᵢ`. -/
+theorem leverageValue_eq_row_invGram_row
+    (X : Matrix n k ℝ) [Invertible (Xᵀ * X)] (i : n) :
+    leverageValue X i = X i ⬝ᵥ (⅟ (Xᵀ * X) *ᵥ X i) := by
+  unfold leverageValue hatMatrix
+  rw [Matrix.dotProduct_mulVec]
+  simp [Matrix.mul_apply, Matrix.vecMul, dotProduct, Matrix.transpose_apply]
+
+/-- Hansen Theorem 3.6.1: leverage values are nonnegative. -/
+theorem leverageValue_nonneg
+    (X : Matrix n k ℝ) [Invertible (Xᵀ * X)] (i : n) :
+    0 ≤ leverageValue X i := by
+  unfold leverageValue
+  exact diag_nonneg_of_symm_idempotent
+    (hatMatrix X) (hatMatrix_transpose X) (hatMatrix_idempotent X) i
+
+/-- Hansen Theorem 3.6.3: the leverage values sum to the number of regressors. -/
+theorem sum_leverageValue_eq_card
+    (X : Matrix n k ℝ) [Invertible (Xᵀ * X)] :
+    ∑ i : n, leverageValue X i = (Fintype.card k : ℝ) := by
+  calc
+    ∑ i : n, leverageValue X i = Matrix.trace (hatMatrix X) := by
+      simp [leverageValue, Matrix.trace]
+    _ = (Fintype.card k : ℝ) := by
+      simpa using hatMatrix_trace (X := X)
+
 /-- Hansen Section 3.12 / Exercise 3.8: the annihilator matrix is idempotent. -/
 theorem annihilatorMatrix_idempotent
     (X : Matrix n k ℝ) [DecidableEq n] [Invertible (Xᵀ * X)] :
     annihilatorMatrix X * annihilatorMatrix X = annihilatorMatrix X := by
   simp [annihilatorMatrix, Matrix.sub_mul, Matrix.mul_sub, hatMatrix_idempotent]
+
+/-- Hansen Theorem 3.6.1: leverage values are bounded above by one. -/
+theorem leverageValue_le_one
+    (X : Matrix n k ℝ) [Invertible (Xᵀ * X)] (i : n) :
+    leverageValue X i ≤ 1 := by
+  classical
+  have hdiag_nonneg : 0 ≤ annihilatorMatrix X i i :=
+    diag_nonneg_of_symm_idempotent
+      (annihilatorMatrix X) (annihilatorMatrix_transpose X)
+      (annihilatorMatrix_idempotent X) i
+  have hdiag_eq : annihilatorMatrix X i i = 1 - hatMatrix X i i := by
+    simp [annihilatorMatrix, Matrix.sub_apply]
+  unfold leverageValue
+  linarith
 
 /-- Hansen Exercise 3.7: the annihilator kills the hat matrix on the left. -/
 theorem annihilator_mul_hatMatrix
