@@ -1069,6 +1069,30 @@ theorem olsHomoLinWaldStatOrZero_tendstoInDistribution_chiSquared_one_homo
         (μ := μ) (X := X) (e := e) (y := y)
         hclt hvar β R hmodel hX_meas he_meas hX0 hhomo hse_pos)
 
+/-- IID joint-observation scalar homoskedastic Wald statistic from homoskedasticity. -/
+theorem olsHomoLinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_iidRobustFeasibleHC
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hX0 : Measurable (X 0))
+    [SigmaFinite (μ.trim (conditioningSpace_le hX0))]
+    (hhomo : HomoskedasticErrorVariance μ X e)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (homoAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearWaldStatOrZero R
+          (olsHomoCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared 1) :=
+  olsHomoLinWaldStatOrZero_tendstoInDistribution_chiSquared_one_homo
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toScoreCLTConditions hm.toErrorVarianceConsistencyConditions β R hm.model
+    hm.x_aestronglyMeasurable hm.e_aestronglyMeasurable hX0 hhomo hse_pos
+
 /-- **Hansen Theorem 7.11, HC0 t-statistic for a scalar linear function.**
 
 For a one-dimensional fixed linear map `R`, the HC0-studentized totalized OLS

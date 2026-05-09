@@ -208,6 +208,8 @@ structure IidRobustFeasibleHCMomentConditions (μ : Measure Ω) [IsProbabilityMe
   int_outer : Integrable (fun ω => Matrix.vecMulVec (X 0 ω) (X 0 ω)) μ
   /-- Integrability of the one-row score vector `e₀X₀`. -/
   int_cross : Integrable (fun ω => e 0 ω • X 0 ω) μ
+  /-- Integrability of the one-row squared structural error. -/
+  int_error_sq : Integrable (fun ω => e 0 ω ^ 2) μ
   /-- Population Gram matrix `Q := E[X₀X₀ᵀ]` is nonsingular. -/
   Q_nonsing : IsUnit (μ[fun ω => Matrix.vecMulVec (X 0 ω) (X 0 ω)]).det
   /-- Population orthogonality `E[e₀X₀] = 0`. -/
@@ -260,6 +262,11 @@ private lemma measurable_jointCross :
   rw [measurable_pi_iff]
   intro i
   simpa using measurable_snd.mul ((measurable_pi_apply i).comp measurable_fst)
+
+omit [Fintype k] [DecidableEq k] in
+private lemma measurable_jointErrorSq :
+    Measurable (fun z : (k → ℝ) × ℝ => z.2 ^ 2) := by
+  exact measurable_snd.pow_const 2
 
 omit [DecidableEq k] in
 private lemma measurable_jointScoreOuter :
@@ -368,6 +375,20 @@ private theorem cross_pairwise_indep
   intro i j hij
   exact hindep.indepFun hij
 
+/-- IID joint observations imply pairwise independence of squared errors
+used by the residual-variance consistency package. -/
+private theorem error_sq_pairwise_indep
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    Pairwise ((· ⟂ᵢ[μ] ·) on (fun i ω => e i ω ^ 2)) := by
+  have hindep : iIndepFun (fun i ω => e i ω ^ 2) μ := by
+    simpa [Function.comp] using
+      h.joint_iIndep.comp (fun _ z => z.2 ^ 2)
+        (fun _ => measurable_jointErrorSq)
+  intro i j hij
+  exact hindep.indepFun hij
+
 /-- IID joint observations imply full independence of the score-vector
 sequence used by the score CLT package. -/
 private theorem cross_iIndep
@@ -427,6 +448,21 @@ theorem toLeastSquaresConsistencyConditions
   int_cross := h.int_cross
   Q_nonsing := h.Q_nonsing
   orthogonality := h.orthogonality
+
+/-- The iid joint-observation package discharges the residual-variance
+condition package by mapping iid observations through squared errors. -/
+theorem toErrorVarianceConsistencyConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    ErrorVarianceConsistencyConditions μ X e where
+  toLeastSquaresConsistencyConditions := h.toLeastSquaresConsistencyConditions
+  indep_error_sq := error_sq_pairwise_indep h
+  ident_error_sq := by
+    intro i
+    have hi := (h.joint_identDistrib i).comp measurable_jointErrorSq
+    simpa [Function.comp] using hi
+  int_error_sq := h.int_error_sq
 
 /-- The iid joint-observation package discharges the score-CLT condition
 package once scalar score-projection square-integrability is supplied. -/
@@ -3924,6 +3960,48 @@ theorem olsHC3LinSEStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
   olsHC3LinSEStar_tendstoInMeasure_of_feasibleHCLeverageConditions
     (μ := μ) (X := X) (e := e) (y := y)
     hm.toRobustCovarianceConsistencyConditions β R j hm.toFeasibleHCLeverageConditions
+
+/-- IID joint-observation residual-variance consistency for `σ̂²`. -/
+theorem olsSigmaSqHatStar_tendstoInMeasure_errorVariance_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (hm : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsSigmaSqHatStar
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => errorVariance μ e) :=
+  olsSigmaSqHatStar_tendstoInMeasure_errorVariance
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toErrorVarianceConsistencyConditions β hm.model
+
+/-- IID joint-observation residual-variance consistency for `s²`. -/
+theorem olsS2Star_tendstoInMeasure_errorVariance_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (hm : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsS2Star
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => errorVariance μ e) :=
+  olsS2Star_tendstoInMeasure_errorVariance
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toErrorVarianceConsistencyConditions β hm.model
+
+/-- IID joint-observation homoskedastic covariance consistency. -/
+theorem olsHomoCovStar_tendstoInMeasure_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (hm : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHomoCovStar
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => homoAsymCov μ X e) :=
+  olsHomoCovStar_tendstoInMeasure
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toErrorVarianceConsistencyConditions β hm.model
 
 /-- IID joint-observation HC0 sandwich consistency. -/
 theorem olsHetCovStar_tendstoInMeasure_of_iidRobustFeasibleHCMomentConditions

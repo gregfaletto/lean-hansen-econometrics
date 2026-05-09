@@ -1979,6 +1979,31 @@ theorem linMap_olsHomoWaldStatOrZero_tendstoInDistribution_chiSquared_homo
     (μ := μ) (X := X) (e := e) (y := y) (r := r)
     hclt hvar β R hmodel hX_meas he_meas hΩ hV_posDef
 
+/-- IID joint-observation multivariate homoskedastic Wald statistic from homoskedasticity. -/
+theorem linMap_olsHomoWaldStatOrZero_tendstoInDistribution_chiSquared_of_iidRobustFeasibleHC
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (β : k → ℝ) (R : Matrix (Fin r) k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hX0 : Measurable (X 0))
+    [SigmaFinite (μ.trim (conditioningSpace_le hX0))]
+    (hhomo : HomoskedasticErrorVariance μ X e)
+    (hV_posDef : (R * homoAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHomoCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHomoWaldStatOrZero_tendstoInDistribution_chiSquared_homo
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    hm.toScoreCLTConditions hm.toErrorVarianceConsistencyConditions β R hm.model
+    hm.x_aestronglyMeasurable hm.e_aestronglyMeasurable hX0 hhomo hV_posDef
+
 /-- Multivariate HC0 Wald statistic for totalized OLS. -/
 theorem linMap_olsHC0WaldStatStar_tendstoInDistribution_chiSquared
     {μ : Measure Ω} [IsProbabilityMeasure μ]
