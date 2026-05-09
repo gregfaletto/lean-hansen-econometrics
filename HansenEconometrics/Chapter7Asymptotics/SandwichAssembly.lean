@@ -836,6 +836,82 @@ theorem randomLinearMapCovariance_tendstoInMeasure
     hLeft_meas hRt_meas hLeft hRt
   simpa [Matrix.mul_assoc] using hFull
 
+/-- **Hansen Theorem 7.10, nonlinear plug-in derivative covariance.**
+
+If the derivative map `R(β)` is continuous at the true parameter and a
+covariance estimator `V̂ₙ` is consistent for `V`, then the plug-in nonlinear
+covariance `R(β̂*ₙ) V̂ₙ R(β̂*ₙ)ᵀ` converges to `R(β) V R(β)ᵀ`. This packages
+the covariance continuous-mapping step for nonlinear functions of OLS. -/
+theorem nonlinearDerivativeCovariance_olsBetaStar_tendstoInMeasure
+    {μ : Measure Ω} [IsFiniteMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ} (β : k → ℝ)
+    (h : LeastSquaresConsistencyConditions μ X e)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    {q : Type*} [Fintype q]
+    (Rfun : (k → ℝ) → Matrix q k ℝ) (hRfun : ContinuousAt Rfun β)
+    (hR_meas : ∀ n, AEStronglyMeasurable
+      (fun ω => Rfun
+        (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω))) μ)
+    {Vhat : ℕ → Ω → Matrix k k ℝ} {V : Matrix k k ℝ}
+    (hV_meas : ∀ n, AEStronglyMeasurable (Vhat n) μ)
+    (hV : TendstoInMeasure μ Vhat atTop (fun _ => V)) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Rfun (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω)) *
+          Vhat n ω *
+          (Rfun (olsBetaStar
+            (stackRegressors X n ω) (stackOutcomes y n ω)))ᵀ)
+      atTop (fun _ => Rfun β * V * (Rfun β)ᵀ) := by
+  have hR : TendstoInMeasure μ
+      (fun n ω =>
+        Rfun (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω)))
+      atTop (fun _ => Rfun β) :=
+    continuousAt_function_olsBetaStar_tendstoInMeasure
+      (μ := μ) (X := X) (e := e) (y := y) β h hmodel Rfun hRfun hR_meas
+  exact randomLinearMapCovariance_tendstoInMeasure
+    (μ := μ)
+    (Rhat := fun n ω =>
+      Rfun (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω)))
+    (R := Rfun β) (Vhat := Vhat) (V := V)
+    hR_meas hV_meas hR hV
+
+/-- **Hansen Theorem 7.10, ordinary-wrapper nonlinear derivative covariance.**
+
+This is the ordinary-on-nonsingular counterpart of
+`nonlinearDerivativeCovariance_olsBetaStar_tendstoInMeasure`. -/
+theorem nonlinearDerivativeCovariance_olsBetaOrZero_tendstoInMeasure
+    {μ : Measure Ω} [IsFiniteMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ} (β : k → ℝ)
+    (h : LeastSquaresConsistencyConditions μ X e)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    {q : Type*} [Fintype q]
+    (Rfun : (k → ℝ) → Matrix q k ℝ) (hRfun : ContinuousAt Rfun β)
+    (hR_meas : ∀ n, AEStronglyMeasurable
+      (fun ω => Rfun
+        (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω))) μ)
+    {Vhat : ℕ → Ω → Matrix k k ℝ} {V : Matrix k k ℝ}
+    (hV_meas : ∀ n, AEStronglyMeasurable (Vhat n) μ)
+    (hV : TendstoInMeasure μ Vhat atTop (fun _ => V)) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Rfun (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω)) *
+          Vhat n ω *
+          (Rfun (olsBetaOrZero
+            (stackRegressors X n ω) (stackOutcomes y n ω)))ᵀ)
+      atTop (fun _ => Rfun β * V * (Rfun β)ᵀ) := by
+  have hR : TendstoInMeasure μ
+      (fun n ω =>
+        Rfun (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω)))
+      atTop (fun _ => Rfun β) :=
+    continuousAt_function_olsBetaOrZero_tendstoInMeasure
+      (μ := μ) (X := X) (e := e) (y := y) β h hmodel Rfun hRfun hR_meas
+  exact randomLinearMapCovariance_tendstoInMeasure
+    (μ := μ)
+    (Rhat := fun n ω =>
+      Rfun (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω)))
+    (R := Rfun β) (Vhat := Vhat) (V := V)
+    hR_meas hV_meas hR hV
+
 omit [DecidableEq k] in
 /-- AEMeasurability of a fixed linear covariance transform `R V Rᵀ`. -/
 theorem linMapCov_aestronglyMeasurable

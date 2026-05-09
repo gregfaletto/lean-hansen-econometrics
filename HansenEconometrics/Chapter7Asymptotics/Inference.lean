@@ -105,6 +105,20 @@ noncomputable def linearRestrictionStdError
     (R : Matrix Unit k ℝ) (Vhat : Matrix k k ℝ) : ℝ :=
   Real.sqrt ((R * Vhat * Rᵀ) () ())
 
+/-- Scalar t-statistic for a generic nonlinear scalar parameter transform. -/
+@[reducible]
+noncomputable def scalarFunctionTStat
+    (θhat θ se root : ℝ) : ℝ :=
+  root * (θhat - θ) / se
+
+/-- Symmetric confidence-interval membership for a generic nonlinear scalar parameter transform. -/
+@[reducible]
+noncomputable def scalarFunctionCIEvent
+    (θhat θ se root crit : ℝ) : Prop :=
+  θ ∈ Set.Icc
+    (θhat - crit * se / root)
+    (θhat + crit * se / root)
+
 omit [DecidableEq k] in
 /-- Numerator of the scalar t-statistic for totalized OLS. -/
 @[reducible]
@@ -422,6 +436,63 @@ theorem studentizedLimit_tendstoInDistribution
   exact tendstoInDistribution_div_of_tendstoInMeasure_const_pos
     (μ := μ) (ν := ν) (X := num) (Y := se) (Z := Z) (c := c)
     hc hnum hse hse_meas hratio_meas
+
+/-- **Hansen Theorem 7.11, generic nonlinear scalar t-statistic.**
+
+If the scaled scalar plug-in error has a distributional limit and the nonlinear
+standard error converges in probability to a positive constant, then the
+studentized nonlinear scalar statistic converges to the corresponding ratio
+limit. -/
+theorem nonlinearScalarTStat_tendstoInDistribution
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    {θ : ℝ} {θhat se : ℕ → Ω → ℝ} {root : ℕ → ℝ}
+    {Z : Ω' → ℝ} {c : ℝ}
+    (hc : 0 < c)
+    (hnum : TendstoInDistribution
+      (fun n ω => root n * (θhat n ω - θ))
+      atTop Z (fun _ => μ) ν)
+    (hse : TendstoInMeasure μ se atTop (fun _ => c))
+    (hse_meas : ∀ n, AEMeasurable (se n) μ) :
+    TendstoInDistribution
+      (fun n ω => scalarFunctionTStat (θhat n ω) θ (se n ω) (root n))
+      atTop (fun ω => Z ω / c) (fun _ => μ) ν := by
+  simpa [scalarFunctionTStat] using
+    studentizedLimit_tendstoInDistribution
+      (μ := μ) (ν := ν)
+      (num := fun n ω => root n * (θhat n ω - θ))
+      (se := se) (Z := Z) (c := c)
+      hc hnum hse hse_meas
+
+/-- **Hansen Theorem 7.12, nonlinear scalar CI coverage from a signed t limit.**
+
+If a nonlinear scalar t-statistic has the standard-normal limit and its standard
+error converges to a positive constant, then the usual symmetric confidence
+interval has standard-normal asymptotic coverage. -/
+theorem nonlinearScalarCI_coverage_of_tstat_standardNormal_se_tendsto_pos
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {θ crit c : ℝ}
+    {θhat se : ℕ → Ω → ℝ} {root : ℕ → ℝ}
+    (hroot : ∀ᶠ n in atTop, 0 < root n)
+    (hc : 0 < c)
+    (hse : TendstoInMeasure μ se atTop (fun _ => c))
+    (hT : TendstoInDistribution
+      (fun n ω => scalarFunctionTStat (θhat n ω) θ (se n ω) (root n))
+      atTop (fun x : ℝ => x) (fun _ => μ) (gaussianReal 0 1)) :
+    Tendsto
+      (fun n => μ {ω |
+        scalarFunctionCIEvent (θhat n ω) θ (se n ω) (root n) crit})
+      atTop
+      (𝓝 (((gaussianReal 0 1).map (fun x : ℝ => |x|)) (Set.Iic crit))) := by
+  have hAbs : TendstoInDistribution
+      (fun n ω => |scalarFunctionTStat (θhat n ω) θ (se n ω) (root n)|)
+      atTop (fun x : ℝ => |x|) (fun _ => μ) (gaussianReal 0 1) := by
+    simpa [Function.comp_def] using hT.continuous_comp continuous_abs
+  simpa [scalarFunctionCIEvent, scalarFunctionTStat] using
+    symmetricCI_coverage_of_abs_tstat_standardNormal_se_tendsto_pos
+      (μ := μ) (θ := θ) (crit := crit) (c := c)
+      (θhat := θhat) (se := se) (root := root)
+      hroot hc hse hAbs
 
 /-- **Hansen §7.17, homoskedastic t-statistic for a scalar linear function.**
 

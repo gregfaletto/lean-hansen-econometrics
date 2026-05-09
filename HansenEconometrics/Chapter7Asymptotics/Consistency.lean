@@ -1137,6 +1137,44 @@ theorem continuousAt_function_olsBetaStar_tendstoInMeasure
       (μ := μ) (X := X) (e := e) (y := y) β h hmodel)
     hφ
 
+/-- **Hansen Theorem 7.8, finite-dimensional parameter transforms.**
+
+For a vector-valued parameter transform `r : ℝᵏ → ℝᵠ`, totalized OLS
+consistency transfers to the plug-in transform `r(β̂*ₙ)`. This is the
+textbook-shaped finite-dimensional wrapper around
+`continuous_function_olsBetaStar_tendstoInMeasure`. -/
+theorem parameterTransform_olsBetaStar_tendstoInMeasure
+    {μ : Measure Ω} [IsFiniteMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ} (β : k → ℝ)
+    (h : LeastSquaresConsistencyConditions μ X e)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    {q : Type*} [Fintype q]
+    (r : (k → ℝ) → q → ℝ) (hr : Continuous r) :
+    TendstoInMeasure μ
+      (fun n ω => r (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω)))
+      atTop (fun _ => r β) := by
+  exact continuous_function_olsBetaStar_tendstoInMeasure
+    (μ := μ) (X := X) (e := e) (y := y) β h hmodel r hr
+
+/-- **Hansen Theorem 7.8, local finite-dimensional parameter transforms.**
+
+The finite-dimensional transform need only be continuous at the true parameter
+`β`; measurability of the composed plug-in transform is kept explicit. -/
+theorem parameterTransform_olsBetaStar_tendstoInMeasure_of_continuousAt
+    {μ : Measure Ω} [IsFiniteMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ} (β : k → ℝ)
+    (h : LeastSquaresConsistencyConditions μ X e)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    {q : Type*} [Fintype q]
+    (r : (k → ℝ) → q → ℝ) (hr : ContinuousAt r β)
+    (hr_meas : ∀ n, AEStronglyMeasurable
+      (fun ω => r (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω))) μ) :
+    TendstoInMeasure μ
+      (fun n ω => r (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω)))
+      atTop (fun _ => r β) := by
+  exact continuousAt_function_olsBetaStar_tendstoInMeasure
+    (μ := μ) (X := X) (e := e) (y := y) β h hmodel r hr hr_meas
+
 /-- **Hansen Theorem 7.8 for ordinary OLS on nonsingular samples.**
 
 The same continuous-function consistency statement holds for `olsBetaOrZero`,
@@ -1211,6 +1249,42 @@ theorem continuousAt_function_olsBetaOrZero_tendstoInMeasure
     (olsBetaOrZero_stack_tendstoInMeasure_beta
       (μ := μ) (X := X) (e := e) (y := y) β h hmodel)
     hφ
+
+/-- **Hansen Theorem 7.8, ordinary-wrapper finite-dimensional transforms.**
+
+For a vector-valued parameter transform `r`, the ordinary-on-nonsingular OLS
+wrapper has the same plug-in consistency as the totalized estimator. -/
+theorem parameterTransform_olsBetaOrZero_tendstoInMeasure
+    {μ : Measure Ω} [IsFiniteMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ} (β : k → ℝ)
+    (h : LeastSquaresConsistencyConditions μ X e)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    {q : Type*} [Fintype q]
+    (r : (k → ℝ) → q → ℝ) (hr : Continuous r) :
+    TendstoInMeasure μ
+      (fun n ω => r (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω)))
+      atTop (fun _ => r β) := by
+  exact continuous_function_olsBetaOrZero_tendstoInMeasure
+    (μ := μ) (X := X) (e := e) (y := y) β h hmodel r hr
+
+/-- **Hansen Theorem 7.8, local ordinary-wrapper parameter transforms.**
+
+The ordinary-on-nonsingular plug-in transform is consistent under continuity at
+`β`, with the composed-transform measurability supplied explicitly. -/
+theorem parameterTransform_olsBetaOrZero_tendstoInMeasure_of_continuousAt
+    {μ : Measure Ω} [IsFiniteMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ} (β : k → ℝ)
+    (h : LeastSquaresConsistencyConditions μ X e)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    {q : Type*} [Fintype q]
+    (r : (k → ℝ) → q → ℝ) (hr : ContinuousAt r β)
+    (hr_meas : ∀ n, AEStronglyMeasurable
+      (fun ω => r (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω))) μ) :
+    TendstoInMeasure μ
+      (fun n ω => r (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω)))
+      atTop (fun _ => r β) := by
+  exact continuousAt_function_olsBetaOrZero_tendstoInMeasure
+    (μ := μ) (X := X) (e := e) (y := y) β h hmodel r hr hr_meas
 
 /-- **Hansen Theorem 7.16, max residual rate packaging.**
 
