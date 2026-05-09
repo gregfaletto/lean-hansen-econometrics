@@ -402,6 +402,24 @@ theorem olsBetaStar_vector_tendstoInDistribution_multivariateGaussian
     (scoreVector_sampleCrossMoment_tendstoInDistribution_multivariateGaussian
       (μ := μ) (X := X) (e := e) h)
 
+/-- **Hansen Theorem 7.16/7.3 bridge, totalized estimator.**
+
+The vector OLS CLT implies the scaled coefficient error
+`√n(β̂*ₙ - β)` is bounded in probability. This is the coefficient-error factor
+needed by the max-residual product-rate proof. -/
+theorem sqrt_smul_olsBetaStar_sub_boundedInProbabilityNorm
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : ScoreCLTConditions μ X e) (β : k → ℝ)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω) :
+    BoundedInProbabilityNorm μ
+      (fun (n : ℕ) ω =>
+        Real.sqrt (n : ℝ) •
+          (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β)) := by
+  exact BoundedInProbabilityNorm.of_tendstoInDistribution
+    (olsBetaStar_vector_tendstoInDistribution_multivariateGaussian
+      (μ := μ) (X := X) (e := e) (y := y) h β hmodel)
+
 /-- **Hansen Theorem 7.3, ordinary-wrapper vector asymptotic normality.**
 
 The same non-conditional vector CLT for the textbook-facing `olsBetaOrZero`
@@ -426,6 +444,23 @@ theorem olsBetaOrZero_vector_tendstoInDistribution_multivariateGaussian
     h.toSampleMomentAssumption71 β hmodel
     (scoreVector_sampleCrossMoment_tendstoInDistribution_multivariateGaussian
       (μ := μ) (X := X) (e := e) h)
+
+/-- **Hansen Theorem 7.16/7.3 bridge, ordinary-wrapper estimator.**
+
+The ordinary-on-nonsingular wrapper has the same bounded scaled coefficient
+error as `olsBetaStar`. -/
+theorem sqrt_smul_olsBetaOrZero_sub_boundedInProbabilityNorm
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : ScoreCLTConditions μ X e) (β : k → ℝ)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω) :
+    BoundedInProbabilityNorm μ
+      (fun (n : ℕ) ω =>
+        Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)) := by
+  exact BoundedInProbabilityNorm.of_tendstoInDistribution
+    (olsBetaOrZero_vector_tendstoInDistribution_multivariateGaussian
+      (μ := μ) (X := X) (e := e) (y := y) h β hmodel)
 
 /-- **Hansen Theorem 7.9, nonlinear Delta-method wrapper for totalized OLS.**
 
