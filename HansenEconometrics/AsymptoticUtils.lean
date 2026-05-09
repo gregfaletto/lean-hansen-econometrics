@@ -21,6 +21,8 @@ Mathlib does not currently provide as named lemmas:
   implies convergence in measure.
 * `tendstoInMeasure_transformed_wlln` — Hansen Theorem 6.2 as a transformed
   WLLN wrapper over `tendstoInMeasure_wlln`.
+* `tendstoInDistribution_continuous_comp` — Hansen Theorem 6.7 in the global
+  continuous-map case, wrapping Mathlib's distributional CMT.
 
 Both are stated for general Banach-space codomains, so they specialize
 directly to scalar, vector, and matrix random variables.
@@ -84,6 +86,23 @@ theorem tendstoInMeasure_continuousAt_const_comp
   refine ⟨ns', hns', ?_⟩
   filter_upwards [hae] with ω hω
   exact hh.tendsto.comp hω
+
+/-- **Hansen Theorem 6.7, global continuous-mapping theorem in distribution.**
+
+If `Xₙ ⇒ Z` and `g` is globally continuous, then `g(Xₙ) ⇒ g(Z)`. This is the
+Mathlib-backed global-continuity face of Hansen's distributional CMT; the
+textbook's a.s.-continuity variant is stronger and can be added separately if a
+downstream proof needs it. -/
+theorem tendstoInDistribution_continuous_comp
+    {Ω Ω' E F : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {P : ℕ → Measure Ω} [∀ n, IsProbabilityMeasure (P n)]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    [TopologicalSpace E] [MeasurableSpace E] [OpensMeasurableSpace E]
+    [TopologicalSpace F] [MeasurableSpace F] [BorelSpace F]
+    {X : ℕ → Ω → E} {Z : Ω' → E} {g : E → F}
+    (hX : TendstoInDistribution X atTop Z P ν) (hg : Continuous g) :
+    TendstoInDistribution (fun n ω => g (X n ω)) atTop (fun ω => g (Z ω)) P ν := by
+  simpa [Function.comp_def] using hX.continuous_comp hg
 
 /-- **Coordinate projection of `TendstoInMeasure`**: if a sequence of `∀ b, X b`-valued
 functions converges in measure, then each coordinate converges in measure.
