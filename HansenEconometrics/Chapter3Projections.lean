@@ -312,6 +312,57 @@ theorem leaveOneOutResidual_eq_inv_one_sub_leverage_mul_residual
   rw [← h]
   rw [← mul_assoc, inv_mul_cancel₀ hdenom, one_mul]
 
+/-- Hansen equation (3.48): the change in coefficient estimates after dropping
+observation `i`. -/
+theorem olsBeta_sub_leaveOneOutBeta_eq_invGram_mulVec
+    (X : Matrix n k ℝ) (y : n → ℝ) (i : n)
+    [Invertible (Xᵀ * X)] [Invertible (leaveOneOutGram X i)] :
+    olsBeta X y - leaveOneOutBeta X y i =
+      leaveOneOutResidual X y i • (⅟ (Xᵀ * X) *ᵥ X i) := by
+  have h := leaveOneOutBeta_eq_olsBeta_sub_invGram_mulVec X y i
+  ext j
+  have hj := congrFun h j
+  simp [Pi.sub_apply, Pi.smul_apply] at hj ⊢
+  linarith
+
+/-- Hansen Section 3.21: the full-sample fitted value minus the leave-one-out
+predicted value is `hᵢᵢ ẽᵢ`. -/
+theorem fitted_sub_leaveOneOutPrediction_eq_leverage_mul_residual
+    (X : Matrix n k ℝ) (y : n → ℝ) (i : n)
+    [Invertible (Xᵀ * X)] [Invertible (leaveOneOutGram X i)] :
+    fitted X y i - leaveOneOutPrediction X y i =
+      leverageValue X i * leaveOneOutResidual X y i := by
+  have hcoef := congrArg (fun b : k → ℝ => X i ⬝ᵥ b)
+    (olsBeta_sub_leaveOneOutBeta_eq_invGram_mulVec X y i)
+  change X i ⬝ᵥ (olsBeta X y - leaveOneOutBeta X y i) =
+      X i ⬝ᵥ (leaveOneOutResidual X y i • (⅟ (Xᵀ * X) *ᵥ X i)) at hcoef
+  have hleft : X i ⬝ᵥ (olsBeta X y - leaveOneOutBeta X y i) =
+      fitted X y i - leaveOneOutPrediction X y i := by
+    unfold fitted leaveOneOutPrediction
+    rw [dotProduct_sub]
+    simp [Matrix.mulVec, dotProduct]
+  have hright : X i ⬝ᵥ (leaveOneOutResidual X y i • (⅟ (Xᵀ * X) *ᵥ X i)) =
+      leverageValue X i * leaveOneOutResidual X y i := by
+    rw [dotProduct_smul, ← leverageValue_eq_row_invGram_row]
+    simp [smul_eq_mul, mul_comm]
+  rw [hleft, hright] at hcoef
+  exact hcoef
+
+/-- Section 3.21 prediction-change diagnostic for a single observation. -/
+noncomputable def predictionInfluence
+    (X : Matrix n k ℝ) (y : n → ℝ) (i : n)
+    [Invertible (Xᵀ * X)] [Invertible (leaveOneOutGram X i)] : ℝ :=
+  |fitted X y i - leaveOneOutPrediction X y i|
+
+/-- Hansen Section 3.21: the prediction-change diagnostic is
+`|hᵢᵢ ẽᵢ|`. -/
+theorem predictionInfluence_eq_abs_leverage_mul_leaveOneOutResidual
+    (X : Matrix n k ℝ) (y : n → ℝ) (i : n)
+    [Invertible (Xᵀ * X)] [Invertible (leaveOneOutGram X i)] :
+    predictionInfluence X y i = |leverageValue X i * leaveOneOutResidual X y i| := by
+  unfold predictionInfluence
+  rw [fitted_sub_leaveOneOutPrediction_eq_leverage_mul_residual]
+
 /-- Hansen Exercise 3.7: the annihilator kills the hat matrix on the left. -/
 theorem annihilator_mul_hatMatrix
     (X : Matrix n k ℝ) [DecidableEq n] [Invertible (Xᵀ * X)] :
