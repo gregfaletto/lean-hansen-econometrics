@@ -1825,6 +1825,43 @@ theorem olsHC0LinSEStar_tendstoInMeasure_of_bddWts_components
     (V := heteroAsymCov μ X e)
     hV_meas hV
 
+/-- **Hansen Theorem 7.10, packaged HC0 covariance for fixed linear functions.** -/
+theorem linMap_olsHC0CovStar_tendstoInMeasure_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q]
+    (h : SampleHC0Assumption76 μ X e) (β : k → ℝ)
+    (R : Matrix q k ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        R * olsHetCovStar
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)
+      atTop (fun _ => R * heteroAsymCov μ X e * Rᵀ) :=
+  linMap_olsHC0CovStar_tendstoInMeasure_of_bddWts_components
+    (μ := μ) (X := X) (e := e) (y := y) h β R
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded
+
+/-- **Hansen §7.11, packaged HC0 standard errors for fixed linear functions.** -/
+theorem olsHC0LinSEStar_tendstoInMeasure_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Finite q]
+    (h : SampleHC0Assumption76 μ X e) (β : k → ℝ)
+    (R : Matrix q k ℝ) (j : q)
+    (hc : FeasibleHCRemainderConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Real.sqrt ((R * olsHetCovStar
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) j j))
+      atTop (fun _ =>
+        Real.sqrt ((R * heteroAsymCov μ X e * Rᵀ) j j)) :=
+  olsHC0LinSEStar_tendstoInMeasure_of_bddWts_components
+    (μ := μ) (X := X) (e := e) (y := y) h β R j
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded
+
 /-- The HC1 finite-sample degrees-of-freedom multiplier `n / (n - k)` tends to `1`. -/
 theorem hc1FiniteSampleScale_tendsto_one (k : Type*) [Fintype k] :
     Tendsto
@@ -2066,6 +2103,43 @@ theorem olsHC1LinSEStar_tendstoInMeasure_of_bddWts_components
         (stackRegressors X n ω) (stackOutcomes y n ω))
     (V := heteroAsymCov μ X e)
     hV_meas hV
+
+/-- **Hansen Theorem 7.10, packaged HC1 covariance for fixed linear functions.** -/
+theorem linMap_olsHC1CovStar_tendstoInMeasure_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q]
+    (h : SampleHC0Assumption76 μ X e) (β : k → ℝ)
+    (R : Matrix q k ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        R * olsHetCovHC1Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)
+      atTop (fun _ => R * heteroAsymCov μ X e * Rᵀ) :=
+  linMap_olsHC1CovStar_tendstoInMeasure_of_bddWts_components
+    (μ := μ) (X := X) (e := e) (y := y) h β R
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded
+
+/-- **Hansen §7.11, packaged HC1 standard errors for fixed linear functions.** -/
+theorem olsHC1LinSEStar_tendstoInMeasure_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Finite q]
+    (h : SampleHC0Assumption76 μ X e) (β : k → ℝ)
+    (R : Matrix q k ℝ) (j : q)
+    (hc : FeasibleHCRemainderConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Real.sqrt ((R * olsHetCovHC1Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) j j))
+      atTop (fun _ =>
+        Real.sqrt ((R * heteroAsymCov μ X e * Rᵀ) j j)) :=
+  olsHC1LinSEStar_tendstoInMeasure_of_bddWts_components
+    (μ := μ) (X := X) (e := e) (y := y) h β R j
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded
 
 /-- **Generic leverage-adjusted sandwich assembly.**
 
@@ -2554,6 +2628,102 @@ theorem linMap_olsHC3CovStar_tendstoInMeasure_of_bddWts_components_maxLev
       (μ := μ) (X := X) (e := e) (y := y)
       (weight := fun h => ((1 - h)⁻¹) ^ 2) measurable_hc3Weight
       h β R hmodel hX_meas he_meas hCrossWeight hQuadWeight hAdj
+
+/-- **Hansen Theorem 7.10, packaged HC2 covariance for fixed linear functions.** -/
+theorem linMap_olsHC2CovStar_tendstoInMeasure_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix q k ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        R * olsHetCovHC2Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)
+      atTop (fun _ => R * heteroAsymCov μ X e * Rᵀ) :=
+  linMap_olsHC2CovStar_tendstoInMeasure_of_bddWts_components_maxLev
+    (μ := μ) (X := X) (e := e) (y := y) h.toSampleHC0Assumption76 β R
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hc.maxLeverage_tendsto
+
+/-- **Hansen Theorem 7.10, packaged HC3 covariance for fixed linear functions.** -/
+theorem linMap_olsHC3CovStar_tendstoInMeasure_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix q k ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        R * olsHetCovHC3Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)
+      atTop (fun _ => R * heteroAsymCov μ X e * Rᵀ) :=
+  linMap_olsHC3CovStar_tendstoInMeasure_of_bddWts_components_maxLev
+    (μ := μ) (X := X) (e := e) (y := y) h.toSampleHC0Assumption76 β R
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hc.maxLeverage_tendsto
+
+/-- **Hansen §7.11, packaged HC2 standard errors for fixed linear functions.** -/
+theorem olsHC2LinSEStar_tendstoInMeasure_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Finite q]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix q k ℝ) (j : q)
+    (hc : FeasibleHCLeverageConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Real.sqrt ((R * olsHetCovHC2Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) j j))
+      atTop (fun _ =>
+        Real.sqrt ((R * heteroAsymCov μ X e * Rᵀ) j j)) := by
+  have hV_meas :=
+    olsHC2CovarianceStar_stack_aestronglyMeasurable_components
+      (μ := μ) (X := X) (e := e) (y := y)
+      h.toSampleMomentAssumption71 β hc.model
+      hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+  have hV :=
+    olsHetCovHC2Star_tendstoInMeasure_of_feasibleHCLeverageConditions
+      (μ := μ) (X := X) (e := e) (y := y) h β hc
+  exact linMapCovStdError_tendstoInMeasure
+    (μ := μ) (R := R) (j := j)
+    (Vhat := fun n ω =>
+      olsHetCovHC2Star
+        (stackRegressors X n ω) (stackOutcomes y n ω))
+    (V := heteroAsymCov μ X e)
+    hV_meas hV
+
+/-- **Hansen §7.11, packaged HC3 standard errors for fixed linear functions.** -/
+theorem olsHC3LinSEStar_tendstoInMeasure_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Finite q]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix q k ℝ) (j : q)
+    (hc : FeasibleHCLeverageConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Real.sqrt ((R * olsHetCovHC3Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) j j))
+      atTop (fun _ =>
+        Real.sqrt ((R * heteroAsymCov μ X e * Rᵀ) j j)) := by
+  have hV_meas :=
+    olsHC3CovarianceStar_stack_aestronglyMeasurable_components
+      (μ := μ) (X := X) (e := e) (y := y)
+      h.toSampleMomentAssumption71 β hc.model
+      hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+  have hV :=
+    olsHetCovHC3Star_tendstoInMeasure_of_feasibleHCLeverageConditions
+      (μ := μ) (X := X) (e := e) (y := y) h β hc
+  exact linMapCovStdError_tendstoInMeasure
+    (μ := μ) (R := R) (j := j)
+    (Vhat := fun n ω =>
+      olsHetCovHC3Star
+        (stackRegressors X n ω) (stackOutcomes y n ω))
+    (V := heteroAsymCov μ X e)
+    hV_meas hV
 
 end Assumption72
 
