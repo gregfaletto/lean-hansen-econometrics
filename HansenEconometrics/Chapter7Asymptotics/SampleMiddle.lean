@@ -887,6 +887,26 @@ theorem maxLeverageStar_tendstoInMeasure_zero_of_uniformIntegrable_rowNorm_sq
       (μ := μ) (X := X) (e := e) h (fun _ => (1 : ℝ))
       (by intro n; norm_num) (by simpa using hRowRate))
 
+/-- **Hansen Theorem 7.17, iid finite-row-moment max-leverage rate.**
+
+If the squared regressor row norms are identically distributed and the first row
+has finite second moment, then the uniform-integrability hypothesis in the
+primitive max-leverage wrapper is discharged by the Chapter 6 iid UI bridge. -/
+theorem maxLeverageStar_tendstoInMeasure_zero_of_identDistrib_memLp_rowNorm_sq
+    {μ : Measure Ω} [IsFiniteMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ}
+    (h : SampleMomentAssumption71 μ X e)
+    (hRowMem : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ)
+    (hRowIdent : ∀ i,
+      IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ) :
+    TendstoInMeasure μ
+      (fun n ω => maxLeverageStar (stackRegressors X n ω))
+      atTop (fun _ => 0) := by
+  exact maxLeverageStar_tendstoInMeasure_zero_of_uniformIntegrable_rowNorm_sq
+    (μ := μ) (X := X) (e := e) h
+    (uniformIntegrable_one_of_identDistrib_memLp
+      (μ := μ) (Z := fun i ω => ‖X i ω‖ ^ 2) hRowMem hRowIdent)
+
 /-- **Hansen Theorem 7.17, finite-sample leverage trace identity.**
 
 On nonsingular samples, the totalized leverages sum to the number of regressors,

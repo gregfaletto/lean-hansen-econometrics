@@ -1,5 +1,6 @@
 import Mathlib.MeasureTheory.Function.UniformIntegrable
 import Mathlib.MeasureTheory.Integral.Lebesgue.Markov
+import Mathlib.Probability.IdentDistrib
 
 /-!
 # Uniform-integrability tail controls for Chapter 6 maximum bounds
@@ -217,5 +218,34 @@ theorem max_norm_scaled_tendstoInMeasure_zero_of_uniformIntegrable_norm_r
     have hdiv : (C : ℝ) / ε ≤ (n : ℝ) := hN.trans (by exact_mod_cast hNn)
     exact (div_le_iff₀ hε).1 hdiv
   exact max_norm_scaled_measure_event_le hZ hε hCtail hδtop hnpos hC rfl
+
+/-- **Hansen Theorem 6.14, identically distributed `L¹` UI wrapper.**
+
+An identically distributed real sequence with a finite first moment is uniformly
+integrable in `L¹`.  This is the primitive moment-to-UI bridge used to feed
+Hansen's maximum theorem when the power variables are iid. -/
+theorem uniformIntegrable_one_of_identDistrib_memLp
+    [IsFiniteMeasure μ] {Z : ℕ → Ω → ℝ}
+    (hZ0 : MemLp (Z 0) 1 μ)
+    (hident : ∀ i, IdentDistrib (Z i) (Z 0) μ μ) :
+    UniformIntegrable Z 1 μ := by
+  exact MemLp.uniformIntegrable_of_identDistrib
+    (μ := μ) (f := Z) (j := 0) (p := 1)
+    (by simp) (by simp) hZ0 hident
+
+/-- **Hansen Theorem 6.16, iid finite-power-moment maximum wrapper.**
+
+If the power variables `Z_i` are identically distributed and `Z_0` is in `L¹`,
+then `n⁻¹ max_{i<n} |Z_i|` on the nonnegative-power scale is `oₚ(1)`.
+For Hansen's textbook statement, use `Z_i = |Y_i|^r`. -/
+theorem max_norm_scaled_tendstoInMeasure_zero_of_identDistrib_memLp
+    [IsFiniteMeasure μ] {Z : ℕ → Ω → ℝ}
+    (hZ0 : MemLp (Z 0) 1 μ)
+    (hident : ∀ i, IdentDistrib (Z i) (Z 0) μ μ) :
+    TendstoInMeasure μ (scaledMaxNNNorm Z) atTop (fun _ => 0) := by
+  exact max_norm_scaled_tendstoInMeasure_zero_of_uniformIntegrable_norm_r
+    (μ := μ) (Z := Z)
+    (uniformIntegrable_one_of_identDistrib_memLp
+      (μ := μ) (Z := Z) hZ0 hident)
 
 end HansenEconometrics

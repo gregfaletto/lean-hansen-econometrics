@@ -556,6 +556,27 @@ theorem maxResidualErrorStar_tendstoInMeasure_zero_of_uniformIntegrable_rowNorm_
       (μ := μ) (X := X) (e := e) β (fun _ => (1 : ℝ))
       (by intro n; norm_num) (by simpa using hProduct))
 
+/-- **Hansen Theorem 7.16, iid finite-row-moment residual uniformity rate.**
+
+If the squared regressor row norms are identically distributed and the first row
+has finite second moment, then the Chapter 6 iid UI bridge discharges the row
+uniform-integrability assumption in the max-residual rate theorem. -/
+theorem maxResidualErrorStar_tendstoInMeasure_zero_of_identDistrib_memLp_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : ScoreCLTConditions μ X e) (β : k → ℝ)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    (hRowMem : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ)
+    (hRowIdent : ∀ i,
+      IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ) :
+    TendstoInMeasure μ
+      (fun n ω => maxResidualErrorStar (stackRegressors X n ω) β (stackErrors e n ω))
+      atTop (fun _ => 0) := by
+  exact maxResidualErrorStar_tendstoInMeasure_zero_of_uniformIntegrable_rowNorm_sq
+    (μ := μ) (X := X) (e := e) (y := y) h β hmodel
+    (uniformIntegrable_one_of_identDistrib_memLp
+      (μ := μ) (Z := fun i ω => ‖X i ω‖ ^ 2) hRowMem hRowIdent)
+
 /-- **Hansen Theorem 7.3, ordinary-wrapper vector asymptotic normality.**
 
 The same non-conditional vector CLT for the textbook-facing `olsBetaOrZero`
