@@ -420,6 +420,142 @@ theorem sqrt_smul_olsBetaStar_sub_boundedInProbabilityNorm
     (olsBetaStar_vector_tendstoInDistribution_multivariateGaussian
       (μ := μ) (X := X) (e := e) (y := y) h β hmodel)
 
+/-- **Hansen Theorem 7.16, residual uniformity rate.**
+
+Under the score CLT conditions, a correctly specified linear model, and uniform
+integrability of squared regressor row norms, the maximum totalized residual
+error is `oₚ(1)`.  The proof combines the Chapter 6 root row-norm rate with the
+OLS CLT's `√n(β̂*ₙ - β)=Oₚ(1)` factor and the deterministic residual bound. -/
+theorem maxResidualErrorStar_tendstoInMeasure_zero_of_uniformIntegrable_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : ScoreCLTConditions μ X e) (β : k → ℝ)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    TendstoInMeasure μ
+      (fun n ω => maxResidualErrorStar (stackRegressors X n ω) β (stackErrors e n ω))
+      atTop (fun _ => 0) := by
+  let rootRow : ℕ → Ω → ℝ := fun n ω =>
+    Real.sqrt
+      ((Fintype.card (Fin n) : ℝ)⁻¹ *
+        maxRowNorm (stackRegressors X n ω) ^ 2)
+  let betaScaledNorm : ℕ → Ω → ℝ := fun n ω =>
+    ‖Real.sqrt (n : ℝ) •
+      (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β)‖
+  have hRoot : TendstoInMeasure μ rootRow atTop (fun _ => 0) := by
+    simpa [rootRow] using
+      (sqrt_scaledMaxRowNorm_sq_tendstoInMeasure_zero_of_uniformIntegrable_norm_sq
+        (μ := μ) (X := X) hUI)
+  have hBetaNorm :=
+    sqrt_smul_olsBetaStar_sub_boundedInProbabilityNorm
+      (μ := μ) (X := X) (e := e) (y := y) h β hmodel
+  have hBeta : BoundedInProbability μ betaScaledNorm := by
+    intro δ hδ
+    obtain ⟨M, hMpos, hMev⟩ := hBetaNorm δ hδ
+    refine ⟨M, hMpos, ?_⟩
+    filter_upwards [hMev] with n hn
+    refine (measure_mono ?_).trans hn
+    intro ω hω
+    simpa [betaScaledNorm, Real.norm_eq_abs, abs_of_nonneg (norm_nonneg _)] using hω
+  have hprod : TendstoInMeasure μ
+      (fun n ω => rootRow n ω * betaScaledNorm n ω) atTop (fun _ => 0) :=
+    TendstoInMeasure.mul_boundedInProbability hRoot hBeta
+  have hboundProduct : TendstoInMeasure μ
+      (fun n ω => (Fintype.card k : ℝ) * (rootRow n ω * betaScaledNorm n ω))
+      atTop (fun _ => 0) :=
+    TendstoInMeasure.const_mul_zero_real (μ := μ) (Fintype.card k : ℝ) hprod
+  have hProduct : TendstoInMeasure μ
+      (fun n ω =>
+        (Fintype.card k : ℝ) * maxRowNorm (stackRegressors X n ω) *
+          ‖olsBetaStar
+            (stackRegressors X n ω)
+            (stackRegressors X n ω *ᵥ β + stackErrors e n ω) - β‖)
+      atTop (fun _ => 0) := by
+    refine TendstoInMeasure.of_abs_le_zero_real hboundProduct ?_
+    intro n ω
+    let Xn : Matrix (Fin n) k ℝ := stackRegressors X n ω
+    let en : Fin n → ℝ := stackErrors e n ω
+    let berr : k → ℝ := olsBetaStar Xn (stackOutcomes y n ω) - β
+    have hstack : stackOutcomes y n ω = Xn *ᵥ β + en :=
+      stack_linear_model X e y β hmodel n ω
+    have hbeta_eq :
+        ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖ = ‖berr‖ := by
+      simp [berr, Xn, en, ← hstack]
+    have hleft_nonneg :
+        0 ≤ (Fintype.card k : ℝ) * maxRowNorm Xn *
+          ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖ := by
+      exact mul_nonneg
+        (mul_nonneg (Nat.cast_nonneg _) (norm_nonneg _))
+        (norm_nonneg _)
+    have hright_nonneg :
+        0 ≤ (Fintype.card k : ℝ) * (rootRow n ω * betaScaledNorm n ω) := by
+      exact mul_nonneg (Nat.cast_nonneg _)
+        (mul_nonneg (Real.sqrt_nonneg _) (norm_nonneg _))
+    have hscaled :
+        (Fintype.card k : ℝ) * maxRowNorm Xn *
+            ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖ ≤
+          (Fintype.card k : ℝ) * (rootRow n ω * betaScaledNorm n ω) := by
+      by_cases hnzero : n = 0
+      · have hrow0 : maxRowNorm Xn = 0 := by
+          unfold maxRowNorm
+          rw [show (fun i : Fin n => ‖Xn i‖) = (0 : Fin n → ℝ) by
+            ext i
+            subst hnzero
+            exact Fin.elim0 i]
+          exact norm_zero
+        have hleft_zero :
+            (Fintype.card k : ℝ) * maxRowNorm Xn *
+              ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖ = 0 := by
+          simp [hrow0]
+        rw [hleft_zero]
+        exact hright_nonneg
+      · have hrow_eq :
+            rootRow n ω * Real.sqrt (n : ℝ) = maxRowNorm (stackRegressors X n ω) := by
+          simpa [rootRow] using
+            sqrt_scaledMaxRowNorm_sq_mul_sqrt_eq_maxRowNorm (X := X) hnzero ω
+        have hrow_eq' :
+            maxRowNorm (stackRegressors X n ω) =
+              rootRow n ω * Real.sqrt (n : ℝ) :=
+          hrow_eq.symm
+        have hscaled_beta :
+            betaScaledNorm n ω =
+              Real.sqrt (n : ℝ) * ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖ := by
+          calc
+            betaScaledNorm n ω = Real.sqrt (n : ℝ) * ‖berr‖ := by
+              change ‖Real.sqrt (n : ℝ) • berr‖ =
+                Real.sqrt (n : ℝ) * ‖berr‖
+              rw [norm_smul, Real.norm_eq_abs, abs_of_nonneg (Real.sqrt_nonneg _)]
+            _ = Real.sqrt (n : ℝ) * ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖ := by
+              rw [← hbeta_eq]
+        have hcore :
+            maxRowNorm Xn * ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖ ≤
+              rootRow n ω * betaScaledNorm n ω := by
+          calc
+            maxRowNorm Xn * ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖
+                = (rootRow n ω * Real.sqrt (n : ℝ)) *
+                    ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖ := by
+                    rw [show maxRowNorm Xn = rootRow n ω * Real.sqrt (n : ℝ) by
+                      simpa [Xn] using hrow_eq']
+            _ = rootRow n ω *
+                  (Real.sqrt (n : ℝ) * ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖) := by
+                    ring
+            _ = rootRow n ω * betaScaledNorm n ω := by rw [← hscaled_beta]
+          exact le_rfl
+        have hk : 0 ≤ (Fintype.card k : ℝ) := Nat.cast_nonneg _
+        calc
+          (Fintype.card k : ℝ) * maxRowNorm Xn *
+              ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖
+              = (Fintype.card k : ℝ) *
+                  (maxRowNorm Xn * ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖) := by
+                    ring
+          _ ≤ (Fintype.card k : ℝ) * (rootRow n ω * betaScaledNorm n ω) :=
+            mul_le_mul_of_nonneg_left hcore hk
+    simpa [Xn, en, abs_of_nonneg hleft_nonneg, abs_of_nonneg hright_nonneg] using hscaled
+  simpa using
+    (scaledMaxResidualErrorStar_tendstoInMeasure_zero_of_scaled_product
+      (μ := μ) (X := X) (e := e) β (fun _ => (1 : ℝ))
+      (by intro n; norm_num) (by simpa using hProduct))
+
 /-- **Hansen Theorem 7.3, ordinary-wrapper vector asymptotic normality.**
 
 The same non-conditional vector CLT for the textbook-facing `olsBetaOrZero`

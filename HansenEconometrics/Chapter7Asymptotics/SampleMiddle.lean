@@ -733,6 +733,41 @@ theorem sqrt_scaledMaxRowNorm_sq_tendstoInMeasure_zero_of_uniformIntegrable_norm
       (μ := μ) (X := X) hUI)
     (by intro n ω; positivity)
 
+omit [DecidableEq k] in
+/-- **Hansen Theorem 7.16/7.17, root row-rate algebra.**
+
+For nonempty samples, the root form
+`sqrt(n⁻¹ max_i ‖X_i‖²)` becomes the maximal row norm after multiplying by
+`sqrt n`.  This is the deterministic bridge used to assemble the residual
+uniformity product rate from Chapter 6's maximum theorem and Chapter 7's OLS
+CLT. -/
+theorem sqrt_scaledMaxRowNorm_sq_mul_sqrt_eq_maxRowNorm
+    (X : ℕ → Ω → (k → ℝ)) {n : ℕ} (hnzero : n ≠ 0) (ω : Ω) :
+    Real.sqrt
+        ((Fintype.card (Fin n) : ℝ)⁻¹ *
+          maxRowNorm (stackRegressors X n ω) ^ 2) *
+      Real.sqrt (n : ℝ) =
+    maxRowNorm (stackRegressors X n ω) := by
+  have hnpos_nat : 0 < n := Nat.pos_of_ne_zero hnzero
+  have hnpos : 0 < (n : ℝ) := Nat.cast_pos.mpr hnpos_nat
+  let row : ℝ := maxRowNorm (stackRegressors X n ω)
+  have hrow_nonneg : 0 ≤ row := norm_nonneg _
+  have hsqrt_inv_mul : Real.sqrt ((n : ℝ)⁻¹) * Real.sqrt (n : ℝ) = 1 := by
+    rw [Real.sqrt_inv, inv_mul_cancel₀]
+    exact (Real.sqrt_pos_of_pos hnpos).ne'
+  calc
+    Real.sqrt
+        ((Fintype.card (Fin n) : ℝ)⁻¹ *
+          maxRowNorm (stackRegressors X n ω) ^ 2) *
+      Real.sqrt (n : ℝ)
+        = Real.sqrt ((n : ℝ)⁻¹ * row ^ 2) * Real.sqrt (n : ℝ) := by
+            simp [row]
+    _ = (Real.sqrt ((n : ℝ)⁻¹) * row) * Real.sqrt (n : ℝ) := by
+      rw [Real.sqrt_mul (inv_nonneg.mpr hnpos.le), Real.sqrt_sq_eq_abs,
+        abs_of_nonneg hrow_nonneg]
+    _ = row * (Real.sqrt ((n : ℝ)⁻¹) * Real.sqrt (n : ℝ)) := by ring
+    _ = row := by rw [hsqrt_inv_mul, mul_one]
+
 /-- **Hansen Theorem 7.17, max-leverage rate packaging.**
 
 Once the Chapter 6 maximum-row-norm rate supplies
