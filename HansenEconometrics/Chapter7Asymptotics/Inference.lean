@@ -119,6 +119,97 @@ noncomputable def scalarFunctionCIEvent
     (θhat - crit * se / root)
     (θhat + crit * se / root)
 
+omit [Fintype k] [DecidableEq k] in
+/-- Real-valued CDF of a scalar statistic at a fixed sample size and cutoff. -/
+noncomputable def statisticCDFReal
+    (μ : Measure Ω) (T : ℕ → Ω → ℝ) (n : ℕ) (x : ℝ) : ℝ :=
+  μ.real {ω | T n ω ≤ x}
+
+omit [Fintype k] [DecidableEq k] in
+/-- First-order Edgeworth expansion interface for scalar statistics.
+
+The field records the theorem-facing content of Hansen's Edgeworth statement:
+after multiplying the CDF error by `√n`, the error converges to a fixed
+correction function. The concrete polynomial/cumulant calculation that proves
+this hypothesis is intentionally left outside this generic wrapper. -/
+structure FirstOrderEdgeworthExpansion
+    (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (T : ℕ → Ω → ℝ) (baseCDF correction : ℝ → ℝ) where
+  /-- Scaled CDF error converges pointwise to the first Edgeworth correction. -/
+  scaled_cdf_error_tendsto :
+    ∀ x, Tendsto
+      (fun n : ℕ => Real.sqrt (n : ℝ) * (statisticCDFReal μ T n x - baseCDF x))
+      atTop (𝓝 (correction x))
+
+namespace FirstOrderEdgeworthExpansion
+
+omit [Fintype k] [DecidableEq k] in
+/-- First-order Edgeworth expansion, written as a vanishing scaled remainder. -/
+theorem scaled_remainder_tendsto_zero
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {T : ℕ → Ω → ℝ} {baseCDF correction : ℝ → ℝ}
+    (h : FirstOrderEdgeworthExpansion μ T baseCDF correction) (x : ℝ) :
+    Tendsto
+      (fun n : ℕ => Real.sqrt (n : ℝ) *
+        (statisticCDFReal μ T n x - baseCDF x -
+          (Real.sqrt (n : ℝ))⁻¹ * correction x))
+      atTop (𝓝 0) := by
+  have hscaled : Tendsto
+      (fun n : ℕ =>
+        Real.sqrt (n : ℝ) * (statisticCDFReal μ T n x - baseCDF x) -
+          correction x)
+      atTop (𝓝 0) := by
+    simpa using
+      (h.scaled_cdf_error_tendsto x).sub
+        (tendsto_const_nhds (x := correction x))
+  have heq :
+      (fun n : ℕ => Real.sqrt (n : ℝ) *
+        (statisticCDFReal μ T n x - baseCDF x -
+          (Real.sqrt (n : ℝ))⁻¹ * correction x)) =ᶠ[atTop]
+      (fun n : ℕ => Real.sqrt (n : ℝ) *
+        (statisticCDFReal μ T n x - baseCDF x) - correction x) := by
+    filter_upwards [eventually_ge_atTop 1] with n hn
+    have hnpos : (0 : ℝ) < n := by exact_mod_cast hn
+    have hsqrt_ne : Real.sqrt (n : ℝ) ≠ 0 :=
+      Real.sqrt_ne_zero'.mpr hnpos
+    field_simp [hsqrt_ne]
+  rw [tendsto_congr' heq]
+  simpa using hscaled
+
+omit [Fintype k] [DecidableEq k] in
+/-- A first-order Edgeworth expansion implies ordinary CDF convergence to the base CDF. -/
+theorem cdf_tendsto_base
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {T : ℕ → Ω → ℝ} {baseCDF correction : ℝ → ℝ}
+    (h : FirstOrderEdgeworthExpansion μ T baseCDF correction) (x : ℝ) :
+    Tendsto (fun n : ℕ => statisticCDFReal μ T n x) atTop (𝓝 (baseCDF x)) := by
+  have hinv_sqrt : Tendsto (fun n : ℕ => (Real.sqrt (n : ℝ))⁻¹)
+      atTop (𝓝 (0 : ℝ)) := by
+    exact tendsto_inv_atTop_zero.comp
+      (Real.tendsto_sqrt_atTop.comp tendsto_natCast_atTop_atTop)
+  have hprod := hinv_sqrt.mul (h.scaled_cdf_error_tendsto x)
+  have herror : Tendsto (fun n : ℕ => statisticCDFReal μ T n x - baseCDF x)
+      atTop (𝓝 0) := by
+    have heq :
+        (fun n : ℕ => (Real.sqrt (n : ℝ))⁻¹ *
+          (Real.sqrt (n : ℝ) *
+            (statisticCDFReal μ T n x - baseCDF x))) =ᶠ[atTop]
+        (fun n : ℕ => statisticCDFReal μ T n x - baseCDF x) := by
+      filter_upwards [eventually_ge_atTop 1] with n hn
+      have hnpos : (0 : ℝ) < n := by exact_mod_cast hn
+      have hsqrt_ne : Real.sqrt (n : ℝ) ≠ 0 :=
+        Real.sqrt_ne_zero'.mpr hnpos
+      field_simp [hsqrt_ne]
+    rw [← tendsto_congr' heq]
+    simpa using hprod
+  have hsum : Tendsto
+      (fun n : ℕ => (statisticCDFReal μ T n x - baseCDF x) + baseCDF x)
+      atTop (𝓝 (0 + baseCDF x)) :=
+    herror.add (tendsto_const_nhds (x := baseCDF x))
+  simpa [sub_eq_add_neg, add_assoc, add_comm, add_left_comm] using hsum
+
+end FirstOrderEdgeworthExpansion
+
 omit [DecidableEq k] in
 /-- Numerator of the scalar t-statistic for totalized OLS. -/
 @[reducible]
