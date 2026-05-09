@@ -157,7 +157,8 @@ Gaussian linear-image/Wald law identification, multivariate homoskedastic and
 HC0/HC1/HC2/HC3 Wald wrappers, HC2/HC3 max-leverage closure, residual
 absolute-weight closure, HC2/HC3 adjustment measurability, nonlinear
 Delta-method distribution wrappers, nonlinear derivative covariance and scalar
-inference packaging, and max-residual rate packaging are all landed.
+inference packaging, max-residual rate packaging, and max-leverage rate
+packaging are all landed.
 
 ## Status
 - The totalized-estimator consistency theorem corresponding to the start of Theorem 7.1 is formalized.
@@ -185,7 +186,7 @@ inference packaging, and max-residual rate packaging are all landed.
 - Theorem 7.13 has the generic multivariate Wald continuous-mapping bridge, a Lean-only named-law bridge, the positive-definite Gaussian/Mahalanobis `χ²(r)` law, the Gaussian linear-image law for `RQ⁻¹Z`, public full-rank Gaussian linear-Wald OLS wrappers using the proved vector OLS CLT, concrete multivariate HC0/HC1/HC2/HC3 Wald wrappers, and the multivariate homoskedastic Wald wrapper; the remaining cleanup is assumption packaging.
 - Theorem 7.14 has scalar and multivariate homoskedastic Wald statistic limits, including the variable-facing wrapper from `HomoskedasticErrorVariance`.
 - Theorem 7.16 has the deterministic pointwise and max-over-sample residual-error inequalities plus a scaled max-residual `oₚ(1)` packaging theorem; the remaining work is to discharge its product-rate hypothesis from primitive iid/moment assumptions using the Chapter 6 maximum bound.
-- Theorem 7.17 has finite-sample leverage trace/average identities and pointwise `0 ≤ hᵢᵢ ≤ 1` bounds on nonsingular designs; the probabilistic max-leverage rate remains.
+- Theorem 7.17 has finite-sample leverage trace/average identities, pointwise `0 ≤ hᵢᵢ ≤ 1` bounds, deterministic inverse-Gram/max-row-norm leverage bounds, and a stochastic max-leverage rate wrapper from the Chapter 6 max-row-rate input.
 
 ## Main theorem signposts
 
@@ -206,7 +207,7 @@ inference packaging, and max-residual rate packaging are all landed.
 | Theorem 7.13 Wald statistics | Generic multivariate Wald CMT is formalized in `waldQuadForm_tendstoInDistribution_of_vector_and_covariance`, with matrix-vector Slutsky support in `matrixMulVec_tendstoInDistribution_of_vector_and_matrix`; `hasLaw_multivariateGaussian_zero_linearMap` and `hasLaw_gaussian_mahalanobis_chiSquared` discharge the Gaussian restriction-map and Mahalanobis `χ²(r)` laws; public full-rank Gaussian linear-Wald OLS wrappers, concrete multivariate HC0/HC1/HC2/HC3 Wald wrappers, and multivariate homoskedastic Wald wrappers are formalized. | Tighten the assumption layer. |
 | Theorem 7.14 homoskedastic Wald statistic | Scalar and multivariate homoskedastic Wald limits are formalized from the variable-facing homoskedasticity assumption `HomoskedasticErrorVariance`, via `scoreCovMat_eq_errorVariance_smul_popGram_homo` and the covariance bridge `V_\beta^0 = V_\beta`. | Tighten the assumption layer to match textbook packaging more literally. |
 | Theorem 7.16 residual uniformity | Deterministic pointwise and max-over-sample residual-error inequalities are formalized via `residualStar_sub_error_abs_le_card_rowNorm_betaErrorNorm` and `maxResidualErrorStar_le_card_maxRowNorm_betaErrorNorm`; scaled max-residual packaging is formalized in `scaledMaxResidualErrorStar_tendstoInMeasure_zero_of_scaled_product`. | Discharge the product-rate hypothesis from primitive iid/moment assumptions using the Chapter 6 maximum bound. |
-| Theorem 7.17 asymptotic leverage | Finite-sample leverage trace/average identities and pointwise `0 ≤ hᵢᵢ ≤ 1` bounds are formalized on nonsingular designs. | Add eigenvalue/operator-norm bounds and probabilistic max-leverage rate packaging. |
+| Theorem 7.17 asymptotic leverage | Finite-sample leverage trace/average identities, pointwise `0 ≤ hᵢᵢ ≤ 1` bounds, deterministic inverse-Gram/max-row-norm leverage bounds, and stochastic rate packaging are formalized. | Connect the Chapter 6 UI maximum theorem directly to the row-norm rate hypothesis for a literal iid/moment statement. |
 | Theorem 7.15 Edgeworth expansion | Pending/signpost-only. | Add Edgeworth expansion infrastructure. |
 
 ## Extracted candidates
@@ -337,7 +338,7 @@ Conventions:
 | Theorem 7.14 | Under Assumptions 7.2, 7.3, and E | Scalar and multivariate homoskedastic Wald limits to `χ²` are formalized from the variable-facing homoskedasticity assumption [HomoskedasticErrorVariance](../../HansenEconometrics/Chapter7Asymptotics/SampleMiddle.lean#L237), using [scoreCovMat_eq_errorVariance_smul_popGram_homo](../../HansenEconometrics/Chapter7Asymptotics/SampleMiddle.lean#L256), [olsHomoLinWaldStatOrZero_tendstoInDistribution_chiSquared_one_homo](../../HansenEconometrics/Chapter7Asymptotics/Inference.lean#L804), and [linMap_olsHomoWaldStatOrZero_tendstoInDistribution_chiSquared_homo](../../HansenEconometrics/Chapter7Asymptotics/Normality.lean). |
 | Theorem 7.15 | Under Assumptions 7.2, 7.3, Ω > 0, E ∥e∥16 < ∞, E ∥X ∥16 < |  |
 | Theorem 7.16 | Under Assumption 7.2 and E ∥X ∥r < ∞, then | Deterministic pointwise and max-over-sample residual-error inequalities are formalized; [scaledMaxResidualErrorStar_tendstoInMeasure_zero_of_scaled_product](../../HansenEconometrics/Chapter7Asymptotics/Consistency.lean) gives the probabilistic rate wrapper once the max-row-norm times coefficient-error product rate is available. |
-| Theorem 7.17 | If Xi is i.i.d., Q X X > 0, and E ∥X ∥r < ∞ for some r ≥ 2, then | Finite-sample leverage trace/average identities and pointwise `0 ≤ hᵢᵢ ≤ 1` bounds are formalized; max-leverage rate remains. |
+| Theorem 7.17 | If Xi is i.i.d., Q X X > 0, and E ∥X ∥r < ∞ for some r ≥ 2, then | Finite-sample leverage trace/average identities, pointwise `0 ≤ hᵢᵢ ≤ 1` bounds, deterministic inverse-Gram/max-row-norm leverage bounds, and the stochastic wrapper [scaledMaxLeverageStar_tendstoInMeasure_zero_of_scaled_maxRowNorm_sq](../../HansenEconometrics/Chapter7Asymptotics/SampleMiddle.lean) are formalized. |
 
 ## Lean-only bridge results
 
@@ -408,6 +409,8 @@ Phase 5 variance-estimator pieces:
 - [average_leverageStar_eq_card_div_card_of_nonsingular](../../HansenEconometrics/Chapter7Asymptotics/SampleMiddle.lean#L554) — nonsingular average leverage is `k / n`.
 - [leverageStar_nonneg_of_nonsingular](../../HansenEconometrics/Chapter7Asymptotics/SampleMiddle.lean#L469) — nonsingular leverage scores are nonnegative.
 - [leverageStar_le_one_of_nonsingular](../../HansenEconometrics/Chapter7Asymptotics/SampleMiddle.lean#L478) — nonsingular leverage scores are bounded above by one.
+- [maxLeverageStar_le_sampleGramInv_maxRowNorm_bound](../../HansenEconometrics/Chapter7Asymptotics/SampleMiddle.lean) — maximal leverage is bounded by inverse sample-Gram norm times `n⁻¹ max_i ‖X_i‖²`.
+- [scaledMaxLeverageStar_tendstoInMeasure_zero_of_scaled_maxRowNorm_sq](../../HansenEconometrics/Chapter7Asymptotics/SampleMiddle.lean) — max-leverage rate follows from the corresponding max-row-norm-squared rate and sample-Gram consistency.
 - [hc1FiniteSampleScale_tendsto_one](../../HansenEconometrics/Chapter7Asymptotics/SandwichAssembly.lean#L1602) — generic HC1 finite-sample scale convergence.
 - [sampleScoreCovLevAdjStar](../../HansenEconometrics/Chapter7Asymptotics/SampleMiddle.lean#L568) — generic leverage-weighted HC middle matrix behind HC2/HC3.
 - [levAdjWtNormStar](../../HansenEconometrics/Chapter7Asymptotics/SampleMiddle.lean#L589) — sup-norm of the scalar leverage adjustment weights `w(hᵢᵢ)-1`.
