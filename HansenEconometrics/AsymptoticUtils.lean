@@ -884,11 +884,11 @@ The fully general textbook statement allows arbitrary positive real exponents;
 this wrapper covers the common integer-moment cases without adding extra
 real-power infrastructure. -/
 theorem BoundedInProbability.of_eventually_integral_norm_pow_bound
-    [IsFiniteMeasure μ] {X : ℕ → α → ℝ} {C : ℝ} {m : ℕ}
-    (hm : m ≠ 0)
+    [IsFiniteMeasure μ] {X : ℕ → α → ℝ} {C : ℝ} {r : ℕ}
+    (hr : r ≠ 0)
     (hC : 0 ≤ C)
-    (hInt : ∀ n, Integrable (fun ω => ‖X n ω‖ ^ m) μ)
-    (hBound : ∀ᶠ n in atTop, ∫ ω, ‖X n ω‖ ^ m ∂μ ≤ C) :
+    (hInt : ∀ n, Integrable (fun ω => ‖X n ω‖ ^ r) μ)
+    (hBound : ∀ᶠ n in atTop, ∫ ω, ‖X n ω‖ ^ r ∂μ ≤ C) :
     BoundedInProbability μ X := by
   intro δ hδ
   by_cases hδtop : δ = ∞
@@ -903,31 +903,31 @@ theorem BoundedInProbability.of_eventually_integral_norm_pow_bound
   have hBpos : 0 < B := div_pos hC1pos hδreal_pos
   have hMpos : 0 < M := by dsimp [M]; linarith
   have hMge_one : 1 ≤ M := by dsimp [M]; linarith
-  let T : ℝ := M ^ m
-  have hTpos : 0 < T := pow_pos hMpos m
+  let T : ℝ := M ^ r
+  have hTpos : 0 < T := pow_pos hMpos r
   refine ⟨M, hMpos, hBound.mono ?_⟩
   intro n hn
   have hcover :
-      {ω | M ≤ ‖X n ω‖} ⊆ {ω | T ≤ ‖X n ω‖ ^ m} := by
+      {ω | M ≤ ‖X n ω‖} ⊆ {ω | T ≤ ‖X n ω‖ ^ r} := by
     intro ω hω
-    exact pow_le_pow_left₀ hMpos.le hω m
+    exact pow_le_pow_left₀ hMpos.le hω r
   have hmarkov :
-      T * μ.real {ω | T ≤ ‖X n ω‖ ^ m} ≤ ∫ ω, ‖X n ω‖ ^ m ∂μ :=
+      T * μ.real {ω | T ≤ ‖X n ω‖ ^ r} ≤ ∫ ω, ‖X n ω‖ ^ r ∂μ :=
     mul_meas_ge_le_integral_of_nonneg
-      (ae_of_all μ fun ω => pow_nonneg (norm_nonneg (X n ω)) m) (hInt n) T
-  have hreal_le : μ.real {ω | T ≤ ‖X n ω‖ ^ m} ≤ C / T := by
-    have hmul_le : μ.real {ω | T ≤ ‖X n ω‖ ^ m} * T ≤ C := by
+      (ae_of_all μ fun ω => pow_nonneg (norm_nonneg (X n ω)) r) (hInt n) T
+  have hreal_le : μ.real {ω | T ≤ ‖X n ω‖ ^ r} ≤ C / T := by
+    have hmul_le : μ.real {ω | T ≤ ‖X n ω‖ ^ r} * T ≤ C := by
       calc
-        μ.real {ω | T ≤ ‖X n ω‖ ^ m} * T
-            = T * μ.real {ω | T ≤ ‖X n ω‖ ^ m} := by ring
-        _ ≤ ∫ ω, ‖X n ω‖ ^ m ∂μ := hmarkov
+        μ.real {ω | T ≤ ‖X n ω‖ ^ r} * T
+            = T * μ.real {ω | T ≤ ‖X n ω‖ ^ r} := by ring
+        _ ≤ ∫ ω, ‖X n ω‖ ^ r ∂μ := hmarkov
         _ ≤ C := hn
     exact (le_div_iff₀ hTpos).2 hmul_le
   have hratio : C / T ≤ δ.toReal := by
     have hB_le_M : B ≤ M := by dsimp [M]; linarith
     have hM_le_T : M ≤ T := by
       dsimp [T]
-      exact Bound.le_self_pow_of_pos hMge_one (Nat.pos_of_ne_zero hm)
+      exact Bound.le_self_pow_of_pos hMge_one (Nat.pos_of_ne_zero hr)
     have hB_le_T : B ≤ T := hB_le_M.trans hM_le_T
     have hδB_le : δ.toReal * B ≤ δ.toReal * T :=
       mul_le_mul_of_nonneg_left hB_le_T hδreal_pos.le
@@ -936,13 +936,48 @@ theorem BoundedInProbability.of_eventually_integral_norm_pow_bound
       field_simp [hδreal_pos.ne']
     exact (div_le_iff₀ hTpos).2 (by nlinarith)
   have htail_power :
-      μ {ω | T ≤ ‖X n ω‖ ^ m} ≤ ENNReal.ofReal (C / T) := by
+      μ {ω | T ≤ ‖X n ω‖ ^ r} ≤ ENNReal.ofReal (C / T) := by
     rw [ENNReal.le_ofReal_iff_toReal_le (measure_ne_top μ _) (div_nonneg hC hTpos.le)]
     simpa [measureReal_def] using hreal_le
   have htail_delta : ENNReal.ofReal (C / T) ≤ δ := by
     rw [ENNReal.ofReal_le_iff_le_toReal hδtop]
     exact hratio
   exact (measure_mono hcover).trans (htail_power.trans htail_delta)
+
+/-- Scaled natural-moment bounds imply scaled scalar `Oₚ(1)`.
+
+If `E|Xₙ|^m` is eventually bounded by `C aₙ^m` for a positive deterministic
+scale `aₙ`, then `aₙ⁻¹ Xₙ` is bounded in probability. This is the integer-power
+scaled version of Hansen Theorem 6.12. -/
+theorem BoundedInProbability.of_eventually_integral_norm_pow_scaled_bound
+    [IsFiniteMeasure μ] {X : ℕ → α → ℝ} {a : ℕ → ℝ} {C : ℝ} {r : ℕ}
+    (hr : r ≠ 0)
+    (hC : 0 ≤ C)
+    (ha : ∀ᶠ n in atTop, 0 < a n)
+    (hInt : ∀ n, Integrable (fun ω => ‖X n ω‖ ^ r) μ)
+    (hBound : ∀ᶠ n in atTop, ∫ ω, ‖X n ω‖ ^ r ∂μ ≤ C * (a n) ^ r) :
+    BoundedInProbability μ (fun n ω => (a n)⁻¹ * X n ω) := by
+  refine BoundedInProbability.of_eventually_integral_norm_pow_bound
+    (C := C) (r := r) hr hC ?_ ?_
+  · intro n
+    simpa [norm_mul, mul_pow, mul_comm, mul_left_comm, mul_assoc] using
+      (hInt n).const_mul (‖(a n)⁻¹‖ ^ r)
+  · filter_upwards [ha, hBound] with n hapos hn
+    have hscale_nonneg : 0 ≤ ‖(a n)⁻¹‖ ^ r := pow_nonneg (norm_nonneg _) r
+    calc
+      ∫ ω, ‖(a n)⁻¹ * X n ω‖ ^ r ∂μ
+          = ∫ ω, ‖(a n)⁻¹‖ ^ r * ‖X n ω‖ ^ r ∂μ := by
+            congr 1
+            ext ω
+            simp [norm_mul, mul_pow]
+      _ = ‖(a n)⁻¹‖ ^ r * ∫ ω, ‖X n ω‖ ^ r ∂μ := by
+            rw [integral_const_mul]
+      _ ≤ ‖(a n)⁻¹‖ ^ r * (C * (a n) ^ r) :=
+            mul_le_mul_of_nonneg_left hn hscale_nonneg
+      _ = C := by
+            have hpow_ne : (a n) ^ r ≠ 0 := pow_ne_zero r hapos.ne'
+            rw [Real.norm_eq_abs, abs_of_pos (inv_pos.mpr hapos), inv_pow]
+            field_simp [hpow_ne]
 
 /-- Scaled first absolute-moment bounds imply scaled scalar `Oₚ(1)`.
 
