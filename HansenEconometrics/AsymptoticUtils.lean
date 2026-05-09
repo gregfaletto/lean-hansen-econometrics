@@ -413,12 +413,18 @@ theorem TendstoInDistribution.integral_norm_limit_le_of_eventually_integral_norm
     TendstoInDistribution.integral_norm_limit_le_of_eventually_integral_norm_bound_of_integrable
       (μ := μ) (ν := ν) (X := X) (Z := Z) hX hBound hZNorm
 
+/-- Real identity clipped to `[-R, R]`. -/
+def realClip (R x : ℝ) : ℝ :=
+  max (-R) (min x R)
+
 /-- Bounded continuous clipping of the real identity to `[-R, R]`. -/
 noncomputable def realClipBoundedContinuousFunction (R : ℝ) (hR : 0 ≤ R) :
     BoundedContinuousFunction ℝ ℝ :=
   BoundedContinuousFunction.mkOfBound (α := ℝ) (β := ℝ)
-    ⟨fun x : ℝ => max (-R) (min x R),
-      continuous_const.max (continuous_id.min continuous_const)⟩ (2 * R)
+    ⟨realClip R, by
+      simpa [realClip] using
+        (continuous_const.max (continuous_id.min continuous_const) : Continuous
+          (fun x : ℝ => max (-R) (min x R)))⟩ (2 * R)
     (fun x y => by
       rw [Real.dist_eq]
       change |max (-R) (min x R) - max (-R) (min y R)| ≤ 2 * R
@@ -432,7 +438,7 @@ noncomputable def realClipBoundedContinuousFunction (R : ℝ) (hR : 0 ≤ R) :
 
 @[simp]
 theorem realClipBoundedContinuousFunction_apply {R : ℝ} (hR : 0 ≤ R) (x : ℝ) :
-    realClipBoundedContinuousFunction R hR x = max (-R) (min x R) :=
+    realClipBoundedContinuousFunction R hR x = realClip R x :=
   rfl
 
 /-- Real clipping agrees with the identity inside the clipping interval. -/
@@ -440,7 +446,7 @@ theorem realClipBoundedContinuousFunction_eq_self_of_abs_le
     {R x : ℝ} (hR : 0 ≤ R) (hx : |x| ≤ R) :
     realClipBoundedContinuousFunction R hR x = x := by
   have hx_interval := abs_le.mp hx
-  rw [realClipBoundedContinuousFunction_apply, min_eq_left hx_interval.2,
+  rw [realClipBoundedContinuousFunction_apply, realClip, min_eq_left hx_interval.2,
     max_eq_right hx_interval.1]
 
 /-- **Hansen Theorem 6.15, bounded continuous weak-moment face.**
@@ -491,12 +497,84 @@ theorem TendstoInDistribution.integral_realClip_tendsto
     (hX : TendstoInDistribution X atTop Z (fun _ => μ) ν)
     {R : ℝ} (hR : 0 ≤ R) :
     Tendsto
-      (fun n => ∫ ω, realClipBoundedContinuousFunction R hR (X n ω) ∂μ)
+      (fun n => ∫ ω, realClip R (X n ω) ∂μ)
       atTop
-      (𝓝 (∫ ω, realClipBoundedContinuousFunction R hR (Z ω) ∂ν)) :=
-  TendstoInDistribution.integral_boundedContinuous_tendsto
-    (μ := μ) (ν := ν) (X := X) (Z := Z) hX
-    (realClipBoundedContinuousFunction R hR)
+      (𝓝 (∫ ω, realClip R (Z ω) ∂ν)) := by
+  simpa [realClipBoundedContinuousFunction_apply] using
+    TendstoInDistribution.integral_boundedContinuous_tendsto
+      (μ := μ) (ν := ν) (X := X) (Z := Z) hX
+      (realClipBoundedContinuousFunction R hR)
+
+/-- **Hansen Theorem 6.15, weak-moment tail-control assembly.**
+
+If clipped expectations converge by weak convergence and the source and limit
+integral tails can be made uniformly small, then the untruncated real
+expectations converge. The remaining theorem-facing task is to derive the tail
+premise from Mathlib uniform integrability. -/
+theorem TendstoInDistribution.integral_tendsto_of_realClip_tails
+    {Ω Ω' : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    {X : ℕ → Ω → ℝ} {Z : Ω' → ℝ}
+    (hX : TendstoInDistribution X atTop Z (fun _ => μ) ν)
+    (hTail : ∀ ε > 0, ∃ R : ℝ, 0 ≤ R ∧
+      |(∫ ω, Z ω ∂ν) - ∫ ω, realClip R (Z ω) ∂ν| ≤ ε ∧
+      ∀ᶠ n in atTop,
+        |(∫ ω, X n ω ∂μ) - ∫ ω, realClip R (X n ω) ∂μ| ≤ ε) :
+    Tendsto (fun n => ∫ ω, X n ω ∂μ) atTop (𝓝 (∫ ω, Z ω ∂ν)) := by
+  rw [Metric.tendsto_atTop]
+  intro ε hε
+  set η : ℝ := ε / 4 with hη_def
+  have hη_pos : 0 < η := by positivity
+  obtain ⟨R, hR, hTailZ, hTailX⟩ := hTail η hη_pos
+  have hClip :
+      ∀ᶠ n in atTop,
+        dist (∫ ω, realClip R (X n ω) ∂μ) (∫ ω, realClip R (Z ω) ∂ν) < η :=
+    eventually_atTop.2
+      ((Metric.tendsto_atTop.1
+        (TendstoInDistribution.integral_realClip_tendsto
+          (μ := μ) (ν := ν) (X := X) (Z := Z) hX hR)) η hη_pos)
+  have hEventually :
+      ∀ᶠ n in atTop, dist (∫ ω, X n ω ∂μ) (∫ ω, Z ω ∂ν) < ε := by
+    filter_upwards [hClip, hTailX] with n hClip_n hTailX_n
+    rw [Real.dist_eq] at hClip_n ⊢
+    have hTailZ' :
+        |(∫ ω, realClip R (Z ω) ∂ν) - ∫ ω, Z ω ∂ν| ≤ η := by
+      simpa [abs_sub_comm] using hTailZ
+    calc
+      |(∫ ω, X n ω ∂μ) - ∫ ω, Z ω ∂ν| ≤
+          |(∫ ω, X n ω ∂μ) - ∫ ω, realClip R (X n ω) ∂μ| +
+            |(∫ ω, realClip R (X n ω) ∂μ) -
+              ∫ ω, realClip R (Z ω) ∂ν| +
+            |(∫ ω, realClip R (Z ω) ∂ν) - ∫ ω, Z ω ∂ν| := by
+        have hdecomp :
+            (∫ ω, X n ω ∂μ) - ∫ ω, Z ω ∂ν =
+              ((∫ ω, X n ω ∂μ) - ∫ ω, realClip R (X n ω) ∂μ) +
+                ((∫ ω, realClip R (X n ω) ∂μ) -
+                  ∫ ω, realClip R (Z ω) ∂ν) +
+                ((∫ ω, realClip R (Z ω) ∂ν) - ∫ ω, Z ω ∂ν) := by
+          ring
+        rw [hdecomp]
+        calc
+          |((∫ ω, X n ω ∂μ) - ∫ ω, realClip R (X n ω) ∂μ) +
+                ((∫ ω, realClip R (X n ω) ∂μ) -
+                  ∫ ω, realClip R (Z ω) ∂ν) +
+                ((∫ ω, realClip R (Z ω) ∂ν) - ∫ ω, Z ω ∂ν)| ≤
+              |((∫ ω, X n ω ∂μ) - ∫ ω, realClip R (X n ω) ∂μ) +
+                ((∫ ω, realClip R (X n ω) ∂μ) -
+                  ∫ ω, realClip R (Z ω) ∂ν)| +
+                |(∫ ω, realClip R (Z ω) ∂ν) - ∫ ω, Z ω ∂ν| := by
+            exact abs_add_le _ _
+          _ ≤
+              |(∫ ω, X n ω ∂μ) - ∫ ω, realClip R (X n ω) ∂μ| +
+                |(∫ ω, realClip R (X n ω) ∂μ) -
+                  ∫ ω, realClip R (Z ω) ∂ν| +
+                |(∫ ω, realClip R (Z ω) ∂ν) - ∫ ω, Z ω ∂ν| := by
+            gcongr
+            exact abs_add_le _ _
+      _ < ε := by
+        linarith
+  exact eventually_atTop.1 hEventually
 
 /-- Square-root continuous mapping at zero for nonnegative real-valued sequences.
 
