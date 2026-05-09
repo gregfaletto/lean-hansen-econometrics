@@ -1,6 +1,6 @@
 import Mathlib.Probability.CentralLimitTheorem
 import HansenEconometrics.AsymptoticUtils
-import HansenEconometrics.AsymptoticUtils.DeltaMethod
+import HansenEconometrics.AsymptoticUtils.StochasticOrder
 import HansenEconometrics.ProbabilityUtils
 import HansenEconometrics.ChiSquared
 import HansenEconometrics.Chapter7Asymptotics.Consistency

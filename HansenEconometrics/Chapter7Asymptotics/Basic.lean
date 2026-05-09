@@ -186,6 +186,53 @@ theorem residualStar_sub_error_abs_le_card_rowNorm_betaErrorNorm
   rw [hres, abs_neg]
   exact abs_dotProduct_le_card_mul_norm_mul_norm (X i) d
 
+/-- Maximum row norm over a finite design matrix. -/
+noncomputable def maxRowNorm (X : Matrix n k ℝ) : ℝ :=
+  ‖fun i : n => ‖X i‖‖
+
+/-- Maximum absolute residual error for the totalized estimator. -/
+noncomputable def maxResidualErrorStar (X : Matrix n k ℝ) (β : k → ℝ) (e : n → ℝ) : ℝ :=
+  ‖fun i : n => olsResidualStar X (X *ᵥ β + e) i - e i‖
+
+/-- **Hansen Theorem 7.16, deterministic max residual bound.**
+
+The pointwise residual-error inequality upgrades to a max-over-sample bound:
+the largest residual error is bounded by the largest regressor row norm times
+the coefficient error, up to the finite-dimensional sup-norm factor. -/
+theorem maxResidualErrorStar_le_card_maxRowNorm_betaErrorNorm
+    (X : Matrix n k ℝ) (β : k → ℝ) (e : n → ℝ) :
+    maxResidualErrorStar X β e ≤
+      (Fintype.card k : ℝ) * maxRowNorm X *
+        ‖olsBetaStar X (X *ᵥ β + e) - β‖ := by
+  have hnonneg : 0 ≤
+      (Fintype.card k : ℝ) * maxRowNorm X *
+        ‖olsBetaStar X (X *ᵥ β + e) - β‖ := by
+    exact mul_nonneg
+      (mul_nonneg (Nat.cast_nonneg _) (norm_nonneg _))
+      (norm_nonneg _)
+  unfold maxResidualErrorStar
+  refine
+    (@pi_norm_le_iff_of_nonneg n (fun _ : n => ℝ) _
+      (fun _ => (by infer_instance : SeminormedAddGroup ℝ))
+      (fun i : n => olsResidualStar X (X *ᵥ β + e) i - e i)
+      ((Fintype.card k : ℝ) * maxRowNorm X *
+        ‖olsBetaStar X (X *ᵥ β + e) - β‖)
+      hnonneg).2 ?_
+  intro i
+  have hpoint := residualStar_sub_error_abs_le_card_rowNorm_betaErrorNorm X β e i
+  have hrow : ‖X i‖ ≤ maxRowNorm X := by
+    simpa [maxRowNorm, Real.norm_eq_abs, abs_of_nonneg (norm_nonneg (X i))] using
+      (norm_le_pi_norm (fun j : n => ‖X j‖) i)
+  have hprod :
+      (Fintype.card k : ℝ) * ‖X i‖ *
+          ‖olsBetaStar X (X *ᵥ β + e) - β‖ ≤
+        (Fintype.card k : ℝ) * maxRowNorm X *
+          ‖olsBetaStar X (X *ᵥ β + e) - β‖ := by
+    exact mul_le_mul_of_nonneg_right
+      (mul_le_mul_of_nonneg_left hrow (by positivity))
+      (norm_nonneg _)
+  simpa [Real.norm_eq_abs] using hpoint.trans hprod
+
 /-- **Hansen Theorem 7.16, ordinary OLS pointwise residual bound.**
 
 On nonsingular finite samples, the same pointwise residual-error inequality

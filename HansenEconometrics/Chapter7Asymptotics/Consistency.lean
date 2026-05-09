@@ -1212,6 +1212,55 @@ theorem continuousAt_function_olsBetaOrZero_tendstoInMeasure
       (μ := μ) (X := X) (e := e) (y := y) β h hmodel)
     hφ
 
+/-- **Hansen Theorem 7.16, max residual rate packaging.**
+
+If a deterministic rate scaling sends the product of the maximal row norm and
+the totalized coefficient error to zero in probability, then the scaled maximum
+residual error is also `oₚ(1)`.  The remaining textbook-specific work is to
+combine this wrapper with the Chapter 6 maximum bound for the regressor row
+norm and the Chapter 7 OLS rate. -/
+theorem scaledMaxResidualErrorStar_tendstoInMeasure_zero_of_scaled_product
+    {μ : Measure Ω} [IsFiniteMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} (β : k → ℝ)
+    (scale : ℕ → ℝ) (hscale_nonneg : ∀ n, 0 ≤ scale n)
+    (hProduct :
+      TendstoInMeasure μ
+        (fun n ω =>
+          scale n *
+            ((Fintype.card k : ℝ) * maxRowNorm (stackRegressors X n ω) *
+              ‖olsBetaStar
+                (stackRegressors X n ω)
+                (stackRegressors X n ω *ᵥ β + stackErrors e n ω) - β‖))
+        atTop (fun _ => 0)) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        scale n * maxResidualErrorStar
+          (stackRegressors X n ω) β (stackErrors e n ω))
+      atTop (fun _ => 0) := by
+  refine TendstoInMeasure.of_abs_le_zero_real hProduct ?_
+  intro n ω
+  let Xn : Matrix (Fin n) k ℝ := stackRegressors X n ω
+  let en : Fin n → ℝ := stackErrors e n ω
+  have hdet := maxResidualErrorStar_le_card_maxRowNorm_betaErrorNorm Xn β en
+  have hleft_nonneg :
+      0 ≤ scale n * maxResidualErrorStar Xn β en :=
+    mul_nonneg (hscale_nonneg n) (norm_nonneg _)
+  have hright_nonneg :
+      0 ≤ scale n *
+        ((Fintype.card k : ℝ) * maxRowNorm Xn *
+          ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖) := by
+    exact mul_nonneg (hscale_nonneg n)
+      (mul_nonneg
+        (mul_nonneg (Nat.cast_nonneg _) (norm_nonneg _))
+        (norm_nonneg _))
+  have hscaled :
+      scale n * maxResidualErrorStar Xn β en ≤
+        scale n *
+          ((Fintype.card k : ℝ) * maxRowNorm Xn *
+            ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖) :=
+    mul_le_mul_of_nonneg_left hdet (hscale_nonneg n)
+  simpa [Xn, en, abs_of_nonneg hleft_nonneg, abs_of_nonneg hright_nonneg] using hscaled
+
 /-- **Theorem 7.4 cross remainder.**
 
 The cross term in the residual-variance expansion is negligible:
