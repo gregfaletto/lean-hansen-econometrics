@@ -131,6 +131,26 @@ theorem TendstoInMeasure.sqrt_nonneg_zero_real
     simpa [Real.dist_eq, abs_of_nonneg (hX_nonneg n ω)] using hsquare
   exact hdist
 
+/-- **Hansen Theorem 6.15, convergence-in-measure UI moment wrapper.**
+
+If real random variables are uniformly integrable and converge in measure, then
+their expectations converge. This is the Vitali/convergence-in-measure face of
+Hansen's moment-convergence theorem; the textbook weak-convergence version has a
+stronger mode-of-convergence premise than this wrapper exposes. -/
+theorem tendsto_integral_of_tendstoInMeasure_uniformIntegrable
+    [IsFiniteMeasure μ]
+    {Z : ℕ → α → ℝ} {Zlim : α → ℝ}
+    (hUI : UniformIntegrable Z 1 μ)
+    (hZ : TendstoInMeasure μ Z atTop Zlim) :
+    Tendsto (fun n => ∫ ω, Z n ω ∂μ) atTop (𝓝 (∫ ω, Zlim ω ∂μ)) := by
+  have hZlim_mem : MemLp Zlim 1 μ := hUI.memLp_of_tendstoInMeasure hZ
+  have hLp : Tendsto (fun n => eLpNorm (Z n - Zlim) 1 μ) atTop (𝓝 0) :=
+    tendsto_Lp_finite_of_tendstoInMeasure
+      (μ := μ) (f := Z) (g := Zlim) le_rfl ENNReal.one_ne_top
+      (fun n => hUI.aestronglyMeasurable n) hZlim_mem hUI.unifIntegrable hZ
+  exact tendsto_integral_of_L1' Zlim (memLp_one_iff_integrable.mp hZlim_mem)
+    (Eventually.of_forall fun n => memLp_one_iff_integrable.mp (hUI.memLp n)) hLp
+
 /-- **Coordinate projection of `TendstoInMeasure`**: if a sequence of `∀ b, X b`-valued
 functions converges in measure, then each coordinate converges in measure.
 
