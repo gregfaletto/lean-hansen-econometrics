@@ -143,6 +143,33 @@ structure FeasibleHCJointWLLNConditions (μ : Measure Ω) [IsProbabilityMeasure 
   quadWeight_integrable : ∀ a b l m : k, Integrable
     (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ
 
+/-- Compact moment sufficient condition package for the feasible HC WLLN layer.
+
+The two moment fields dominate every coordinatewise third/fourth scalar summand
+used by the residual-substitution expansion. This keeps the public assumption
+surface closer to textbook row-norm moment conditions while still feeding the
+existing scalar WLLN constructors. -/
+structure FeasibleHCMomentWLLNConditions (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (X : ℕ → Ω → (k → ℝ)) (e y : ℕ → Ω → ℝ) (β : k → ℝ) where
+  /-- Linear-model decomposition of the observed outcome. -/
+  model : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω
+  /-- Component measurability of the regressor sequence. -/
+  x_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (X i) μ
+  /-- Component measurability of the structural-error sequence. -/
+  e_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (e i) μ
+  /-- Pairwise independence of the joint observations `(Xᵢ, eᵢ)`. -/
+  joint_pairwise_indep : Pairwise ((· ⟂ᵢ[μ] ·) on
+    (fun i ω => (X i ω, e i ω)))
+  /-- Identical distribution of the joint observations against the baseline row. -/
+  joint_identDistrib : ∀ i,
+    IdentDistrib (fun ω => (X i ω, e i ω))
+      (fun ω => (X 0 ω, e 0 ω)) μ μ
+  /-- Compact third-moment domination for feasible-HC cross weights. -/
+  absError_rowNorm_cubed_integrable :
+    Integrable (fun ω => |e 0 ω| * ‖X 0 ω‖ ^ 3) μ
+  /-- Compact fourth-row-moment domination for feasible-HC quadratic weights. -/
+  rowNorm_fourth_integrable : Integrable (fun ω => ‖X 0 ω‖ ^ 4) μ
+
 omit [Fintype k] [DecidableEq k] in
 private lemma measurable_hcCrossWeightScalar (a b l : k) :
     Measurable (fun z : (k → ℝ) × ℝ =>
@@ -160,6 +187,73 @@ private lemma measurable_hcQuadWeightScalar (a b l m : k) :
     ((measurable_pi_apply m).comp measurable_fst)).mul
     ((measurable_pi_apply a).comp measurable_fst)).mul
     ((measurable_pi_apply b).comp measurable_fst)
+
+omit [DecidableEq k] in
+private theorem hcCrossWeight_integrable_of_absError_rowNorm_cubed
+    {μ : Measure Ω} {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ}
+    (hX0 : AEStronglyMeasurable (X 0) μ)
+    (he0 : AEStronglyMeasurable (e 0) μ)
+    (hAbs : Integrable (fun ω => |e 0 ω| * ‖X 0 ω‖ ^ 3) μ)
+    (a b l : k) :
+    Integrable (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ := by
+  have hXl : AEStronglyMeasurable (fun ω => X 0 ω l) μ :=
+    (continuous_apply l).comp_aestronglyMeasurable hX0
+  have hXa : AEStronglyMeasurable (fun ω => X 0 ω a) μ :=
+    (continuous_apply a).comp_aestronglyMeasurable hX0
+  have hXb : AEStronglyMeasurable (fun ω => X 0 ω b) μ :=
+    (continuous_apply b).comp_aestronglyMeasurable hX0
+  have hf : AEStronglyMeasurable
+      (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ :=
+    (((he0.const_mul 2).mul hXl).mul hXa).mul hXb
+  refine (hAbs.const_mul 2).mono' hf (ae_of_all μ fun ω => ?_)
+  have hxl : |X 0 ω l| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) l
+  have hxa : |X 0 ω a| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) a
+  have hxb : |X 0 ω b| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) b
+  calc
+    ‖2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b‖
+        = 2 * |e 0 ω| * |X 0 ω l| * |X 0 ω a| * |X 0 ω b| := by
+          simp [Real.norm_eq_abs, mul_assoc]
+    _ ≤ 2 * |e 0 ω| * ‖X 0 ω‖ * ‖X 0 ω‖ * ‖X 0 ω‖ := by
+      gcongr
+    _ = 2 * (|e 0 ω| * ‖X 0 ω‖ ^ 3) := by ring
+
+omit [DecidableEq k] in
+private theorem hcQuadWeight_integrable_of_rowNorm_fourth
+    {μ : Measure Ω} {X : ℕ → Ω → (k → ℝ)}
+    (hX0 : AEStronglyMeasurable (X 0) μ)
+    (hFourth : Integrable (fun ω => ‖X 0 ω‖ ^ 4) μ)
+    (a b l m : k) :
+    Integrable (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ := by
+  have hXl : AEStronglyMeasurable (fun ω => X 0 ω l) μ :=
+    (continuous_apply l).comp_aestronglyMeasurable hX0
+  have hXm : AEStronglyMeasurable (fun ω => X 0 ω m) μ :=
+    (continuous_apply m).comp_aestronglyMeasurable hX0
+  have hXa : AEStronglyMeasurable (fun ω => X 0 ω a) μ :=
+    (continuous_apply a).comp_aestronglyMeasurable hX0
+  have hXb : AEStronglyMeasurable (fun ω => X 0 ω b) μ :=
+    (continuous_apply b).comp_aestronglyMeasurable hX0
+  have hf : AEStronglyMeasurable
+      (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ :=
+    ((hXl.mul hXm).mul hXa).mul hXb
+  refine hFourth.mono' hf (ae_of_all μ fun ω => ?_)
+  have hxl : |X 0 ω l| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) l
+  have hxm : |X 0 ω m| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) m
+  have hxa : |X 0 ω a| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) a
+  have hxb : |X 0 ω b| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) b
+  calc
+    ‖X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b‖
+        = |X 0 ω l| * |X 0 ω m| * |X 0 ω a| * |X 0 ω b| := by
+          simp [Real.norm_eq_abs, mul_assoc]
+    _ ≤ ‖X 0 ω‖ * ‖X 0 ω‖ * ‖X 0 ω‖ * ‖X 0 ω‖ := by
+      gcongr
+    _ = ‖X 0 ω‖ ^ 4 := by ring
 
 namespace FeasibleHCJointWLLNConditions
 
@@ -198,6 +292,43 @@ theorem toFeasibleHCWeightWLLNConditions
     simpa [Function.comp] using h
 
 end FeasibleHCJointWLLNConditions
+
+namespace FeasibleHCMomentWLLNConditions
+
+omit [DecidableEq k] in
+/-- Compact row-norm/error moments discharge the scalar integrability fields in
+the joint-observation feasible-HC WLLN package. -/
+theorem toFeasibleHCJointWLLNConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : FeasibleHCMomentWLLNConditions μ X e y β) :
+    FeasibleHCJointWLLNConditions μ X e y β where
+  model := hm.model
+  x_aestronglyMeasurable := hm.x_aestronglyMeasurable
+  e_aestronglyMeasurable := hm.e_aestronglyMeasurable
+  joint_pairwise_indep := hm.joint_pairwise_indep
+  joint_identDistrib := hm.joint_identDistrib
+  crossWeight_integrable := fun a b l =>
+    hcCrossWeight_integrable_of_absError_rowNorm_cubed
+      (μ := μ) (X := X) (e := e)
+      (hm.x_aestronglyMeasurable 0) (hm.e_aestronglyMeasurable 0)
+      hm.absError_rowNorm_cubed_integrable a b l
+  quadWeight_integrable := fun a b l m =>
+    hcQuadWeight_integrable_of_rowNorm_fourth
+      (μ := μ) (X := X)
+      (hm.x_aestronglyMeasurable 0) hm.rowNorm_fourth_integrable a b l m
+
+omit [DecidableEq k] in
+/-- Compact row-norm/error moments derive the scalar-WLLN condition package for
+feasible HC third/fourth weights. -/
+theorem toFeasibleHCWeightWLLNConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : FeasibleHCMomentWLLNConditions μ X e y β) :
+    FeasibleHCWeightWLLNConditions μ X e y β :=
+  hm.toFeasibleHCJointWLLNConditions.toFeasibleHCWeightWLLNConditions
+
+end FeasibleHCMomentWLLNConditions
 
 namespace FeasibleHCRemainderConditions
 
@@ -350,6 +481,20 @@ theorem toFeasibleHCRemainderConditions
   hj.toFeasibleHCWeightWLLNConditions.toFeasibleHCRemainderConditions
 
 end FeasibleHCJointWLLNConditions
+
+namespace FeasibleHCMomentWLLNConditions
+
+omit [DecidableEq k] in
+/-- Compact row-norm/error moments directly discharge the feasible HC0/HC1
+bounded-weight remainder package. -/
+theorem toFeasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : FeasibleHCMomentWLLNConditions μ X e y β) :
+    FeasibleHCRemainderConditions μ X e y β :=
+  hm.toFeasibleHCWeightWLLNConditions.toFeasibleHCRemainderConditions
+
+end FeasibleHCMomentWLLNConditions
 
 namespace FeasibleHCLeverageConditions
 
@@ -595,6 +740,62 @@ theorem toFeasibleHCLeverageConditions_robust_identDistrib_memLp_rowNorm_sq
     |>.toFeasibleHCLeverageConditions_robust_identDistrib_memLp_rowNorm_sq h hRowMem hRowIdent
 
 end FeasibleHCJointWLLNConditions
+
+namespace FeasibleHCMomentWLLNConditions
+
+/-- Build the HC2/HC3 feasible-condition package from compact row-norm/error
+moments plus the squared-row uniform-integrability max-leverage discharge. -/
+theorem toFeasibleHCLeverageConditions_uniformIntegrable_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : FeasibleHCMomentWLLNConditions μ X e y β)
+    (h : SampleMomentAssumption71 μ X e)
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  hm.toFeasibleHCJointWLLNConditions
+    |>.toFeasibleHCLeverageConditions_uniformIntegrable_rowNorm_sq h hUI
+
+/-- Build the HC2/HC3 feasible-condition package from compact row-norm/error
+moments plus the iid finite-squared-row-moment max-leverage discharge. -/
+theorem toFeasibleHCLeverageConditions_identDistrib_memLp_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : FeasibleHCMomentWLLNConditions μ X e y β)
+    (h : SampleMomentAssumption71 μ X e)
+    (hRowMem : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ)
+    (hRowIdent : ∀ i,
+      IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  hm.toFeasibleHCJointWLLNConditions
+    |>.toFeasibleHCLeverageConditions_identDistrib_memLp_rowNorm_sq h hRowMem hRowIdent
+
+/-- Robust-covariance-package version of
+`toFeasibleHCLeverageConditions_uniformIntegrable_rowNorm_sq`. -/
+theorem toFeasibleHCLeverageConditions_robust_uniformIntegrable_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : FeasibleHCMomentWLLNConditions μ X e y β)
+    (h : RobustCovarianceConsistencyConditions μ X e)
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  hm.toFeasibleHCJointWLLNConditions
+    |>.toFeasibleHCLeverageConditions_robust_uniformIntegrable_rowNorm_sq h hUI
+
+/-- Robust-covariance-package version of
+`toFeasibleHCLeverageConditions_identDistrib_memLp_rowNorm_sq`. -/
+theorem toFeasibleHCLeverageConditions_robust_identDistrib_memLp_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : FeasibleHCMomentWLLNConditions μ X e y β)
+    (h : RobustCovarianceConsistencyConditions μ X e)
+    (hRowMem : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ)
+    (hRowIdent : ∀ i,
+      IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  hm.toFeasibleHCJointWLLNConditions
+    |>.toFeasibleHCLeverageConditions_robust_identDistrib_memLp_rowNorm_sq h hRowMem hRowIdent
+
+end FeasibleHCMomentWLLNConditions
 
 omit [Fintype k] [DecidableEq k] in
 /-- The ideal HC0 score covariance average of stacked samples is the range-indexed
