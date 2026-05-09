@@ -77,6 +77,44 @@ structure FeasibleHCLeverageConditions (μ : Measure Ω) [IsProbabilityMeasure �
       (fun n ω => maxLeverageStar (stackRegressors X n ω))
       atTop (fun _ => 0)
 
+/-- Primitive scalar-WLLN condition package for the feasible HC0/HC1
+bounded-weight layer.
+
+This packages the integrability, pairwise-independence, and identical-distribution
+hypotheses for the third- and fourth-moment scalar summands that appear in the
+HC0 residual-substitution expansion. It is a proof-facing sufficient condition
+that feeds `FeasibleHCRemainderConditions`. -/
+structure FeasibleHCWeightWLLNConditions (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (X : ℕ → Ω → (k → ℝ)) (e y : ℕ → Ω → ℝ) (β : k → ℝ) where
+  /-- Linear-model decomposition of the observed outcome. -/
+  model : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω
+  /-- Component measurability of the regressor sequence. -/
+  x_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (X i) μ
+  /-- Component measurability of the structural-error sequence. -/
+  e_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (e i) μ
+  /-- Integrability of each baseline third-moment scalar summand. -/
+  crossWeight_integrable : ∀ a b l : k, Integrable
+    (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ
+  /-- Pairwise independence of each third-moment scalar summand sequence. -/
+  crossWeight_pairwise_indep : ∀ a b l : k, Pairwise ((· ⟂ᵢ[μ] ·) on
+    (fun i ω => 2 * e i ω * X i ω l * X i ω a * X i ω b))
+  /-- Identical distribution of each third-moment scalar summand sequence. -/
+  crossWeight_identDistrib : ∀ a b l : k, ∀ i,
+    IdentDistrib
+      (fun ω => 2 * e i ω * X i ω l * X i ω a * X i ω b)
+      (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ μ
+  /-- Integrability of each baseline fourth-moment scalar summand. -/
+  quadWeight_integrable : ∀ a b l m : k, Integrable
+    (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ
+  /-- Pairwise independence of each fourth-moment scalar summand sequence. -/
+  quadWeight_pairwise_indep : ∀ a b l m : k, Pairwise ((· ⟂ᵢ[μ] ·) on
+    (fun i ω => X i ω l * X i ω m * X i ω a * X i ω b))
+  /-- Identical distribution of each fourth-moment scalar summand sequence. -/
+  quadWeight_identDistrib : ∀ a b l m : k, ∀ i,
+    IdentDistrib
+      (fun ω => X i ω l * X i ω m * X i ω a * X i ω b)
+      (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ μ
+
 namespace FeasibleHCRemainderConditions
 
 omit [Fintype k] [DecidableEq k] in
@@ -196,6 +234,24 @@ theorem of_weight_wlln
       (hQuadInt a b l m) (hQuadIndep a b l m) (hQuadIdent a b l m)
 
 end FeasibleHCRemainderConditions
+
+namespace FeasibleHCWeightWLLNConditions
+
+omit [DecidableEq k] in
+/-- The scalar-WLLN condition package discharges the bounded empirical
+third/fourth weight hypotheses in `FeasibleHCRemainderConditions`. -/
+theorem toFeasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hw : FeasibleHCWeightWLLNConditions μ X e y β) :
+    FeasibleHCRemainderConditions μ X e y β :=
+  FeasibleHCRemainderConditions.of_weight_wlln
+    (μ := μ) (X := X) (e := e) (y := y) (β := β)
+    hw.model hw.x_aestronglyMeasurable hw.e_aestronglyMeasurable
+    hw.crossWeight_integrable hw.crossWeight_pairwise_indep hw.crossWeight_identDistrib
+    hw.quadWeight_integrable hw.quadWeight_pairwise_indep hw.quadWeight_identDistrib
+
+end FeasibleHCWeightWLLNConditions
 
 namespace FeasibleHCLeverageConditions
 
@@ -329,6 +385,62 @@ theorem of_weight_wlln_identDistrib_memLp_rowNorm_sq
     hRowMem hRowIdent
 
 end FeasibleHCLeverageConditions
+
+namespace FeasibleHCWeightWLLNConditions
+
+/-- Build the HC2/HC3 feasible-condition package from scalar WLLN weight
+conditions plus the squared-row uniform-integrability max-leverage discharge. -/
+theorem toFeasibleHCLeverageConditions_uniformIntegrable_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hw : FeasibleHCWeightWLLNConditions μ X e y β)
+    (h : SampleMomentAssumption71 μ X e)
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  FeasibleHCLeverageConditions.ofRemainder_uniformIntegrable_rowNorm_sq
+    h hw.toFeasibleHCRemainderConditions hUI
+
+/-- Build the HC2/HC3 feasible-condition package from scalar WLLN weight
+conditions plus the iid finite-squared-row-moment max-leverage discharge. -/
+theorem toFeasibleHCLeverageConditions_identDistrib_memLp_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hw : FeasibleHCWeightWLLNConditions μ X e y β)
+    (h : SampleMomentAssumption71 μ X e)
+    (hRowMem : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ)
+    (hRowIdent : ∀ i,
+      IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  FeasibleHCLeverageConditions.ofRemainder_identDistrib_memLp_rowNorm_sq
+    h hw.toFeasibleHCRemainderConditions hRowMem hRowIdent
+
+/-- Robust-covariance-package version of
+`toFeasibleHCLeverageConditions_uniformIntegrable_rowNorm_sq`. -/
+theorem toFeasibleHCLeverageConditions_robust_uniformIntegrable_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hw : FeasibleHCWeightWLLNConditions μ X e y β)
+    (h : RobustCovarianceConsistencyConditions μ X e)
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  FeasibleHCLeverageConditions.ofRobustRemainder_uniformIntegrable_rowNorm_sq
+    h hw.toFeasibleHCRemainderConditions hUI
+
+/-- Robust-covariance-package version of
+`toFeasibleHCLeverageConditions_identDistrib_memLp_rowNorm_sq`. -/
+theorem toFeasibleHCLeverageConditions_robust_identDistrib_memLp_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hw : FeasibleHCWeightWLLNConditions μ X e y β)
+    (h : RobustCovarianceConsistencyConditions μ X e)
+    (hRowMem : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ)
+    (hRowIdent : ∀ i,
+      IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  FeasibleHCLeverageConditions.ofRobustRemainder_identDistrib_memLp_rowNorm_sq
+    h hw.toFeasibleHCRemainderConditions hRowMem hRowIdent
+
+end FeasibleHCWeightWLLNConditions
 
 omit [Fintype k] [DecidableEq k] in
 /-- The ideal HC0 score covariance average of stacked samples is the range-indexed
