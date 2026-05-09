@@ -259,6 +259,100 @@ theorem uniformIntegrable_one_of_identDistrib_memLp
     (μ := μ) (f := Z) (j := 0) (p := 1)
     (by simp) (by simp) hZ0 hident
 
+/-- **Hansen Theorem 6.14, uniform higher-moment UI wrapper.**
+
+If the sequence is uniformly bounded in `Lᵖ` for some finite exponent `p > 1`,
+then it is uniformly integrable in `L¹`. This is the broader textbook
+sufficient condition behind the iid finite-first-moment face above. -/
+theorem uniformIntegrable_one_of_eLpNorm_bdd_gt_one
+    [IsFiniteMeasure μ] {Z : ℕ → Ω → ℝ} {p : ℝ≥0∞}
+    (hp : 1 < p) (hp_top : p ≠ ∞)
+    (hZ : ∀ i, AEStronglyMeasurable (Z i) μ)
+    (hbound : ∃ B : ℝ≥0, ∀ i, eLpNorm (Z i) p μ ≤ B) :
+    UniformIntegrable Z 1 μ := by
+  obtain ⟨B, hB⟩ := hbound
+  have hp_ge_one : 1 ≤ p := hp.le
+  have hp_zero : p ≠ 0 := by
+    exact ne_of_gt (lt_trans (by norm_num : (0 : ℝ≥0∞) < 1) hp)
+  have hp_real_gt_one : 1 < p.toReal := by
+    rw [← ENNReal.toReal_one]
+    exact (ENNReal.toReal_lt_toReal ENNReal.one_ne_top hp_top).2 hp
+  have htheta_pos : 0 < 1 / (1 : ℝ≥0∞).toReal - 1 / p.toReal := by
+    simp only [ENNReal.toReal_one, one_div]
+    rw [sub_pos]
+    simpa using inv_lt_one_of_one_lt₀ hp_real_gt_one
+  let Bstar : ℝ≥0∞ := max (B : ℝ≥0∞) 1
+  have hBstar_ne_top : Bstar ≠ ∞ := by
+    dsimp [Bstar]
+    finiteness
+  refine ⟨hZ, ?_, ?_⟩
+  · intro ε hε
+    have htend := ENNReal.tendsto_const_mul_rpow_nhds_zero_of_pos
+      (c := Bstar) hBstar_ne_top htheta_pos
+    have hevent :
+        ∀ᶠ x in 𝓝 (0 : ℝ≥0∞),
+          Bstar * x ^ (1 / (1 : ℝ≥0∞).toReal - 1 / p.toReal) ≤
+            ENNReal.ofReal ε :=
+      (ENNReal.tendsto_nhds_zero.1 htend
+        (ENNReal.ofReal ε) (ENNReal.ofReal_pos.mpr hε))
+    obtain ⟨a, ha_pos, ha_sub⟩ := ENNReal.nhds_zero_basis_Iic.mem_iff.1 hevent
+    obtain ⟨δnn, hδnn_pos, hδnn_lt⟩ :=
+      ENNReal.lt_iff_exists_nnreal_btwn.1 ha_pos
+    refine ⟨(δnn : ℝ), by exact_mod_cast (ENNReal.coe_pos.mp hδnn_pos),
+      fun i s hs hμs => ?_⟩
+    have hZi_restrict : AEStronglyMeasurable (Z i) (μ.restrict s) :=
+      (hZ i).mono_measure Measure.restrict_le_self
+    have hcomp := eLpNorm_le_eLpNorm_mul_rpow_measure_univ
+      (μ := μ.restrict s) (f := Z i)
+      (p := (1 : ℝ≥0∞)) (q := p) hp_ge_one hZi_restrict
+    have hμs_nn : μ s ≤ (δnn : ℝ≥0∞) := by
+      simpa [ENNReal.ofReal_coe_nnreal] using hμs
+    have hpow :
+        (μ.restrict s Set.univ) ^
+            (1 / (1 : ℝ≥0∞).toReal - 1 / p.toReal) ≤
+          (δnn : ℝ≥0∞) ^ (1 / (1 : ℝ≥0∞).toReal - 1 / p.toReal) := by
+      rw [Measure.restrict_apply_univ]
+      exact ENNReal.rpow_le_rpow hμs_nn htheta_pos.le
+    have hB_i : eLpNorm (Z i) p (μ.restrict s) ≤ Bstar := by
+      exact (eLpNorm_mono_measure (Z i) Measure.restrict_le_self).trans
+        ((hB i).trans (le_max_left _ _))
+    have hsmall :
+        Bstar * (δnn : ℝ≥0∞) ^
+            (1 / (1 : ℝ≥0∞).toReal - 1 / p.toReal) ≤
+          ENNReal.ofReal ε :=
+      ha_sub (le_of_lt hδnn_lt)
+    calc
+      eLpNorm (s.indicator (Z i)) 1 μ
+          = eLpNorm (Z i) 1 (μ.restrict s) :=
+            eLpNorm_indicator_eq_eLpNorm_restrict hs
+      _ ≤ eLpNorm (Z i) p (μ.restrict s) *
+          (μ.restrict s Set.univ) ^
+            (1 / (1 : ℝ≥0∞).toReal - 1 / p.toReal) :=
+        hcomp
+      _ ≤ Bstar * (δnn : ℝ≥0∞) ^
+            (1 / (1 : ℝ≥0∞).toReal - 1 / p.toReal) := by
+        gcongr
+      _ ≤ ENNReal.ofReal ε := hsmall
+  · let A : ℝ≥0∞ :=
+      Bstar * μ Set.univ ^ (1 / (1 : ℝ≥0∞).toReal - 1 / p.toReal)
+    have hA_ne_top : A ≠ ∞ := by
+      dsimp [A]
+      finiteness
+    refine ⟨A.toNNReal, fun i => ?_⟩
+    rw [ENNReal.coe_toNNReal hA_ne_top]
+    have hcomp := eLpNorm_le_eLpNorm_mul_rpow_measure_univ
+      (μ := μ) (f := Z i) (p := (1 : ℝ≥0∞)) (q := p) hp_ge_one (hZ i)
+    have hB_i : eLpNorm (Z i) p μ ≤ Bstar :=
+      (hB i).trans (le_max_left _ _)
+    calc
+      eLpNorm (Z i) 1 μ
+          ≤ eLpNorm (Z i) p μ *
+              μ Set.univ ^ (1 / (1 : ℝ≥0∞).toReal - 1 / p.toReal) :=
+        hcomp
+      _ ≤ Bstar * μ Set.univ ^
+              (1 / (1 : ℝ≥0∞).toReal - 1 / p.toReal) := by
+        gcongr
+
 /-- **Hansen Theorem 6.16, iid finite-power-moment maximum wrapper.**
 
 If the power variables `Z_i` are identically distributed and `Z_0` is in `L¹`,
