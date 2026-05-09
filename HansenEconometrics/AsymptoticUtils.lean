@@ -184,6 +184,81 @@ theorem TendstoInDistribution.integral_boundedContinuous_nonneg_limit_le_of_even
     exact ((hN N le_rfl).1).trans ((hN N le_rfl).2)
   exact hlower.trans hliminf_le
 
+/-- Bounded continuous truncation of the norm: `x ↦ min ‖x‖ R`.
+
+The nonnegative bound `hR` is included so the function has range in `[0, R]`.
+This is the truncation used for the weak-convergence-facing bounded-moment
+layer in Hansen Theorem 6.13. -/
+noncomputable def normTruncBoundedContinuousFunction
+    (E : Type*) [SeminormedAddCommGroup E] (R : ℝ) (hR : 0 ≤ R) :
+    BoundedContinuousFunction E ℝ :=
+  BoundedContinuousFunction.mkOfBound (α := E) (β := ℝ)
+    ⟨fun x : E => min ‖x‖ R, continuous_norm.min continuous_const⟩ R
+    (fun x y => by
+      rw [Real.dist_eq]
+      change |min ‖x‖ R - min ‖y‖ R| ≤ R
+      have hx0 : 0 ≤ min ‖x‖ R := le_min (norm_nonneg x) hR
+      have hy0 : 0 ≤ min ‖y‖ R := le_min (norm_nonneg y) hR
+      have hxR : min ‖x‖ R ≤ R := min_le_right _ _
+      have hyR : min ‖y‖ R ≤ R := min_le_right _ _
+      exact abs_le.mpr ⟨by linarith, by linarith⟩)
+
+@[simp]
+theorem normTruncBoundedContinuousFunction_apply
+    {E : Type*} [SeminormedAddCommGroup E] {R : ℝ} (hR : 0 ≤ R) (x : E) :
+    normTruncBoundedContinuousFunction E R hR x = min ‖x‖ R :=
+  rfl
+
+/-- The norm truncation is nonnegative. -/
+theorem normTruncBoundedContinuousFunction_nonneg
+    {E : Type*} [SeminormedAddCommGroup E] {R : ℝ} (hR : 0 ≤ R) :
+    0 ≤ normTruncBoundedContinuousFunction E R hR :=
+  fun x => by
+    change (0 : ℝ) ≤ normTruncBoundedContinuousFunction E R hR x
+    rw [normTruncBoundedContinuousFunction_apply]
+    exact le_min (norm_nonneg x) hR
+
+/-- The norm truncation is bounded above by the norm. -/
+theorem normTruncBoundedContinuousFunction_le_norm
+    {E : Type*} [SeminormedAddCommGroup E] {R : ℝ} (hR : 0 ≤ R) (x : E) :
+    normTruncBoundedContinuousFunction E R hR x ≤ ‖x‖ := by
+  rw [normTruncBoundedContinuousFunction_apply]
+  exact min_le_left _ _
+
+/-- **Hansen Theorem 6.13, norm-truncation weak-moment layer.**
+
+If `Xₙ ⇒ Z` and the expected norms of `Xₙ` are eventually bounded by `C`, then
+every bounded continuous norm truncation of the limit has expectation at most
+`C`. This is the reusable truncation step toward the textbook unbounded norm
+statement. -/
+theorem TendstoInDistribution.integral_normTrunc_limit_le_of_eventually_integral_norm_bound
+    {Ω Ω' E : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    [SeminormedAddCommGroup E] [MeasurableSpace E] [OpensMeasurableSpace E]
+    [BorelSpace E] [HasOuterApproxClosed E]
+    {X : ℕ → Ω → E} {Z : Ω' → E}
+    (hX : TendstoInDistribution X atTop Z (fun _ => μ) ν)
+    {C R : ℝ} (hR : 0 ≤ R)
+    (hBound : ∀ᶠ n in atTop,
+      Integrable (fun ω => ‖X n ω‖) μ ∧ ∫ ω, ‖X n ω‖ ∂μ ≤ C) :
+    ∫ ω, normTruncBoundedContinuousFunction E R hR (Z ω) ∂ν ≤ C := by
+  let f := normTruncBoundedContinuousFunction E R hR
+  have hfBound : ∀ᶠ n in atTop, ∫ ω, f (X n ω) ∂μ ≤ C := by
+    filter_upwards [hBound] with n hn
+    have hf_map_int : Integrable f (μ.map (X n)) :=
+      f.integrable (μ := μ.map (X n))
+    have hf_int : Integrable (fun ω => f (X n ω)) μ := by
+      simpa [Function.comp_def] using
+        hf_map_int.comp_aemeasurable (hX.forall_aemeasurable n)
+    have hle : ∫ ω, f (X n ω) ∂μ ≤ ∫ ω, ‖X n ω‖ ∂μ :=
+      integral_mono hf_int hn.1
+        (fun ω => normTruncBoundedContinuousFunction_le_norm hR (X n ω))
+    exact hle.trans hn.2
+  exact TendstoInDistribution.integral_boundedContinuous_nonneg_limit_le_of_eventually_bound
+    (μ := μ) (ν := ν) (X := X) (Z := Z) hX f
+    (normTruncBoundedContinuousFunction_nonneg hR) hfBound
+
 /-- **Hansen Theorem 6.15, bounded continuous weak-moment face.**
 
 Weak convergence is exactly convergence of expectations for bounded continuous
