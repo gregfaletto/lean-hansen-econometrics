@@ -230,6 +230,78 @@ theorem ofRemainder_identDistrib_memLp_rowNorm_sq
     maxLeverageStar_tendstoInMeasure_zero_of_identDistrib_memLp_rowNorm_sq
       (μ := μ) (X := X) (e := e) h hRowMem hRowIdent
 
+/-- Build the HC2/HC3 feasible-condition package directly from scalar WLLN
+primitive hypotheses for the HC0/HC1 bounded weights plus the squared-row
+uniform-integrability max-leverage discharge. -/
+theorem of_weight_wlln_uniformIntegrable_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : SampleMomentAssumption71 μ X e)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    (hX_meas : ∀ i, AEStronglyMeasurable (X i) μ)
+    (he_meas : ∀ i, AEStronglyMeasurable (e i) μ)
+    (hCrossInt : ∀ a b l : k, Integrable
+      (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ)
+    (hCrossIndep : ∀ a b l : k, Pairwise ((· ⟂ᵢ[μ] ·) on
+      (fun i ω => 2 * e i ω * X i ω l * X i ω a * X i ω b)))
+    (hCrossIdent : ∀ a b l : k, ∀ i,
+      IdentDistrib
+        (fun ω => 2 * e i ω * X i ω l * X i ω a * X i ω b)
+        (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ μ)
+    (hQuadInt : ∀ a b l m : k, Integrable
+      (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ)
+    (hQuadIndep : ∀ a b l m : k, Pairwise ((· ⟂ᵢ[μ] ·) on
+      (fun i ω => X i ω l * X i ω m * X i ω a * X i ω b)))
+    (hQuadIdent : ∀ a b l m : k, ∀ i,
+      IdentDistrib
+        (fun ω => X i ω l * X i ω m * X i ω a * X i ω b)
+        (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ μ)
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  ofRemainder_uniformIntegrable_rowNorm_sq h
+    (FeasibleHCRemainderConditions.of_weight_wlln
+      (μ := μ) (X := X) (e := e) (y := y) (β := β)
+      hmodel hX_meas he_meas hCrossInt hCrossIndep hCrossIdent
+      hQuadInt hQuadIndep hQuadIdent)
+    hUI
+
+/-- Build the HC2/HC3 feasible-condition package directly from scalar WLLN
+primitive hypotheses for the HC0/HC1 bounded weights plus the iid
+finite-squared-row-moment max-leverage discharge. -/
+theorem of_weight_wlln_identDistrib_memLp_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : SampleMomentAssumption71 μ X e)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    (hX_meas : ∀ i, AEStronglyMeasurable (X i) μ)
+    (he_meas : ∀ i, AEStronglyMeasurable (e i) μ)
+    (hCrossInt : ∀ a b l : k, Integrable
+      (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ)
+    (hCrossIndep : ∀ a b l : k, Pairwise ((· ⟂ᵢ[μ] ·) on
+      (fun i ω => 2 * e i ω * X i ω l * X i ω a * X i ω b)))
+    (hCrossIdent : ∀ a b l : k, ∀ i,
+      IdentDistrib
+        (fun ω => 2 * e i ω * X i ω l * X i ω a * X i ω b)
+        (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ μ)
+    (hQuadInt : ∀ a b l m : k, Integrable
+      (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ)
+    (hQuadIndep : ∀ a b l m : k, Pairwise ((· ⟂ᵢ[μ] ·) on
+      (fun i ω => X i ω l * X i ω m * X i ω a * X i ω b)))
+    (hQuadIdent : ∀ a b l m : k, ∀ i,
+      IdentDistrib
+        (fun ω => X i ω l * X i ω m * X i ω a * X i ω b)
+        (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ μ)
+    (hRowMem : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ)
+    (hRowIdent : ∀ i,
+      IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  ofRemainder_identDistrib_memLp_rowNorm_sq h
+    (FeasibleHCRemainderConditions.of_weight_wlln
+      (μ := μ) (X := X) (e := e) (y := y) (β := β)
+      hmodel hX_meas he_meas hCrossInt hCrossIndep hCrossIdent
+      hQuadInt hQuadIndep hQuadIdent)
+    hRowMem hRowIdent
+
 end FeasibleHCLeverageConditions
 
 omit [Fintype k] [DecidableEq k] in
