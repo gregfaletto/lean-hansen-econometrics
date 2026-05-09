@@ -880,9 +880,9 @@ theorem BoundedInProbability.of_eventually_integral_norm_bound
 /-- An eventual higher natural-moment bound implies scalar `Oₚ(1)`.
 
 This is the natural-power Markov-inequality face of Hansen Theorem 6.12.
-The fully general textbook statement allows arbitrary positive real exponents;
-this wrapper covers the common integer-moment cases without adding extra
-real-power infrastructure. -/
+The positive-real-exponent face is
+`BoundedInProbability.of_eventually_integral_norm_rpow_bound`; this wrapper
+keeps the common integer-moment cases convenient. -/
 theorem BoundedInProbability.of_eventually_integral_norm_pow_bound
     [IsFiniteMeasure μ] {X : ℕ → α → ℝ} {C : ℝ} {r : ℕ}
     (hr : r ≠ 0)
@@ -944,11 +944,78 @@ theorem BoundedInProbability.of_eventually_integral_norm_pow_bound
     exact hratio
   exact (measure_mono hcover).trans (htail_power.trans htail_delta)
 
+/-- An eventual positive-real moment bound implies scalar `Oₚ(1)`.
+
+This is the arbitrary positive-real-exponent Markov-inequality face of Hansen
+Theorem 6.12 for the unit scale: if `E|Xₙ|^p` is eventually bounded for some
+`p > 0`, then `Xₙ = Oₚ(1)`. -/
+theorem BoundedInProbability.of_eventually_integral_norm_rpow_bound
+    [IsFiniteMeasure μ] {X : ℕ → α → ℝ} {C p : ℝ}
+    (hp : 0 < p)
+    (hC : 0 ≤ C)
+    (hInt : ∀ n, Integrable (fun ω => ‖X n ω‖ ^ p) μ)
+    (hBound : ∀ᶠ n in atTop, ∫ ω, ‖X n ω‖ ^ p ∂μ ≤ C) :
+    BoundedInProbability μ X := by
+  intro δ hδ
+  by_cases hδtop : δ = ∞
+  · refine ⟨1, by norm_num, Eventually.of_forall ?_⟩
+    intro n
+    rw [hδtop]
+    exact le_top
+  have hδreal_pos : 0 < δ.toReal := ENNReal.toReal_pos hδ.ne' hδtop
+  let B : ℝ := (C + 1) / δ.toReal
+  let T : ℝ := B + 1
+  let M : ℝ := T ^ p⁻¹
+  have hC1pos : 0 < C + 1 := by linarith
+  have hBpos : 0 < B := div_pos hC1pos hδreal_pos
+  have hTpos : 0 < T := by dsimp [T]; linarith
+  have hMpos : 0 < M := Real.rpow_pos_of_pos hTpos p⁻¹
+  have hMpow : M ^ p = T := by
+    dsimp [M]
+    simpa using Real.rpow_inv_rpow hTpos.le hp.ne'
+  refine ⟨M, hMpos, hBound.mono ?_⟩
+  intro n hn
+  have hcover :
+      {ω | M ≤ ‖X n ω‖} ⊆ {ω | T ≤ ‖X n ω‖ ^ p} := by
+    intro ω hω
+    have hpow : M ^ p ≤ ‖X n ω‖ ^ p :=
+      Real.rpow_le_rpow hMpos.le hω hp.le
+    simpa [hMpow] using hpow
+  have hmarkov :
+      T * μ.real {ω | T ≤ ‖X n ω‖ ^ p} ≤ ∫ ω, ‖X n ω‖ ^ p ∂μ :=
+    mul_meas_ge_le_integral_of_nonneg
+      (ae_of_all μ fun ω => Real.rpow_nonneg (norm_nonneg (X n ω)) p) (hInt n) T
+  have hreal_le : μ.real {ω | T ≤ ‖X n ω‖ ^ p} ≤ C / T := by
+    have hmul_le : μ.real {ω | T ≤ ‖X n ω‖ ^ p} * T ≤ C := by
+      calc
+        μ.real {ω | T ≤ ‖X n ω‖ ^ p} * T
+            = T * μ.real {ω | T ≤ ‖X n ω‖ ^ p} := by ring
+        _ ≤ ∫ ω, ‖X n ω‖ ^ p ∂μ := hmarkov
+        _ ≤ C := hn
+    exact (le_div_iff₀ hTpos).2 hmul_le
+  have hratio : C / T ≤ δ.toReal := by
+    have hδB : δ.toReal * B = C + 1 := by
+      dsimp [B]
+      field_simp [hδreal_pos.ne']
+    exact (div_le_iff₀ hTpos).2 (by
+      dsimp [T]
+      nlinarith [hδB, hδreal_pos])
+  have htail_power :
+      μ {ω | T ≤ ‖X n ω‖ ^ p} ≤ ENNReal.ofReal (C / T) := by
+    rw [ENNReal.le_ofReal_iff_toReal_le (measure_ne_top μ _) (div_nonneg hC hTpos.le)]
+    simpa [measureReal_def] using hreal_le
+  have htail_delta : ENNReal.ofReal (C / T) ≤ δ := by
+    rw [ENNReal.ofReal_le_iff_le_toReal hδtop]
+    exact hratio
+  exact (measure_mono hcover).trans (htail_power.trans htail_delta)
+
 /-- Scaled natural-moment bounds imply scaled scalar `Oₚ(1)`.
 
 If `E|Xₙ|^m` is eventually bounded by `C aₙ^m` for a positive deterministic
 scale `aₙ`, then `aₙ⁻¹ Xₙ` is bounded in probability. This is the integer-power
-scaled version of Hansen Theorem 6.12. -/
+scaled version of Hansen Theorem 6.12; see
+`BoundedInProbability.of_eventually_integral_norm_rpow_scaled_bound` for the
+positive-real-exponent version. -/
 theorem BoundedInProbability.of_eventually_integral_norm_pow_scaled_bound
     [IsFiniteMeasure μ] {X : ℕ → α → ℝ} {a : ℕ → ℝ} {C : ℝ} {r : ℕ}
     (hr : r ≠ 0)
@@ -977,6 +1044,47 @@ theorem BoundedInProbability.of_eventually_integral_norm_pow_scaled_bound
       _ = C := by
             have hpow_ne : (a n) ^ r ≠ 0 := pow_ne_zero r hapos.ne'
             rw [Real.norm_eq_abs, abs_of_pos (inv_pos.mpr hapos), inv_pow]
+            field_simp [hpow_ne]
+
+/-- Scaled positive-real moment bounds imply scaled scalar `Oₚ(1)`.
+
+If `E|Xₙ|^p` is eventually bounded by `C aₙ^p` for a positive deterministic
+scale `aₙ` and `p > 0`, then `aₙ⁻¹ Xₙ` is bounded in probability. This is the
+positive-real-exponent scaled face of Hansen Theorem 6.12. -/
+theorem BoundedInProbability.of_eventually_integral_norm_rpow_scaled_bound
+    [IsFiniteMeasure μ] {X : ℕ → α → ℝ} {a : ℕ → ℝ} {C p : ℝ}
+    (hp : 0 < p)
+    (hC : 0 ≤ C)
+    (ha : ∀ᶠ n in atTop, 0 < a n)
+    (hInt : ∀ n, Integrable (fun ω => ‖X n ω‖ ^ p) μ)
+    (hBound : ∀ᶠ n in atTop, ∫ ω, ‖X n ω‖ ^ p ∂μ ≤ C * (a n) ^ p) :
+    BoundedInProbability μ (fun n ω => (a n)⁻¹ * X n ω) := by
+  refine BoundedInProbability.of_eventually_integral_norm_rpow_bound
+    (C := C) (p := p) hp hC ?_ ?_
+  · intro n
+    have hEq :
+        (fun ω => ‖(a n)⁻¹ * X n ω‖ ^ p) =
+          fun ω => ‖(a n)⁻¹‖ ^ p * ‖X n ω‖ ^ p := by
+      funext ω
+      rw [norm_mul, Real.mul_rpow (norm_nonneg _) (norm_nonneg _)]
+    rw [hEq]
+    exact (hInt n).const_mul (‖(a n)⁻¹‖ ^ p)
+  · filter_upwards [ha, hBound] with n hapos hn
+    have hscale_nonneg : 0 ≤ ‖(a n)⁻¹‖ ^ p :=
+      Real.rpow_nonneg (norm_nonneg _) p
+    calc
+      ∫ ω, ‖(a n)⁻¹ * X n ω‖ ^ p ∂μ
+          = ∫ ω, ‖(a n)⁻¹‖ ^ p * ‖X n ω‖ ^ p ∂μ := by
+            congr 1
+            ext ω
+            rw [norm_mul, Real.mul_rpow (norm_nonneg _) (norm_nonneg _)]
+      _ = ‖(a n)⁻¹‖ ^ p * ∫ ω, ‖X n ω‖ ^ p ∂μ := by
+            rw [integral_const_mul]
+      _ ≤ ‖(a n)⁻¹‖ ^ p * (C * (a n) ^ p) :=
+            mul_le_mul_of_nonneg_left hn hscale_nonneg
+      _ = C := by
+            rw [Real.norm_eq_abs, abs_of_pos (inv_pos.mpr hapos), Real.inv_rpow hapos.le p]
+            have hpow_ne : (a n) ^ p ≠ 0 := (Real.rpow_pos_of_pos hapos p).ne'
             field_simp [hpow_ne]
 
 /-- Scaled first absolute-moment bounds imply scaled scalar `Oₚ(1)`.
