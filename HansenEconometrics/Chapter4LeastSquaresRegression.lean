@@ -127,6 +127,22 @@ noncomputable def olsHuberWhiteHC3VarianceEstimator
   olsConditionalVarianceMatrix X
     (Matrix.diagonal fun i => ((1 - hatMatrix X i i)⁻¹)^2 * residual X y i ^ 2)
 
+/-- HC leverage-weight ordering on the nonsaturated textbook range.
+
+If a leverage value satisfies `0 ≤ h < 1`, then the HC2 scalar weight
+`(1 - h)⁻¹` is at least the HC0 weight `1`, and the HC3 scalar weight
+`((1 - h)⁻¹)^2` is at least the HC2 weight. This is the scalar deterministic
+core behind finite-sample HC0/HC2/HC3 ordering statements. -/
+theorem hc_leverage_weight_ordering {h : ℝ} (h_nonneg : 0 ≤ h) (h_lt_one : h < 1) :
+    1 ≤ (1 - h)⁻¹ ∧ (1 - h)⁻¹ ≤ ((1 - h)⁻¹)^2 := by
+  have ht_pos : 0 < 1 - h := sub_pos.mpr h_lt_one
+  have ht_le_one : 1 - h ≤ 1 := by linarith
+  have h_hc2 : 1 ≤ (1 - h)⁻¹ := (one_le_inv₀ ht_pos).2 ht_le_one
+  have h_hc3 : (1 - h)⁻¹ ≤ ((1 - h)⁻¹)^2 := by
+    simpa [pow_two] using
+      (Bound.le_self_pow_of_pos h_hc2 (show 0 < (2 : ℕ) by norm_num))
+  exact ⟨h_hc2, h_hc3⟩
+
 /-- Clustered covariance: sandwich on cluster-summed scores. -/
 noncomputable def olsClusteredVarianceEstimator
     {G : Type*} [Fintype G] [DecidableEq G]

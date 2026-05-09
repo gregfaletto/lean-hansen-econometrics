@@ -63,13 +63,13 @@ weighted lower bound is now formalized as
 For estimator bookkeeping, Chapter 4 now includes the finite-sample residual variance estimator,
 its deterministic linear-model/quadratic-form rewrites, conditional and unconditional
 homoskedastic unbiasedness, HC0/HC1/HC2/HC3 covariance estimators, and a minimal clustered
-sandwich definition with a linear-model rewrite.
+sandwich definition with a linear-model rewrite. The scalar HC leverage-weight ordering
+`1 ≤ (1-h)⁻¹ ≤ ((1-h)⁻¹)^2` is also formalized on the nonsaturated range `0 ≤ h < 1`.
 
 ## Deferred / won't do for now
 For the current pass we are intentionally not pushing Chapter 4 to applied-completeness.
 The following are explicitly deferred unless they become prerequisite later:
-- heteroskedastic formula for `E[σ̂² | X] = n⁻¹ tr(MD)`
-- HC2/HC3 unbiasedness or finite-sample ordering results
+- full HC2/HC3 covariance-matrix unbiasedness or finite-sample ordering results
 - clustered covariance asymptotics and partition/Finpartition infrastructure
 - HC4 and other leverage-adjustment families
 
@@ -123,10 +123,11 @@ Conventions:
 
 - [olsHetCovHC2Star_eq_smul_olsHuberWhiteHC2VarianceEstimator](../../HansenEconometrics/Chapter7Asymptotics/SandwichAssembly.lean#L1271): Chapter 7 totalized HC2 equals `(Fintype.card n : ℝ) •` the Chapter 4 base HC2 estimator on nonsingular designs.
 - [olsHetCovHC3Star_eq_smul_olsHuberWhiteHC3VarianceEstimator](../../HansenEconometrics/Chapter7Asymptotics/SandwichAssembly.lean#L1284): analogous HC3 bridge.
+- [hc_leverage_weight_ordering](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L136): on `0 ≤ h < 1`, the HC2 scalar leverage weight dominates HC0 and the HC3 scalar leverage weight dominates HC2.
 
 ## Notes
 
 - Chapter 4 has strong deterministic and conditional-expectation coverage already, so this file is
   mostly a map from Hansen's notation into the matrix-valued Lean API.
-- The remaining covariance-estimator gaps are HC ordering/unbiasedness refinements and
+- The remaining covariance-estimator gaps are full matrix-level HC ordering/unbiasedness refinements and
   clustered/asymptotic refinements.
