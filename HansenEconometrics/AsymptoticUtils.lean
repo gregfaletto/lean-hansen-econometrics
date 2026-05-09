@@ -413,6 +413,36 @@ theorem TendstoInDistribution.integral_norm_limit_le_of_eventually_integral_norm
     TendstoInDistribution.integral_norm_limit_le_of_eventually_integral_norm_bound_of_integrable
       (μ := μ) (ν := ν) (X := X) (Z := Z) hX hBound hZNorm
 
+/-- Bounded continuous clipping of the real identity to `[-R, R]`. -/
+noncomputable def realClipBoundedContinuousFunction (R : ℝ) (hR : 0 ≤ R) :
+    BoundedContinuousFunction ℝ ℝ :=
+  BoundedContinuousFunction.mkOfBound (α := ℝ) (β := ℝ)
+    ⟨fun x : ℝ => max (-R) (min x R),
+      continuous_const.max (continuous_id.min continuous_const)⟩ (2 * R)
+    (fun x y => by
+      rw [Real.dist_eq]
+      change |max (-R) (min x R) - max (-R) (min y R)| ≤ 2 * R
+      have hx_lo : -R ≤ max (-R) (min x R) := le_max_left _ _
+      have hy_lo : -R ≤ max (-R) (min y R) := le_max_left _ _
+      have hx_hi : max (-R) (min x R) ≤ R :=
+        max_le (by linarith) (min_le_right _ _)
+      have hy_hi : max (-R) (min y R) ≤ R :=
+        max_le (by linarith) (min_le_right _ _)
+      exact abs_le.mpr ⟨by linarith, by linarith⟩)
+
+@[simp]
+theorem realClipBoundedContinuousFunction_apply {R : ℝ} (hR : 0 ≤ R) (x : ℝ) :
+    realClipBoundedContinuousFunction R hR x = max (-R) (min x R) :=
+  rfl
+
+/-- Real clipping agrees with the identity inside the clipping interval. -/
+theorem realClipBoundedContinuousFunction_eq_self_of_abs_le
+    {R x : ℝ} (hR : 0 ≤ R) (hx : |x| ≤ R) :
+    realClipBoundedContinuousFunction R hR x = x := by
+  have hx_interval := abs_le.mp hx
+  rw [realClipBoundedContinuousFunction_apply, min_eq_left hx_interval.2,
+    max_eq_right hx_interval.1]
+
 /-- **Hansen Theorem 6.15, bounded continuous weak-moment face.**
 
 Weak convergence is exactly convergence of expectations for bounded continuous
@@ -447,6 +477,26 @@ theorem TendstoInDistribution.integral_boundedContinuous_tendsto
     funext n
     rw [integral_map (hX.forall_aemeasurable n) (by fun_prop)]
   simpa [hlimit, hseq] using hmap
+
+/-- **Hansen Theorem 6.15, clipped real weak-moment face.**
+
+If `Xₙ ⇒ Z`, then expectations of every bounded continuous clipped identity
+`x ↦ max (-R) (min x R)` converge. This is the truncation bridge used before
+adding the tail-control step for the full uniform-integrability theorem. -/
+theorem TendstoInDistribution.integral_realClip_tendsto
+    {Ω Ω' : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    {X : ℕ → Ω → ℝ} {Z : Ω' → ℝ}
+    (hX : TendstoInDistribution X atTop Z (fun _ => μ) ν)
+    {R : ℝ} (hR : 0 ≤ R) :
+    Tendsto
+      (fun n => ∫ ω, realClipBoundedContinuousFunction R hR (X n ω) ∂μ)
+      atTop
+      (𝓝 (∫ ω, realClipBoundedContinuousFunction R hR (Z ω) ∂ν)) :=
+  TendstoInDistribution.integral_boundedContinuous_tendsto
+    (μ := μ) (ν := ν) (X := X) (Z := Z) hX
+    (realClipBoundedContinuousFunction R hR)
 
 /-- Square-root continuous mapping at zero for nonnegative real-valued sequences.
 
