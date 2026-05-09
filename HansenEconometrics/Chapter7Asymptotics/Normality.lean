@@ -577,6 +577,23 @@ theorem maxResidualErrorStar_tendstoInMeasure_zero_of_identDistrib_memLp_rowNorm
     (uniformIntegrable_one_of_identDistrib_memLp
       (μ := μ) (Z := fun i ω => ‖X i ω‖ ^ 2) hRowMem hRowIdent)
 
+/-- **Hansen Theorem 7.16, iid feasible-HC package endpoint.**
+
+The unified iid robust feasible-HC package directly discharges residual
+uniformity through its score-CLT, model, finite squared-row-moment, and row-norm
+identical-distribution fields. -/
+theorem maxResidualErrorStar_tendstoInMeasure_zero_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω => maxResidualErrorStar (stackRegressors X n ω) β (stackErrors e n ω))
+      atTop (fun _ => 0) :=
+  maxResidualErrorStar_tendstoInMeasure_zero_of_identDistrib_memLp_rowNorm_sq
+    (μ := μ) (X := X) (e := e) (y := y)
+    h.toScoreCLTConditions β h.model
+    h.rowNorm_sq_memLp h.rowNorm_sq_identDistrib
+
 /-- **Hansen Theorem 7.3, ordinary-wrapper vector asymptotic normality.**
 
 The same non-conditional vector CLT for the textbook-facing `olsBetaOrZero`

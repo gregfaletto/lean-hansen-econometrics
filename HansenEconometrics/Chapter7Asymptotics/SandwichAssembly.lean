@@ -427,6 +427,19 @@ private theorem joint_pairwise_indep
   intro i j hij
   exact h.joint_iIndep.indepFun hij
 
+/-- IID joint observations imply identical distribution of squared row norms,
+the primitive input used by the Chapter 6 maximum theorem in the 7.16/7.17
+rate wrappers. -/
+theorem rowNorm_sq_identDistrib
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    ∀ i, IdentDistrib (fun ω => ‖X i ω‖ ^ 2)
+      (fun ω => ‖X 0 ω‖ ^ 2) μ μ := by
+  intro i
+  have hi := (h.joint_identDistrib i).comp measurable_rowNormSq_fst
+  simpa [Function.comp] using hi
+
 /-- The iid joint-observation package discharges the least-squares consistency
 condition package by mapping iid observations through the relevant row moments. -/
 theorem toLeastSquaresConsistencyConditions
@@ -517,6 +530,23 @@ theorem toRobustFeasibleHCMomentConditions
   toFeasibleHCMomentWLLNConditions :=
     IidRobustFeasibleHCMomentConditions.toFeasibleHCMomentWLLNConditions h
   rowNorm_sq_memLp := h.rowNorm_sq_memLp
+
+/-- **Hansen Theorem 7.17, iid feasible-HC package endpoint.**
+
+The unified iid robust feasible-HC package directly discharges the max-leverage
+rate through its finite squared-row-moment field and the row-norm
+identical-distribution bridge above. -/
+theorem maxLeverageStar_tendstoInMeasure_zero_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω => maxLeverageStar (stackRegressors X n ω))
+      atTop (fun _ => 0) :=
+  maxLeverageStar_tendstoInMeasure_zero_of_identDistrib_memLp_rowNorm_sq
+    (μ := μ) (X := X) (e := e)
+    h.toLeastSquaresConsistencyConditions
+    h.rowNorm_sq_memLp h.rowNorm_sq_identDistrib
 
 end IidRobustFeasibleHCMomentConditions
 
