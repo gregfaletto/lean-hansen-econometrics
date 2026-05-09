@@ -295,6 +295,7 @@ Links:
 | --- | --- |
 | $ACE = \int ACE(x) f(x)\,dx$ | <code>averageTreatmentEffect μ Y0 Y1 = ∫ ω, conditionalAverageTreatmentEffectOn μ Y0 Y1 X ω ∂μ</code> |
 | Under the mean-independence consequence of CIA, the treatment-and-covariate potential-outcome contrast equals CATE | <code>conditionalPotentialOutcomeContrastOn μ Y0 Y1 (fun ω => (D ω, X ω)) =ᵐ[μ] conditionalAverageTreatmentEffectOn μ Y0 Y1 X</code> |
+| Under the mean-independence consequence of CIA, CATE conditioned on treatment and covariates equals CATE conditioned on covariates | <code>conditionalAverageTreatmentEffectOn μ Y0 Y1 (fun ω => (D ω, X ω)) =ᵐ[μ] conditionalAverageTreatmentEffectOn μ Y0 Y1 X</code> |
 
 Notes:
 - This is a first formal bridge toward Theorem 2.12, not the final theorem as written in Hansen.
@@ -337,3 +338,5 @@ Hansen's notation and the Lean formalization.
   difference of conditional potential-outcome means.
 - [`conditionalPotentialOutcomeContrastOn_treatment_covariates_eq_cate_of_meanIndependent`](../HansenEconometrics/Chapter2PotentialOutcomes.lean):
   mean-independence bridge from conditioning on `(D, X)` to the CATE.
+- [`conditionalAverageTreatmentEffectOn_treatment_covariates_eq_of_meanIndependent`](../HansenEconometrics/Chapter2PotentialOutcomes.lean):
+  direct CATE bridge from conditioning on `(D, X)` to conditioning on `X`.

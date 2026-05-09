@@ -164,6 +164,22 @@ theorem conditionalPotentialOutcomeContrastOn_treatment_covariates_eq_cate_of_me
       (conditionalAverageTreatmentEffectOn_eq_conditionalPotentialOutcomeContrastOn
         (μ := μ) (X := X) hY1 hY0).symm
 
+/-- Direct CATE bridge for the variable-facing version of Hansen Theorem 2.12. Under the
+mean-independence consequence of CIA, conditioning the treatment effect on `(D, X)` gives the same
+conditional average treatment effect as conditioning on `X` alone. -/
+theorem conditionalAverageTreatmentEffectOn_treatment_covariates_eq_of_meanIndependent
+    {Y0 Y1 : Ω → ℝ} {D : Ω → Bool} {X : Ω → β}
+    (hmean : TreatmentMeanIndependentOn μ Y0 Y1 D X)
+    (hY1 : Integrable Y1 μ) (hY0 : Integrable Y0 μ) :
+    conditionalAverageTreatmentEffectOn μ Y0 Y1 (fun ω => (D ω, X ω)) =ᵐ[μ]
+      conditionalAverageTreatmentEffectOn μ Y0 Y1 X :=
+  (conditionalAverageTreatmentEffectOn_eq_conditionalPotentialOutcomeContrastOn
+    (μ := μ) (X := fun ω => (D ω, X ω)) hY1 hY0).trans <|
+      (conditionalPotentialOutcomeContrastOn_treatment_covariates_eq_of_meanIndependent
+        (μ := μ) hmean).trans <|
+        (conditionalAverageTreatmentEffectOn_eq_conditionalPotentialOutcomeContrastOn
+          (μ := μ) (X := X) hY1 hY0).symm
+
 end Probability
 
 end HansenEconometrics
