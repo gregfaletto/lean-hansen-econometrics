@@ -77,6 +77,126 @@ structure FeasibleHCLeverageConditions (μ : Measure Ω) [IsProbabilityMeasure �
       (fun n ω => maxLeverageStar (stackRegressors X n ω))
       atTop (fun _ => 0)
 
+namespace FeasibleHCRemainderConditions
+
+omit [Fintype k] [DecidableEq k] in
+/-- Empirical third-moment HC0 cross weights are bounded in probability when
+the scalar summands satisfy the WLLN primitive hypotheses. -/
+theorem crossWeight_bounded_of_wlln
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} (a b l : k)
+    (hint : Integrable
+      (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ)
+    (hindep : Pairwise ((· ⟂ᵢ[μ] ·) on
+      (fun i ω => 2 * e i ω * X i ω l * X i ω a * X i ω b)))
+    (hident : ∀ i,
+      IdentDistrib
+        (fun ω => 2 * e i ω * X i ω l * X i ω a * X i ω b)
+        (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ μ) :
+    BoundedInProbability μ
+      (fun n ω =>
+        sampleScoreCovCrossWeight
+          (stackRegressors X n ω) (stackErrors e n ω) a b l) := by
+  let W : ℕ → Ω → ℝ := fun i ω =>
+    2 * e i ω * X i ω l * X i ω a * X i ω b
+  have hWLLN : TendstoInMeasure μ
+      (fun (n : ℕ) ω => (n : ℝ)⁻¹ • ∑ i ∈ Finset.range n, W i ω)
+      atTop (fun _ => μ[W 0]) :=
+    tendstoInMeasure_wlln W hint hindep hident
+  have hWeight : TendstoInMeasure μ
+      (fun n ω =>
+        sampleScoreCovCrossWeight
+          (stackRegressors X n ω) (stackErrors e n ω) a b l)
+      atTop (fun _ => μ[W 0]) := by
+    refine hWLLN.congr_left (fun n => ae_of_all μ (fun ω => ?_))
+    have hsum :
+        (∑ i : Fin n,
+          2 * e i.val ω * X i.val ω l * X i.val ω a * X i.val ω b) =
+          ∑ i ∈ Finset.range n, 2 * e i ω * X i ω l * X i ω a * X i ω b :=
+      Fin.sum_univ_eq_sum_range
+        (fun i => 2 * e i ω * X i ω l * X i ω a * X i ω b) n
+    simp [sampleScoreCovCrossWeight, stackRegressors, stackErrors, W,
+      Fintype.card_fin, hsum]
+  exact BoundedInProbability.of_tendstoInMeasure_const hWeight
+
+omit [Fintype k] [DecidableEq k] in
+/-- Empirical fourth-moment HC0 quadratic weights are bounded in probability
+when the scalar summands satisfy the WLLN primitive hypotheses. -/
+theorem quadWeight_bounded_of_wlln
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} (a b l m : k)
+    (hint : Integrable
+      (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ)
+    (hindep : Pairwise ((· ⟂ᵢ[μ] ·) on
+      (fun i ω => X i ω l * X i ω m * X i ω a * X i ω b)))
+    (hident : ∀ i,
+      IdentDistrib
+        (fun ω => X i ω l * X i ω m * X i ω a * X i ω b)
+        (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ μ) :
+    BoundedInProbability μ
+      (fun n ω =>
+        sampleScoreCovQuadraticWeight
+          (stackRegressors X n ω) a b l m) := by
+  let W : ℕ → Ω → ℝ := fun i ω =>
+    X i ω l * X i ω m * X i ω a * X i ω b
+  have hWLLN : TendstoInMeasure μ
+      (fun (n : ℕ) ω => (n : ℝ)⁻¹ • ∑ i ∈ Finset.range n, W i ω)
+      atTop (fun _ => μ[W 0]) :=
+    tendstoInMeasure_wlln W hint hindep hident
+  have hWeight : TendstoInMeasure μ
+      (fun n ω =>
+        sampleScoreCovQuadraticWeight
+          (stackRegressors X n ω) a b l m)
+      atTop (fun _ => μ[W 0]) := by
+    refine hWLLN.congr_left (fun n => ae_of_all μ (fun ω => ?_))
+    have hsum :
+        (∑ i : Fin n,
+          X i.val ω l * X i.val ω m * X i.val ω a * X i.val ω b) =
+          ∑ i ∈ Finset.range n, X i ω l * X i ω m * X i ω a * X i ω b :=
+      Fin.sum_univ_eq_sum_range
+        (fun i => X i ω l * X i ω m * X i ω a * X i ω b) n
+    simp [sampleScoreCovQuadraticWeight, stackRegressors, W,
+      Fintype.card_fin, hsum]
+  exact BoundedInProbability.of_tendstoInMeasure_const hWeight
+
+omit [DecidableEq k] in
+/-- Build the feasible HC0/HC1 remainder package from scalar WLLN primitive
+hypotheses for the empirical third- and fourth-moment weights. -/
+theorem of_weight_wlln
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    (hX_meas : ∀ i, AEStronglyMeasurable (X i) μ)
+    (he_meas : ∀ i, AEStronglyMeasurable (e i) μ)
+    (hCrossInt : ∀ a b l : k, Integrable
+      (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ)
+    (hCrossIndep : ∀ a b l : k, Pairwise ((· ⟂ᵢ[μ] ·) on
+      (fun i ω => 2 * e i ω * X i ω l * X i ω a * X i ω b)))
+    (hCrossIdent : ∀ a b l : k, ∀ i,
+      IdentDistrib
+        (fun ω => 2 * e i ω * X i ω l * X i ω a * X i ω b)
+        (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ μ)
+    (hQuadInt : ∀ a b l m : k, Integrable
+      (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ)
+    (hQuadIndep : ∀ a b l m : k, Pairwise ((· ⟂ᵢ[μ] ·) on
+      (fun i ω => X i ω l * X i ω m * X i ω a * X i ω b)))
+    (hQuadIdent : ∀ a b l m : k, ∀ i,
+      IdentDistrib
+        (fun ω => X i ω l * X i ω m * X i ω a * X i ω b)
+        (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ μ) :
+    FeasibleHCRemainderConditions μ X e y β where
+  model := hmodel
+  x_aestronglyMeasurable := hX_meas
+  e_aestronglyMeasurable := he_meas
+  crossWeight_bounded := fun a b l =>
+    crossWeight_bounded_of_wlln (μ := μ) (X := X) (e := e) a b l
+      (hCrossInt a b l) (hCrossIndep a b l) (hCrossIdent a b l)
+  quadWeight_bounded := fun a b l m =>
+    quadWeight_bounded_of_wlln (μ := μ) (X := X) a b l m
+      (hQuadInt a b l m) (hQuadIndep a b l m) (hQuadIdent a b l m)
+
+end FeasibleHCRemainderConditions
+
 namespace FeasibleHCLeverageConditions
 
 /-- Build the HC2/HC3 feasible-condition package from the HC0/HC1 remainder
