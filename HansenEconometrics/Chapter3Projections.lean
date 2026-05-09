@@ -211,6 +211,107 @@ theorem leverageValue_le_one
   unfold leverageValue
   linarith
 
+/-- Hansen equation (3.42): the leave-one-out Gram matrix
+`X'X - Xᵢ Xᵢ'`. -/
+noncomputable def leaveOneOutGram (X : Matrix n k ℝ) (i : n) : Matrix k k ℝ :=
+  Xᵀ * X - Matrix.vecMulVec (X i) (X i)
+
+/-- Hansen equation (3.42): the leave-one-out cross-product vector
+`X'Y - Xᵢ Yᵢ`. -/
+noncomputable def leaveOneOutCross (X : Matrix n k ℝ) (y : n → ℝ) (i : n) : k → ℝ :=
+  Xᵀ *ᵥ y - y i • X i
+
+/-- Hansen equation (3.42): leave-one-out coefficient written with the reduced
+Gram matrix. -/
+noncomputable def leaveOneOutBeta
+    (X : Matrix n k ℝ) (y : n → ℝ) (i : n) [Invertible (leaveOneOutGram X i)] :
+    k → ℝ :=
+  ⅟ (leaveOneOutGram X i) *ᵥ leaveOneOutCross X y i
+
+/-- Leave-one-out fitted value for observation `i`. -/
+noncomputable def leaveOneOutPrediction
+    (X : Matrix n k ℝ) (y : n → ℝ) (i : n) [Invertible (leaveOneOutGram X i)] : ℝ :=
+  X i ⬝ᵥ leaveOneOutBeta X y i
+
+/-- Hansen equation (3.44): leave-one-out prediction error. -/
+noncomputable def leaveOneOutResidual
+    (X : Matrix n k ℝ) (y : n → ℝ) (i : n) [Invertible (leaveOneOutGram X i)] : ℝ :=
+  y i - leaveOneOutPrediction X y i
+
+/-- The leave-one-out coefficient satisfies the reduced normal equations. -/
+theorem leaveOneOutGram_mulVec_leaveOneOutBeta
+    (X : Matrix n k ℝ) (y : n → ℝ) (i : n) [Invertible (leaveOneOutGram X i)] :
+    leaveOneOutGram X i *ᵥ leaveOneOutBeta X y i = leaveOneOutCross X y i := by
+  unfold leaveOneOutBeta
+  rw [Matrix.mulVec_mulVec, mul_invOf_self, Matrix.one_mulVec]
+
+/-- Hansen Theorem 3.7 / equation (3.43): leave-one-out coefficients can be
+computed from the full-sample coefficient and prediction error. -/
+theorem leaveOneOutBeta_eq_olsBeta_sub_invGram_mulVec
+    (X : Matrix n k ℝ) (y : n → ℝ) (i : n)
+    [Invertible (Xᵀ * X)] [Invertible (leaveOneOutGram X i)] :
+    leaveOneOutBeta X y i =
+      olsBeta X y - leaveOneOutResidual X y i • (⅟ (Xᵀ * X) *ᵥ X i) := by
+  let A : Matrix k k ℝ := Xᵀ * X
+  let x : k → ℝ := X i
+  let b : k → ℝ := leaveOneOutBeta X y i
+  let t : ℝ := leaveOneOutResidual X y i
+  have hnormal := leaveOneOutGram_mulVec_leaveOneOutBeta X y i
+  have hAeq : A *ᵥ b = Xᵀ *ᵥ y - t • x := by
+    subst A; subst x; subst b; subst t
+    unfold leaveOneOutResidual leaveOneOutPrediction at *
+    unfold leaveOneOutGram leaveOneOutCross at hnormal
+    rw [Matrix.sub_mulVec, Matrix.vecMulVec_mulVec] at hnormal
+    ext j
+    have hj := congrFun hnormal j
+    simp [Pi.sub_apply, Pi.smul_apply, smul_eq_mul] at hj ⊢
+    linarith
+  subst A; subst x; subst b; subst t
+  calc
+    leaveOneOutBeta X y i =
+        ⅟ (Xᵀ * X) *ᵥ ((Xᵀ * X) *ᵥ leaveOneOutBeta X y i) := by
+      rw [Matrix.mulVec_mulVec, invOf_mul_self, Matrix.one_mulVec]
+    _ = ⅟ (Xᵀ * X) *ᵥ (Xᵀ *ᵥ y - leaveOneOutResidual X y i • X i) := by
+      rw [hAeq]
+    _ = olsBeta X y - leaveOneOutResidual X y i • (⅟ (Xᵀ * X) *ᵥ X i) := by
+      unfold olsBeta
+      rw [Matrix.mulVec_sub, Matrix.mulVec_smul]
+
+/-- Hansen Theorem 3.7 / equation (3.44), multiplication form:
+`(1 - hᵢᵢ) ẽᵢ = êᵢ`. -/
+theorem one_sub_leverage_mul_leaveOneOutResidual_eq_residual
+    (X : Matrix n k ℝ) (y : n → ℝ) (i : n)
+    [Invertible (Xᵀ * X)] [Invertible (leaveOneOutGram X i)] :
+    (1 - leverageValue X i) * leaveOneOutResidual X y i = residual X y i := by
+  have hcoef := congrArg (fun b : k → ℝ => X i ⬝ᵥ b)
+    (leaveOneOutBeta_eq_olsBeta_sub_invGram_mulVec X y i)
+  have hpred :
+      leaveOneOutPrediction X y i =
+        fitted X y i - leaveOneOutResidual X y i * leverageValue X i := by
+    calc
+      leaveOneOutPrediction X y i = X i ⬝ᵥ leaveOneOutBeta X y i := rfl
+      _ = X i ⬝ᵥ
+          (olsBeta X y - leaveOneOutResidual X y i • (⅟ (Xᵀ * X) *ᵥ X i)) := by
+            simpa using hcoef
+      _ = fitted X y i - leaveOneOutResidual X y i * leverageValue X i := by
+        unfold fitted
+        rw [dotProduct_sub, dotProduct_smul, ← leverageValue_eq_row_invGram_row]
+        simp [smul_eq_mul, Matrix.mulVec, dotProduct]
+  unfold leaveOneOutResidual residual at *
+  simp [Pi.sub_apply] at hpred ⊢
+  nlinarith
+
+/-- Hansen Theorem 3.7 / equation (3.44): leave-one-out prediction errors are
+full-sample residuals scaled by `(1 - hᵢᵢ)⁻¹`. -/
+theorem leaveOneOutResidual_eq_inv_one_sub_leverage_mul_residual
+    (X : Matrix n k ℝ) (y : n → ℝ) (i : n)
+    [Invertible (Xᵀ * X)] [Invertible (leaveOneOutGram X i)]
+    (hdenom : 1 - leverageValue X i ≠ 0) :
+    leaveOneOutResidual X y i = (1 - leverageValue X i)⁻¹ * residual X y i := by
+  have h := one_sub_leverage_mul_leaveOneOutResidual_eq_residual X y i
+  rw [← h]
+  rw [← mul_assoc, inv_mul_cancel₀ hdenom, one_mul]
+
 /-- Hansen Exercise 3.7: the annihilator kills the hat matrix on the left. -/
 theorem annihilator_mul_hatMatrix
     (X : Matrix n k ℝ) [DecidableEq n] [Invertible (Xᵀ * X)] :
