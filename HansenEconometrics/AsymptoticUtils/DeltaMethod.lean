@@ -250,6 +250,91 @@ theorem coordinateInvDerivativeMatrix_hasLaw_multivariateGaussian_zero
     hasLaw_multivariateGaussian_zero_linearMap (n := k) (q := Fin 1) hS
       (coordinateInvDerivativeMatrix j β)
 
+set_option linter.unusedFintypeInType false in
+/-- Coordinate-product derivative for a finite-dimensional parameter vector. -/
+theorem coordinateProduct_hasFDerivAt (j l : k) (β : k → ℝ) :
+    HasFDerivAt (fun b : k → ℝ => b j * b l)
+      (((β j) • (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) l)) +
+        ((β l) • (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) j))) β := by
+  have hj : HasFDerivAt (fun b : k → ℝ => b j)
+      (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) j) β :=
+    (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) j).hasFDerivAt
+  have hl : HasFDerivAt (fun b : k → ℝ => b l)
+      (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) l) β :=
+    (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) l).hasFDerivAt
+  simpa using hj.mul hl
+
+/-- Coordinate-product Delta-method remainder. -/
+theorem coordinateProduct_deltaMethod_remainder_isLittleO (j l : k) (β : k → ℝ) :
+    (fun b : k → ℝ =>
+      b j * b l - β j * β l -
+        ((((β j) • (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) l)) +
+          ((β l) • (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) j)))
+          (b - β)))
+        =o[𝓝 β] (fun b => b - β) :=
+  deltaMethod_remainder_isLittleO (coordinateProduct_hasFDerivAt j l β)
+
+set_option linter.unusedFintypeInType false in
+/-- One-dimensional vector-valued coordinate-product derivative. -/
+theorem coordinateProductVector_hasFDerivAt (j l : k) (β : k → ℝ) :
+    HasFDerivAt (fun b : k → ℝ => fun _ : Fin 1 => b j * b l)
+      (ContinuousLinearMap.pi fun _ : Fin 1 =>
+        (((β j) • (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) l)) +
+          ((β l) • (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) j)))) β := by
+  rw [hasFDerivAt_pi]
+  intro _
+  simpa using coordinateProduct_hasFDerivAt j l β
+
+/-- One-dimensional vector-valued coordinate-product Delta-method remainder. -/
+theorem coordinateProductVector_deltaMethod_remainder_isLittleO (j l : k) (β : k → ℝ) :
+    (fun b : k → ℝ =>
+      (fun _ : Fin 1 => b j * b l) - (fun _ : Fin 1 => β j * β l) -
+        (ContinuousLinearMap.pi fun _ : Fin 1 =>
+          (((β j) • (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) l)) +
+            ((β l) • (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) j))))
+          (b - β))
+        =o[𝓝 β] (fun b => b - β) :=
+  deltaMethod_remainder_isLittleO (coordinateProductVector_hasFDerivAt j l β)
+
+/-- Matrix row for the derivative of the coordinate-product transform `β ↦ β_j β_l`. -/
+def coordinateProductDerivativeMatrix {k : Type*} [DecidableEq k]
+    (j l : k) (β : k → ℝ) : Matrix (Fin 1) k ℝ :=
+  fun _ => Pi.single l (β j) + Pi.single j (β l)
+
+/-- Applying the coordinate-product derivative row gives the product-rule
+linearization. -/
+theorem coordinateProductDerivativeMatrix_mulVec {k : Type*} [Fintype k] [DecidableEq k]
+    (j l : k) (β v : k → ℝ) :
+    (coordinateProductDerivativeMatrix j l β *ᵥ v) 0 = β j * v l + β l * v j := by
+  rw [Matrix.mulVec]
+  change (Pi.single l (β j) + Pi.single j (β l)) ⬝ᵥ v = β j * v l + β l * v j
+  rw [add_dotProduct]
+  simp
+
+/-- Euclidean-space application form of `coordinateProductDerivativeMatrix_mulVec`. -/
+theorem matrixContinuousLinearMap_coordinateProductDerivativeMatrix_apply
+    {k : Type*} [Fintype k] [DecidableEq k]
+    (j l : k) (β : k → ℝ) (v : EuclideanSpace ℝ k) :
+    (matrixContinuousLinearMap (coordinateProductDerivativeMatrix j l β) v).ofLp 0 =
+      β j * v.ofLp l + β l * v.ofLp j := by
+  rw [matrixContinuousLinearMap_apply]
+  exact coordinateProductDerivativeMatrix_mulVec j l β v.ofLp
+
+/-- Gaussian image law for the coordinate-product derivative row. -/
+theorem coordinateProductDerivativeMatrix_hasLaw_multivariateGaussian_zero
+    {k : Type*} [Fintype k] [DecidableEq k]
+    {S : Matrix k k ℝ} (hS : S.PosSemidef) (j l : k) (β : k → ℝ) :
+    HasLaw
+      (fun z : EuclideanSpace ℝ k =>
+        matrixContinuousLinearMap (coordinateProductDerivativeMatrix j l β) z)
+      (multivariateGaussian 0
+        (coordinateProductDerivativeMatrix j l β * S *
+          (coordinateProductDerivativeMatrix j l β)ᵀ))
+      (multivariateGaussian 0 S) := by
+  simpa using
+    hasLaw_multivariateGaussian_zero_linearMap (n := k) (q := Fin 1) hS
+      (coordinateProductDerivativeMatrix j l β)
+
 end ConcreteTransforms
 
 section DeltaDistribution
