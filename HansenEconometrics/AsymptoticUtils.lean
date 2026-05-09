@@ -19,6 +19,8 @@ Mathlib does not currently provide as named lemmas:
 * `tendstoInMeasure_wlln` — a **weak law of large numbers** wrapper: strong
   law gives a.s. convergence, and in a finite-measure space a.s. convergence
   implies convergence in measure.
+* `tendstoInMeasure_transformed_wlln` — Hansen Theorem 6.2 as a transformed
+  WLLN wrapper over `tendstoInMeasure_wlln`.
 
 Both are stated for general Banach-space codomains, so they specialize
 directly to scalar, vector, and matrix random variables.
@@ -924,6 +926,33 @@ theorem tendstoInMeasure_wlln
     rw [heq]
     exact hscaled
   exact tendstoInMeasure_of_tendsto_ae hmeas hae
+
+/-- **Hansen Theorem 6.2, transformed WLLN.**
+
+If `X i` are pairwise-independent and identically distributed and `h (X 0)` is integrable,
+then the sample mean of the transformed variables `h (X i)` converges in probability to
+`𝔼[h (X 0)]`. This is the textbook transformed WLLN packaged as composition of the
+Banach-valued WLLN with measurable-map preservation of independence and identical distribution. -/
+theorem tendstoInMeasure_transformed_wlln
+    {E F : Type*}
+    [MeasurableSpace E]
+    [NormedAddCommGroup F] [NormedSpace ℝ F] [CompleteSpace F]
+    [MeasurableSpace F] [BorelSpace F]
+    [IsFiniteMeasure μ]
+    (X : ℕ → Ω → E) (h : E → F)
+    (hh : Measurable h)
+    (hint : Integrable (fun ω => h (X 0 ω)) μ)
+    (hindep : Pairwise ((· ⟂ᵢ[μ] ·) on X))
+    (hident : ∀ i, IdentDistrib (X i) (X 0) μ μ) :
+    TendstoInMeasure μ
+      (fun (n : ℕ) ω => (n : ℝ)⁻¹ • ∑ i ∈ Finset.range n, h (X i ω))
+      atTop
+      (fun _ => μ[fun ω => h (X 0 ω)]) :=
+  tendstoInMeasure_wlln
+    (fun i ω => h (X i ω))
+    hint
+    (fun _ _ hij => IndepFun.comp (hindep hij) hh hh)
+    (fun i => (hident i).comp hh)
 
 end WLLN
 
