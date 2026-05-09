@@ -276,4 +276,76 @@ theorem iidVectorCLT_tendstoInDistribution_multivariateGaussian
 
 end IidCLT
 
+section ArrayCLT
+
+variable {Ω : Type*} {mΩ : MeasurableSpace Ω}
+variable {k : Type*} [Fintype k] [DecidableEq k]
+
+/-- Projection-level sufficient condition package for Hansen's multivariate
+Lindeberg CLT.
+
+The scalar Lindeberg proof obligations are represented by the projection CLT
+field. This package keeps the chapter-facing multivariate endpoint usable while
+leaving the scalar triangular-array Lindeberg theorem as the remaining
+probability-engine task. -/
+structure MultivariateLindebergCLTConditions
+    (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (T : ℕ → Ω → (k → ℝ)) (S : Matrix k k ℝ) where
+  /-- A.e. measurability of the normalized array statistic at each sample size. -/
+  aemeasurable : ∀ n, AEMeasurable (T n) μ
+  /-- Scalar projection CLTs against the matching multivariate Gaussian law. -/
+  projection_clt : ∀ a : k → ℝ,
+    TendstoInDistribution
+      (fun n ω => T n ω ⬝ᵥ a)
+      atTop
+      (fun z : EuclideanSpace ℝ k => z.ofLp ⬝ᵥ a)
+      (fun _ => μ)
+      (multivariateGaussian 0 S)
+
+/-- **Hansen Theorem 6.4, multivariate Lindeberg CLT endpoint.**
+
+Once scalar projection Lindeberg CLTs are available for a normalized triangular
+array statistic, Cramér-Wold gives the corresponding multivariate Gaussian
+limit. The textbook normalization `V_n^{-1/2} ∑ᵢ Y_{ni}` is represented by the
+user-supplied statistic `T`. -/
+theorem multivariateLindebergCLT_tendstoInDistribution
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {T : ℕ → Ω → (k → ℝ)} {S : Matrix k k ℝ}
+    (h : MultivariateLindebergCLTConditions μ T S) :
+    TendstoInDistribution
+      (fun n ω => WithLp.toLp 2 (T n ω))
+      atTop
+      (fun z : EuclideanSpace ℝ k => z)
+      (fun _ => μ)
+      (multivariateGaussian 0 S) :=
+  vectorCLT_tendstoInDistribution_multivariateGaussian_of_projections
+    h.aemeasurable h.projection_clt
+
+/-- Projection-level sufficient condition package for Hansen's heterogeneous
+array CLT. The statistic `T n` is typically `√n * \bar Y_n`; the limit
+covariance is the supplied matrix `V`. -/
+abbrev HeterogeneousArrayCLTConditions
+    (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (T : ℕ → Ω → (k → ℝ)) (V : Matrix k k ℝ) :=
+  MultivariateLindebergCLTConditions μ T V
+
+/-- **Hansen Theorem 6.5, heterogeneous-array CLT endpoint.**
+
+This is the multivariate Cramér-Wold assembly for the heterogeneous-array CLT:
+scalar projection CLTs for the normalized sample average imply convergence to
+the centered Gaussian with covariance `V`. -/
+theorem heterogeneousArrayCLT_tendstoInDistribution
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {T : ℕ → Ω → (k → ℝ)} {V : Matrix k k ℝ}
+    (h : HeterogeneousArrayCLTConditions μ T V) :
+    TendstoInDistribution
+      (fun n ω => WithLp.toLp 2 (T n ω))
+      atTop
+      (fun z : EuclideanSpace ℝ k => z)
+      (fun _ => μ)
+      (multivariateGaussian 0 V) :=
+  multivariateLindebergCLT_tendstoInDistribution h
+
+end ArrayCLT
+
 end HansenEconometrics
