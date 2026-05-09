@@ -64,12 +64,14 @@ For estimator bookkeeping, Chapter 4 now includes the finite-sample residual var
 its deterministic linear-model/quadratic-form rewrites, conditional and unconditional
 homoskedastic unbiasedness, HC0/HC1/HC2/HC3 covariance estimators, and a minimal clustered
 sandwich definition with a linear-model rewrite. The scalar HC leverage-weight ordering
-`1 ≤ (1-h)⁻¹ ≤ ((1-h)⁻¹)^2` is also formalized on the nonsaturated range `0 ≤ h < 1`.
+`1 ≤ (1-h)⁻¹ ≤ ((1-h)⁻¹)^2` is also formalized on the nonsaturated range `0 ≤ h < 1`,
+and the corresponding HC0/HC2/HC3 covariance-matrix ordering is proved in positive-semidefinite
+order.
 
 ## Deferred / won't do for now
 For the current pass we are intentionally not pushing Chapter 4 to applied-completeness.
 The following are explicitly deferred unless they become prerequisite later:
-- full HC2/HC3 covariance-matrix unbiasedness or finite-sample ordering results
+- full HC2/HC3 covariance-matrix unbiasedness results
 - clustered covariance asymptotics and partition/Finpartition infrastructure
 - HC4 and other leverage-adjustment families
 
@@ -107,27 +109,30 @@ Conventions:
 | Theorem 4.2 unconditional covariance identity | $\mathbb{E}[(\hat{\beta} - \beta)(\hat{\beta} - \beta)'] = \mathbb{E}[\operatorname{Var}(\hat{\beta} \mid X)]$ | [ols_integral_centered_mul_eq_variance_matrix](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1016)<br><code>∫ ω, Matrix.of fun i j => centered β̂ ω i * centered β̂ ω j ∂μ = olsConditionalVarianceMatrix X D</code> |
 | Theorem 4.2 homoskedastic simplification | $\operatorname{Var}(\hat{\beta} \mid X) = \sigma^2 (X'X)^{-1}$ | [olsConditionalVarianceMatrix_homoskedastic](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L88)<br><code>olsConditionalVarianceMatrix X (σ2 • 1) = σ2 • ⅟ (Xᵀ * X)</code> |
 | Gauss-Markov lower bound | $\operatorname{Var}(\tilde{\beta} \mid X) - \operatorname{Var}(\hat{\beta} \mid X) \succeq 0$ | [gaussMarkov_variance_gap_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L244)<br><code>(Aᵀ * A - ⅟ (Xᵀ * X)).PosSemidef</code> |
-| GLS coefficient | $\hat{\beta}_{GLS} = (X' \Omega^{-1} X)^{-1} X' \Omega^{-1} Y$ | [glsBeta](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1081)<br><code>glsBeta X Ω y := (⅟ (Xᵀ * Ω⁻¹ * X)) *ᵥ (Xᵀ *ᵥ (Ω⁻¹ *ᵥ y))</code> |
-| GLS decomposition | $\hat{\beta}_{GLS} = \beta + (X' \Omega^{-1} X)^{-1} X' \Omega^{-1} e$ | [glsBeta_linear_decomposition](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1087)<br><code>glsBeta X Ω (X *ᵥ β + e) = β + (⅟ (Xᵀ * Ω⁻¹ * X)) *ᵥ (Xᵀ *ᵥ (Ω⁻¹ *ᵥ e))</code> |
-| Generalized Gauss-Markov lower bound | weighted variance gap is positive semidefinite | [generalizedGaussMarkov_variance_gap_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1112)<br><code>(Aᵀ * Ω * A - ⅟ (Xᵀ * Ω⁻¹ * X)).PosSemidef</code> |
+| GLS coefficient | $\hat{\beta}_{GLS} = (X' \Omega^{-1} X)^{-1} X' \Omega^{-1} Y$ | [glsBeta](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1265)<br><code>glsBeta X Ω y := (⅟ (Xᵀ * Ω⁻¹ * X)) *ᵥ (Xᵀ *ᵥ (Ω⁻¹ *ᵥ y))</code> |
+| GLS decomposition | $\hat{\beta}_{GLS} = \beta + (X' \Omega^{-1} X)^{-1} X' \Omega^{-1} e$ | [glsBeta_linear_decomposition](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1271)<br><code>glsBeta X Ω (X *ᵥ β + e) = β + (⅟ (Xᵀ * Ω⁻¹ * X)) *ᵥ (Xᵀ *ᵥ (Ω⁻¹ *ᵥ e))</code> |
+| Generalized Gauss-Markov lower bound | weighted variance gap is positive semidefinite | [generalizedGaussMarkov_variance_gap_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1296)<br><code>(Aᵀ * Ω * A - ⅟ (Xᵀ * Ω⁻¹ * X)).PosSemidef</code> |
 | White HC0 covariance estimator | $\hat{V}_{HC0} = (X'X)^{-1} X' \operatorname{diag}(\hat{e}_i^2) X (X'X)^{-1}$ | [olsHuberWhiteVarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L68)<br><code>olsHuberWhiteVarianceEstimator X y := olsConditionalVarianceMatrix X (Matrix.diagonal fun i => residual X y i ^ 2)</code> |
 | HC1 covariance estimator | $\hat{V}_{HC1} = \frac{n}{n-k} \hat{V}_{HC0}$ | [olsHuberWhiteHC1VarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L73)<br><code>olsHuberWhiteHC1VarianceEstimator X y := ((n : ℝ) / (n - k : ℝ)) • olsHuberWhiteVarianceEstimator X y</code> |
 | Method-of-moments residual variance `σ̂²` | $\hat{\sigma}^2 = n^{-1}\sum_i \hat e_i^2$ and, under diagonal heteroskedastic conditional second moments, $\mathbb{E}[\hat{\sigma}^2 \mid X] = n^{-1}\operatorname{tr}(MD)$ | [olsSigmaSqHat](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean), [olsSigmaSqHat_linear_model_quadratic_form](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean), and [ols_condExp_sigmaSqHat_eq_inv_card_trace_diagonal](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean) |
-| Residual variance estimator `s²` | $s^2 = (n-k)^{-1}\sum_i \hat e_i^2$ | [olsResidualVarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L175), [olsResidualSumSquares](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L182), [olsResidualVarianceEstimator_linear_model_quadratic_form](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L233) |
-| `s²` conditional and unconditional unbiasedness | $\mathbb{E}[s^2 \mid X] = \sigma^2$ and $\mathbb{E}[s^2] = \sigma^2$ under homoskedastic conditional second moments | [ols_condExp_residualVarianceEstimator_eq_sigmaSq](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L374), [ols_integral_residualVarianceEstimator_eq_sigmaSq](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L424) |
-| HC2 covariance estimator | $\hat V_{HC2} = (X'X)^{-1} X'\operatorname{diag}((1-h_{ii})^{-1}\hat e_i^2)X(X'X)^{-1}$ | [olsHuberWhiteHC2VarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L116), [olsHuberWhiteHC2VarianceEstimator_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L142) |
-| HC3 covariance estimator | $\hat V_{HC3} = (X'X)^{-1} X'\operatorname{diag}((1-h_{ii})^{-2}\hat e_i^2)X(X'X)^{-1}$ | [olsHuberWhiteHC3VarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L124), [olsHuberWhiteHC3VarianceEstimator_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L152) |
-| Clustered covariance estimator | cluster-level score sandwich | [olsClusteredVarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L131), [olsClusteredVarianceEstimator_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L162) |
+| Residual variance estimator `s²` | $s^2 = (n-k)^{-1}\sum_i \hat e_i^2$ | [olsResidualVarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L273), [olsResidualSumSquares](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L280), [olsResidualVarianceEstimator_linear_model_quadratic_form](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L343) |
+| `s²` conditional and unconditional unbiasedness | $\mathbb{E}[s^2 \mid X] = \sigma^2$ and $\mathbb{E}[s^2] = \sigma^2$ under homoskedastic conditional second moments | [ols_condExp_residualVarianceEstimator_eq_sigmaSq](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L558), [ols_integral_residualVarianceEstimator_eq_sigmaSq](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L608) |
+| HC2 covariance estimator | $\hat V_{HC2} = (X'X)^{-1} X'\operatorname{diag}((1-h_{ii})^{-1}\hat e_i^2)X(X'X)^{-1}$ | [olsHuberWhiteHC2VarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L116), [olsHuberWhiteHC2VarianceEstimator_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L233) |
+| HC3 covariance estimator | $\hat V_{HC3} = (X'X)^{-1} X'\operatorname{diag}((1-h_{ii})^{-2}\hat e_i^2)X(X'X)^{-1}$ | [olsHuberWhiteHC3VarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L124), [olsHuberWhiteHC3VarianceEstimator_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L243) |
+| Clustered covariance estimator | cluster-level score sandwich | [olsClusteredVarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L222), [olsClusteredVarianceEstimator_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L253) |
 
 ## Lean-only bridge results
 
 - [olsHetCovHC2Star_eq_smul_olsHuberWhiteHC2VarianceEstimator](../../HansenEconometrics/Chapter7Asymptotics/SandwichAssembly.lean#L1271): Chapter 7 totalized HC2 equals `(Fintype.card n : ℝ) •` the Chapter 4 base HC2 estimator on nonsingular designs.
 - [olsHetCovHC3Star_eq_smul_olsHuberWhiteHC3VarianceEstimator](../../HansenEconometrics/Chapter7Asymptotics/SandwichAssembly.lean#L1284): analogous HC3 bridge.
 - [hc_leverage_weight_ordering](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L136): on `0 ≤ h < 1`, the HC2 scalar leverage weight dominates HC0 and the HC3 scalar leverage weight dominates HC2.
+- [olsConditionalVarianceMatrix_diagonal_mono_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L150): monotone diagonal covariance weights induce a positive-semidefinite sandwich difference.
+- [olsHuberWhiteVarianceEstimator_le_HC2_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L183): finite-sample HC2 dominates HC0 in PSD order on the nonsaturated leverage range.
+- [olsHuberWhiteHC2VarianceEstimator_le_HC3_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L204): finite-sample HC3 dominates HC2 in PSD order on the nonsaturated leverage range.
 
 ## Notes
 
 - Chapter 4 has strong deterministic and conditional-expectation coverage already, so this file is
   mostly a map from Hansen's notation into the matrix-valued Lean API.
-- The remaining covariance-estimator gaps are full matrix-level HC ordering/unbiasedness refinements and
+- The remaining covariance-estimator gaps are full HC2/HC3 covariance-matrix unbiasedness and
   clustered/asymptotic refinements.

@@ -143,6 +143,81 @@ theorem hc_leverage_weight_ordering {h : ℝ} (h_nonneg : 0 ≤ h) (h_lt_one : h
       (Bound.le_self_pow_of_pos h_hc2 (show 0 < (2 : ℕ) by norm_num))
   exact ⟨h_hc2, h_hc3⟩
 
+/-- Monotone diagonal weights give a positive-semidefinite sandwich difference.
+
+This is the deterministic matrix core behind finite-sample ordering statements
+for diagonal covariance estimators such as HC0/HC2/HC3. -/
+theorem olsConditionalVarianceMatrix_diagonal_mono_posSemidef
+    (X : Matrix n k ℝ) (d₁ d₂ : n → ℝ)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    (hmono : ∀ i, d₁ i ≤ d₂ i) :
+    (olsConditionalVarianceMatrix X (Matrix.diagonal d₂) -
+      olsConditionalVarianceMatrix X (Matrix.diagonal d₁)).PosSemidef := by
+  let A : Matrix n k ℝ := X * ⅟ (Xᵀ * X)
+  let D : Matrix n n ℝ := Matrix.diagonal fun i => d₂ i - d₁ i
+  have hD : D.PosSemidef := by
+    dsimp [D]
+    exact Matrix.PosSemidef.diagonal (fun i => sub_nonneg.mpr (hmono i))
+  have hpsd : (Aᵀ * D * A).PosSemidef := by
+    simpa [A, D, Matrix.conjTranspose] using
+      (Matrix.PosSemidef.conjTranspose_mul_mul_same hD A)
+  have hdiff :
+      olsConditionalVarianceMatrix X (Matrix.diagonal d₂) -
+        olsConditionalVarianceMatrix X (Matrix.diagonal d₁) = Aᵀ * D * A := by
+    rw [← olsConditionalVarianceMatrix_eq_Atranspose_D_A X (Matrix.diagonal d₂)]
+    rw [← olsConditionalVarianceMatrix_eq_Atranspose_D_A X (Matrix.diagonal d₁)]
+    dsimp [A, D]
+    rw [← Matrix.sub_mul, ← Matrix.mul_sub]
+    congr 2
+    ext i j
+    by_cases hij : i = j
+    · subst j
+      simp
+    · simp [Matrix.diagonal, hij]
+  simpa [hdiff]
+
+/-- Matrix-level HC0/HC2 ordering on the nonsaturated leverage range.
+
+If every leverage satisfies `0 ≤ hᵢᵢ < 1`, then the HC2 covariance estimator
+dominates HC0 in positive-semidefinite order. -/
+theorem olsHuberWhiteVarianceEstimator_le_HC2_posSemidef
+    (X : Matrix n k ℝ) (y : n → ℝ)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    (hlev_nonneg : ∀ i, 0 ≤ hatMatrix X i i)
+    (hlev_lt_one : ∀ i, hatMatrix X i i < 1) :
+    (olsHuberWhiteHC2VarianceEstimator X y -
+      olsHuberWhiteVarianceEstimator X y).PosSemidef := by
+  refine olsConditionalVarianceMatrix_diagonal_mono_posSemidef
+    (X := X)
+    (d₁ := fun i => residual X y i ^ 2)
+    (d₂ := fun i => (1 - hatMatrix X i i)⁻¹ * residual X y i ^ 2)
+    ?_
+  intro i
+  simpa [one_mul] using mul_le_mul_of_nonneg_right
+    (hc_leverage_weight_ordering (hlev_nonneg i) (hlev_lt_one i)).1
+    (sq_nonneg (residual X y i))
+
+/-- Matrix-level HC2/HC3 ordering on the nonsaturated leverage range.
+
+If every leverage satisfies `0 ≤ hᵢᵢ < 1`, then the HC3 covariance estimator
+dominates HC2 in positive-semidefinite order. -/
+theorem olsHuberWhiteHC2VarianceEstimator_le_HC3_posSemidef
+    (X : Matrix n k ℝ) (y : n → ℝ)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    (hlev_nonneg : ∀ i, 0 ≤ hatMatrix X i i)
+    (hlev_lt_one : ∀ i, hatMatrix X i i < 1) :
+    (olsHuberWhiteHC3VarianceEstimator X y -
+      olsHuberWhiteHC2VarianceEstimator X y).PosSemidef := by
+  refine olsConditionalVarianceMatrix_diagonal_mono_posSemidef
+    (X := X)
+    (d₁ := fun i => (1 - hatMatrix X i i)⁻¹ * residual X y i ^ 2)
+    (d₂ := fun i => ((1 - hatMatrix X i i)⁻¹)^2 * residual X y i ^ 2)
+    ?_
+  intro i
+  exact mul_le_mul_of_nonneg_right
+    (hc_leverage_weight_ordering (hlev_nonneg i) (hlev_lt_one i)).2
+    (sq_nonneg (residual X y i))
+
 /-- Clustered covariance: sandwich on cluster-summed scores. -/
 noncomputable def olsClusteredVarianceEstimator
     {G : Type*} [Fintype G] [DecidableEq G]
