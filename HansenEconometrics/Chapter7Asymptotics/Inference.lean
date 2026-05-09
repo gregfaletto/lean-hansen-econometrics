@@ -3133,6 +3133,71 @@ theorem scoreProj_olsBetaOrZero_tendstoInDistribution_gaussian_cov_all
     scoreProj_olsBetaOrZero_tendstoInDistribution_gaussian_cov
       (μ := μ) (ν := ν) (X := X) (e := e) (y := y) h β a hmodel (hZ a)
 
+/-- **Hansen Theorem 7.3 for literal ordinary OLS under sample-Gram invertibility,
+scalar-projection form.**
+
+When every realized stacked sample Gram is invertible, the textbook `olsBeta`
+estimator is available pointwise and agrees with `olsBetaOrZero`, so the
+ordinary-wrapper scalar projection CLT transfers to the dependent ordinary-OLS
+surface. -/
+theorem scoreProj_olsBeta_tendstoInDistribution_gaussian_cov_of_invertible
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : ScoreCLTConditions μ X e) (β a : k → ℝ)
+    (hInv : ∀ n ω,
+      Invertible ((stackRegressors X n ω)ᵀ * stackRegressors X n ω))
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    {Z : Ω' → ℝ}
+    (hZ : HasLaw Z
+      (gaussianReal 0 (olsProjectionAsymVar μ X e a).toNNReal) ν) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (Real.sqrt (n : ℝ) •
+          ((letI : Invertible
+              ((stackRegressors X n ω)ᵀ * stackRegressors X n ω) := hInv n ω
+            olsBeta (stackRegressors X n ω) (stackOutcomes y n ω)) - β)) ⬝ᵥ a)
+      atTop Z (fun _ => μ) ν := by
+  have hOrZero := scoreProj_olsBetaOrZero_tendstoInDistribution_gaussian_cov
+    (μ := μ) (ν := ν) (X := X) (e := e) (y := y) h β a hmodel hZ
+  refine TendstoInDistribution.congr ?_ EventuallyEq.rfl hOrZero
+  intro n
+  exact ae_of_all μ (fun ω => by
+    letI : Invertible ((stackRegressors X n ω)ᵀ * stackRegressors X n ω) :=
+      hInv n ω
+    change
+      (Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)) ⬝ᵥ a =
+        (Real.sqrt (n : ℝ) •
+          (olsBeta (stackRegressors X n ω) (stackOutcomes y n ω) - β)) ⬝ᵥ a
+    rw [olsBetaOrZero_eq_olsBeta])
+
+/-- **Hansen Theorem 7.3, all scalar projections for literal ordinary OLS under
+sample-Gram invertibility.** -/
+theorem scoreProj_olsBeta_tendstoInDistribution_gaussian_cov_all_of_invertible
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : ScoreCLTConditions μ X e) (β : k → ℝ)
+    (hInv : ∀ n ω,
+      Invertible ((stackRegressors X n ω)ᵀ * stackRegressors X n ω))
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    {Z : (k → ℝ) → Ω' → ℝ}
+    (hZ : ∀ a : k → ℝ,
+      HasLaw (Z a)
+        (gaussianReal 0 (olsProjectionAsymVar μ X e a).toNNReal) ν) :
+    ∀ a : k → ℝ,
+      TendstoInDistribution
+        (fun (n : ℕ) ω =>
+          (Real.sqrt (n : ℝ) •
+            ((letI : Invertible
+                ((stackRegressors X n ω)ᵀ * stackRegressors X n ω) := hInv n ω
+              olsBeta (stackRegressors X n ω) (stackOutcomes y n ω)) - β)) ⬝ᵥ a)
+        atTop (Z a) (fun _ => μ) ν :=
+  fun a =>
+    scoreProj_olsBeta_tendstoInDistribution_gaussian_cov_of_invertible
+      (μ := μ) (ν := ν) (X := X) (e := e) (y := y) h β a hInv hmodel (hZ a)
+
 end Assumption72
 
 end HansenEconometrics
