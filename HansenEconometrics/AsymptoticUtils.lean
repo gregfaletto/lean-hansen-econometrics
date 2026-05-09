@@ -259,13 +259,89 @@ theorem TendstoInDistribution.integral_normTrunc_limit_le_of_eventually_integral
     (μ := μ) (ν := ν) (X := X) (Z := Z) hX f
     (normTruncBoundedContinuousFunction_nonneg hR) hfBound
 
+/-- **Hansen Theorem 6.13, limit-integrability weak-moment face.**
+
+If `Xₙ ⇒ Z` and the expected norms of `Xₙ` are eventually bounded by `C`, then
+the limit-law norm is integrable. The proof bounds all bounded continuous norm
+truncations and passes to the monotone limit at the `lintegral` level. -/
+theorem TendstoInDistribution.integrable_norm_limit_of_eventually_integral_norm_bound
+    {Ω Ω' E : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    [SeminormedAddCommGroup E] [MeasurableSpace E] [OpensMeasurableSpace E]
+    [BorelSpace E] [HasOuterApproxClosed E]
+    {X : ℕ → Ω → E} {Z : Ω' → E}
+    (hX : TendstoInDistribution X atTop Z (fun _ => μ) ν)
+    {C : ℝ}
+    (hBound : ∀ᶠ n in atTop,
+      Integrable (fun ω => ‖X n ω‖) μ ∧ ∫ ω, ‖X n ω‖ ∂μ ≤ C) :
+    Integrable (fun ω => ‖Z ω‖) ν := by
+  have htrunc_bound :
+      ∀ n : ℕ, ∫ ω, min ‖Z ω‖ (n : ℝ) ∂ν ≤ C := by
+    intro n
+    have hn_nonneg : 0 ≤ (n : ℝ) := by positivity
+    simpa [normTruncBoundedContinuousFunction_apply] using
+      TendstoInDistribution.integral_normTrunc_limit_le_of_eventually_integral_norm_bound
+        (μ := μ) (ν := ν) (X := X) (Z := Z) hX hn_nonneg hBound
+  have hnorm_aemeas : AEMeasurable (fun ω => ‖Z ω‖) ν :=
+    continuous_norm.measurable.comp_aemeasurable hX.aemeasurable_limit
+  have htrunc_int :
+      ∀ n : ℕ, Integrable (fun ω => min ‖Z ω‖ (n : ℝ)) ν := by
+    intro n
+    have hn_nonneg : 0 ≤ (n : ℝ) := by positivity
+    let f := normTruncBoundedContinuousFunction E (n : ℝ) hn_nonneg
+    have hf_map_int : Integrable f (ν.map Z) :=
+      f.integrable (μ := ν.map Z)
+    have hf_int : Integrable (fun ω => f (Z ω)) ν := by
+      simpa [Function.comp_def] using
+        hf_map_int.comp_aemeasurable hX.aemeasurable_limit
+    simpa [f, normTruncBoundedContinuousFunction_apply] using hf_int
+  have htrunc_lintegral_bound :
+      ∀ n : ℕ, ∫⁻ ω, ENNReal.ofReal (min ‖Z ω‖ (n : ℝ)) ∂ν ≤ ENNReal.ofReal C := by
+    intro n
+    have hnn : 0 ≤ᵐ[ν] fun ω => min ‖Z ω‖ (n : ℝ) :=
+      ae_of_all ν (fun ω => le_min (norm_nonneg _) (by positivity))
+    rw [← ofReal_integral_eq_lintegral_ofReal (htrunc_int n) hnn]
+    exact ENNReal.ofReal_le_ofReal (htrunc_bound n)
+  have htrunc_lintegral_tendsto :
+      Tendsto
+        (fun n : ℕ => ∫⁻ ω, ENNReal.ofReal (min ‖Z ω‖ (n : ℝ)) ∂ν)
+        atTop (𝓝 (∫⁻ ω, ENNReal.ofReal ‖Z ω‖ ∂ν)) := by
+    refine lintegral_tendsto_of_tendsto_of_monotone ?_ ?_ ?_
+    · intro n
+      exact (hnorm_aemeas.min aemeasurable_const).ennreal_ofReal
+    · exact ae_of_all ν (fun ω => by
+        intro n m hnm
+        exact ENNReal.ofReal_le_ofReal (min_le_min le_rfl (by exact_mod_cast hnm)))
+    · exact ae_of_all ν (fun ω => by
+        have hreal :
+            Tendsto (fun n : ℕ => min ‖Z ω‖ (n : ℝ)) atTop (𝓝 ‖Z ω‖) := by
+          have hcast : ∀ᶠ n : ℕ in atTop, ‖Z ω‖ ≤ (n : ℝ) :=
+            (tendsto_natCast_atTop_atTop (R := ℝ)).eventually
+              (eventually_ge_atTop (‖Z ω‖))
+          have heq :
+              (fun n : ℕ => min ‖Z ω‖ (n : ℝ)) =ᶠ[atTop] fun _ => ‖Z ω‖ := by
+            filter_upwards [hcast] with n hn
+            exact min_eq_left hn
+          rw [tendsto_congr' heq]
+          exact tendsto_const_nhds
+        exact ENNReal.tendsto_ofReal hreal)
+  have hlimit_lintegral_bound :
+      ∫⁻ ω, ENNReal.ofReal ‖Z ω‖ ∂ν ≤ ENNReal.ofReal C :=
+    le_of_tendsto' htrunc_lintegral_tendsto htrunc_lintegral_bound
+  refine ⟨?_, ?_⟩
+  · rw [aestronglyMeasurable_iff_aemeasurable]
+    exact hnorm_aemeas
+  · rw [hasFiniteIntegral_iff_ofReal (ae_of_all ν (fun ω => norm_nonneg (Z ω)))]
+    exact hlimit_lintegral_bound.trans_lt ENNReal.ofReal_lt_top
+
 /-- **Hansen Theorem 6.13, integrable-limit norm weak-moment face.**
 
 If `Xₙ ⇒ Z`, the expected norms of `Xₙ` are eventually bounded by `C`, and the
 limit norm is integrable, then the limit-law expected norm is at most `C`. The
 proof applies the norm-truncation bound for every truncation level and then
 uses monotone convergence. -/
-theorem TendstoInDistribution.integral_norm_limit_le_of_eventually_integral_norm_bound
+theorem TendstoInDistribution.integral_norm_limit_le_of_eventually_integral_norm_bound_of_integrable
     {Ω Ω' E : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
     {μ : Measure Ω} [IsProbabilityMeasure μ]
     {ν : Measure Ω'} [IsProbabilityMeasure ν]
@@ -312,6 +388,30 @@ theorem TendstoInDistribution.integral_norm_limit_le_of_eventually_integral_norm
         rw [tendsto_congr' heq]
         exact tendsto_const_nhds)
   exact le_of_tendsto' htrunc_tendsto htrunc_bound
+
+/-- **Hansen Theorem 6.13, weak-convergence bounded first moments pass to the limit.**
+
+If `Xₙ ⇒ Z` and the expected norms of `Xₙ` are eventually bounded by `C`, then
+the limit-law expected norm is at most `C`. -/
+theorem TendstoInDistribution.integral_norm_limit_le_of_eventually_integral_norm_bound
+    {Ω Ω' E : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    [SeminormedAddCommGroup E] [MeasurableSpace E] [OpensMeasurableSpace E]
+    [BorelSpace E] [HasOuterApproxClosed E]
+    {X : ℕ → Ω → E} {Z : Ω' → E}
+    (hX : TendstoInDistribution X atTop Z (fun _ => μ) ν)
+    {C : ℝ}
+    (hBound : ∀ᶠ n in atTop,
+      Integrable (fun ω => ‖X n ω‖) μ ∧ ∫ ω, ‖X n ω‖ ∂μ ≤ C) :
+    ∫ ω, ‖Z ω‖ ∂ν ≤ C := by
+  have hZNorm :
+      Integrable (fun ω => ‖Z ω‖) ν :=
+    TendstoInDistribution.integrable_norm_limit_of_eventually_integral_norm_bound
+      (μ := μ) (ν := ν) (X := X) (Z := Z) hX hBound
+  exact
+    TendstoInDistribution.integral_norm_limit_le_of_eventually_integral_norm_bound_of_integrable
+      (μ := μ) (ν := ν) (X := X) (Z := Z) hX hBound hZNorm
 
 /-- **Hansen Theorem 6.15, bounded continuous weak-moment face.**
 
