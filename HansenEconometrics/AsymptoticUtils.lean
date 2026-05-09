@@ -827,6 +827,56 @@ theorem BoundedInProbability.of_tendstoInMeasure_const
     simpa [Real.dist_eq] using hdist
   exact le_of_lt (lt_of_le_of_lt (measure_mono hcover) hn)
 
+/-- A uniform eventual first absolute-moment bound implies scalar `Oₚ(1)`.
+
+This is the Markov-inequality face of Hansen Theorem 6.12 for the case
+`aₙ = 1` and moment exponent one. Higher-moment statements reduce to this
+after applying the theorem to the nonnegative transformed sequence. -/
+theorem BoundedInProbability.of_eventually_integral_norm_bound
+    [IsFiniteMeasure μ] {X : ℕ → α → ℝ} {C : ℝ}
+    (hC : 0 ≤ C)
+    (hInt : ∀ n, Integrable (fun ω => ‖X n ω‖) μ)
+    (hBound : ∀ᶠ n in atTop, ∫ ω, ‖X n ω‖ ∂μ ≤ C) :
+    BoundedInProbability μ X := by
+  intro δ hδ
+  by_cases hδtop : δ = ∞
+  · refine ⟨1, by norm_num, Eventually.of_forall ?_⟩
+    intro n
+    rw [hδtop]
+    exact le_top
+  have hδreal_pos : 0 < δ.toReal := ENNReal.toReal_pos hδ.ne' hδtop
+  let M : ℝ := (C + 1) / δ.toReal
+  have hC1pos : 0 < C + 1 := by linarith
+  have hMpos : 0 < M := div_pos hC1pos hδreal_pos
+  refine ⟨M, hMpos, hBound.mono ?_⟩
+  intro n hn
+  have hmarkov :
+      M * μ.real {ω | M ≤ ‖X n ω‖} ≤ ∫ ω, ‖X n ω‖ ∂μ :=
+    mul_meas_ge_le_integral_of_nonneg
+      (ae_of_all μ fun ω => norm_nonneg (X n ω)) (hInt n) M
+  have hreal_le : μ.real {ω | M ≤ ‖X n ω‖} ≤ C / M := by
+    have hmul_le : μ.real {ω | M ≤ ‖X n ω‖} * M ≤ C := by
+      calc
+        μ.real {ω | M ≤ ‖X n ω‖} * M
+            = M * μ.real {ω | M ≤ ‖X n ω‖} := by ring
+        _ ≤ ∫ ω, ‖X n ω‖ ∂μ := hmarkov
+        _ ≤ C := hn
+    exact (le_div_iff₀ hMpos).2 hmul_le
+  have hratio : C / M ≤ δ.toReal := by
+    dsimp [M]
+    have hC1ne : C + 1 ≠ 0 := by linarith
+    have hδne : δ.toReal ≠ 0 := hδreal_pos.ne'
+    field_simp [hC1ne, hδne]
+    nlinarith [hC, hδreal_pos.le]
+  have htail_ofReal :
+      μ {ω | M ≤ ‖X n ω‖} ≤ ENNReal.ofReal (C / M) := by
+    rw [ENNReal.le_ofReal_iff_toReal_le (measure_ne_top μ _) (div_nonneg hC hMpos.le)]
+    simpa [measureReal_def] using hreal_le
+  have htail_delta : ENNReal.ofReal (C / M) ≤ δ := by
+    rw [ENNReal.ofReal_le_iff_le_toReal hδtop]
+    exact hratio
+  exact htail_ofReal.trans htail_delta
+
 /-- A pointwise absolute bound transfers boundedness in probability. -/
 theorem BoundedInProbability.of_abs_le
     {μ : Measure α} {X Y : ℕ → α → ℝ}
