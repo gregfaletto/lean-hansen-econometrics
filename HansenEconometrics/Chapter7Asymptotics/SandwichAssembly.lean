@@ -40,6 +40,42 @@ private lemma matrixBorelSpaceInst : BorelSpace (Matrix k k ℝ) :=
 
 attribute [local instance] matrixBorelSpaceInst
 
+/-- Condition package for the feasible HC0/HC1 residual-substitution layer.
+
+This collects the linear-model identity, component measurability, and bounded
+empirical third/fourth weight premises that appear repeatedly in the current
+HC0/HC1 covariance wrappers. It is a chapter-facing sufficient condition layer,
+not a claim that these hypotheses are minimal. -/
+structure FeasibleHCRemainderConditions (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (X : ℕ → Ω → (k → ℝ)) (e y : ℕ → Ω → ℝ) (β : k → ℝ) where
+  /-- Linear-model decomposition of the observed outcome. -/
+  model : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω
+  /-- Component measurability of the regressor sequence. -/
+  x_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (X i) μ
+  /-- Component measurability of the structural-error sequence. -/
+  e_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (e i) μ
+  /-- Bounded-in-probability third-weight controls for the HC0 cross remainder. -/
+  crossWeight_bounded : ∀ a b l : k, BoundedInProbability μ
+    (fun n ω =>
+      sampleScoreCovCrossWeight
+        (stackRegressors X n ω) (stackErrors e n ω) a b l)
+  /-- Bounded-in-probability fourth-weight controls for the HC0 quadratic remainder. -/
+  quadWeight_bounded : ∀ a b l m : k, BoundedInProbability μ
+    (fun n ω =>
+      sampleScoreCovQuadraticWeight
+        (stackRegressors X n ω) a b l m)
+
+/-- Condition package for the HC2/HC3 leverage-adjusted feasible covariance
+wrappers. It adds maximal leverage `oₚ(1)` to the feasible HC0 remainder
+package. -/
+structure FeasibleHCLeverageConditions (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (X : ℕ → Ω → (k → ℝ)) (e y : ℕ → Ω → ℝ) (β : k → ℝ)
+    extends FeasibleHCRemainderConditions μ X e y β where
+  /-- Maximal totalized leverage converges to zero in probability. -/
+  maxLeverage_tendsto :
+    TendstoInMeasure μ
+      (fun n ω => maxLeverageStar (stackRegressors X n ω))
+      atTop (fun _ => 0)
 
 omit [Fintype k] [DecidableEq k] in
 /-- The ideal HC0 score covariance average of stacked samples is the range-indexed
@@ -1629,6 +1665,27 @@ theorem olsHetCovStar_tendstoInMeasure_of_bddWts_components
     (μ := μ) (X := X) (e := e) (y := y)
     h β hmodel hScore_meas hCrossWeight hQuadWeight
 
+/-- **Hansen Theorem 7.6, feasible HC0 sandwich under packaged remainder conditions.**
+
+This is the chapter-facing packaged version of
+`olsHetCovStar_tendstoInMeasure_of_bddWts_components`: the linear model,
+component measurability, and bounded-weight residual-remainder controls are
+carried by `FeasibleHCRemainderConditions`. -/
+theorem olsHetCovStar_tendstoInMeasure_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : SampleHC0Assumption76 μ X e) (β : k → ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHetCovStar
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => heteroAsymCov μ X e) :=
+  olsHetCovStar_tendstoInMeasure_of_bddWts_components
+    (μ := μ) (X := X) (e := e) (y := y) h β
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded
+
 /-- AEMeasurability of the totalized feasible HC0 sandwich estimator from
 component measurability. -/
 theorem olsHetCovStar_stack_aestronglyMeasurable_components
@@ -1882,6 +1939,25 @@ theorem olsHetCovHC1Star_tendstoInMeasure_of_bddWts_components
   exact olsHetCovHC1Star_tendstoInMeasure_of_bddWts
     (μ := μ) (X := X) (e := e) (y := y)
     h β hmodel hScore_meas hCrossWeight hQuadWeight
+
+/-- **Hansen Theorem 7.7, HC1 sandwich under packaged remainder conditions.**
+
+HC1 has the same probability limit as HC0 under the packaged feasible
+remainder conditions. -/
+theorem olsHetCovHC1Star_tendstoInMeasure_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : SampleHC0Assumption76 μ X e) (β : k → ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHetCovHC1Star
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => heteroAsymCov μ X e) :=
+  olsHetCovHC1Star_tendstoInMeasure_of_bddWts_components
+    (μ := μ) (X := X) (e := e) (y := y) h β
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded
 
 /-- AEMeasurability of the totalized HC1 sandwich estimator from component
 measurability. -/
@@ -2368,6 +2444,44 @@ theorem olsHetCovHC3Star_tendstoInMeasure_of_bddWts_components_maxLev
       (μ := μ) (X := X) (e := e) (y := y)
       (weight := fun h => ((1 - h)⁻¹) ^ 2) measurable_hc3Weight
       h.toSampleHC0Assumption76 β hmodel hX_meas he_meas hCrossWeight hQuadWeight hAdj
+
+/-- **Hansen Theorem 7.7, HC2 sandwich under packaged leverage conditions.**
+
+This is the packaged HC2 wrapper: the feasible HC0 remainder controls are
+bundled together with maximal leverage `oₚ(1)`. -/
+theorem olsHetCovHC2Star_tendstoInMeasure_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHetCovHC2Star
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => heteroAsymCov μ X e) :=
+  olsHetCovHC2Star_tendstoInMeasure_of_bddWts_components_maxLev
+    (μ := μ) (X := X) (e := e) (y := y) h β
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hc.maxLeverage_tendsto
+
+/-- **Hansen Theorem 7.7, HC3 sandwich under packaged leverage conditions.**
+
+This is the packaged HC3 wrapper: the feasible HC0 remainder controls are
+bundled together with maximal leverage `oₚ(1)`. -/
+theorem olsHetCovHC3Star_tendstoInMeasure_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHetCovHC3Star
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => heteroAsymCov μ X e) :=
+  olsHetCovHC3Star_tendstoInMeasure_of_bddWts_components_maxLev
+    (μ := μ) (X := X) (e := e) (y := y) h β
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hc.maxLeverage_tendsto
 
 /-- HC2 covariance for fixed linear functions from maximal leverage. -/
 theorem linMap_olsHC2CovStar_tendstoInMeasure_of_bddWts_components_maxLev
