@@ -877,6 +877,73 @@ theorem BoundedInProbability.of_eventually_integral_norm_bound
     exact hratio
   exact htail_ofReal.trans htail_delta
 
+/-- An eventual higher natural-moment bound implies scalar `Oₚ(1)`.
+
+This is the natural-power Markov-inequality face of Hansen Theorem 6.12.
+The fully general textbook statement allows arbitrary positive real exponents;
+this wrapper covers the common integer-moment cases without adding extra
+real-power infrastructure. -/
+theorem BoundedInProbability.of_eventually_integral_norm_pow_bound
+    [IsFiniteMeasure μ] {X : ℕ → α → ℝ} {C : ℝ} {m : ℕ}
+    (hm : m ≠ 0)
+    (hC : 0 ≤ C)
+    (hInt : ∀ n, Integrable (fun ω => ‖X n ω‖ ^ m) μ)
+    (hBound : ∀ᶠ n in atTop, ∫ ω, ‖X n ω‖ ^ m ∂μ ≤ C) :
+    BoundedInProbability μ X := by
+  intro δ hδ
+  by_cases hδtop : δ = ∞
+  · refine ⟨1, by norm_num, Eventually.of_forall ?_⟩
+    intro n
+    rw [hδtop]
+    exact le_top
+  have hδreal_pos : 0 < δ.toReal := ENNReal.toReal_pos hδ.ne' hδtop
+  let B : ℝ := (C + 1) / δ.toReal
+  let M : ℝ := B + 1
+  have hC1pos : 0 < C + 1 := by linarith
+  have hBpos : 0 < B := div_pos hC1pos hδreal_pos
+  have hMpos : 0 < M := by dsimp [M]; linarith
+  have hMge_one : 1 ≤ M := by dsimp [M]; linarith
+  let T : ℝ := M ^ m
+  have hTpos : 0 < T := pow_pos hMpos m
+  refine ⟨M, hMpos, hBound.mono ?_⟩
+  intro n hn
+  have hcover :
+      {ω | M ≤ ‖X n ω‖} ⊆ {ω | T ≤ ‖X n ω‖ ^ m} := by
+    intro ω hω
+    exact pow_le_pow_left₀ hMpos.le hω m
+  have hmarkov :
+      T * μ.real {ω | T ≤ ‖X n ω‖ ^ m} ≤ ∫ ω, ‖X n ω‖ ^ m ∂μ :=
+    mul_meas_ge_le_integral_of_nonneg
+      (ae_of_all μ fun ω => pow_nonneg (norm_nonneg (X n ω)) m) (hInt n) T
+  have hreal_le : μ.real {ω | T ≤ ‖X n ω‖ ^ m} ≤ C / T := by
+    have hmul_le : μ.real {ω | T ≤ ‖X n ω‖ ^ m} * T ≤ C := by
+      calc
+        μ.real {ω | T ≤ ‖X n ω‖ ^ m} * T
+            = T * μ.real {ω | T ≤ ‖X n ω‖ ^ m} := by ring
+        _ ≤ ∫ ω, ‖X n ω‖ ^ m ∂μ := hmarkov
+        _ ≤ C := hn
+    exact (le_div_iff₀ hTpos).2 hmul_le
+  have hratio : C / T ≤ δ.toReal := by
+    have hB_le_M : B ≤ M := by dsimp [M]; linarith
+    have hM_le_T : M ≤ T := by
+      dsimp [T]
+      exact Bound.le_self_pow_of_pos hMge_one (Nat.pos_of_ne_zero hm)
+    have hB_le_T : B ≤ T := hB_le_M.trans hM_le_T
+    have hδB_le : δ.toReal * B ≤ δ.toReal * T :=
+      mul_le_mul_of_nonneg_left hB_le_T hδreal_pos.le
+    have hδB : δ.toReal * B = C + 1 := by
+      dsimp [B]
+      field_simp [hδreal_pos.ne']
+    exact (div_le_iff₀ hTpos).2 (by nlinarith)
+  have htail_power :
+      μ {ω | T ≤ ‖X n ω‖ ^ m} ≤ ENNReal.ofReal (C / T) := by
+    rw [ENNReal.le_ofReal_iff_toReal_le (measure_ne_top μ _) (div_nonneg hC hTpos.le)]
+    simpa [measureReal_def] using hreal_le
+  have htail_delta : ENNReal.ofReal (C / T) ≤ δ := by
+    rw [ENNReal.ofReal_le_iff_le_toReal hδtop]
+    exact hratio
+  exact (measure_mono hcover).trans (htail_power.trans htail_delta)
+
 /-- Scaled first absolute-moment bounds imply scaled scalar `Oₚ(1)`.
 
 This is the `δ = 1` scaled face of Hansen Theorem 6.12: if the first absolute
