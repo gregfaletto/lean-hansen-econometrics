@@ -230,6 +230,32 @@ theorem ofRemainder_identDistrib_memLp_rowNorm_sq
     maxLeverageStar_tendstoInMeasure_zero_of_identDistrib_memLp_rowNorm_sq
       (μ := μ) (X := X) (e := e) h hRowMem hRowIdent
 
+/-- Build the HC2/HC3 feasible-condition package from the HC0/HC1 remainder
+package plus the robust-covariance condition package and squared-row
+uniform-integrability max-leverage discharge. -/
+theorem ofRobustRemainder_uniformIntegrable_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  ofRemainder_uniformIntegrable_rowNorm_sq h.toSampleMomentAssumption71 hc hUI
+
+/-- Build the HC2/HC3 feasible-condition package from the HC0/HC1 remainder
+package plus the robust-covariance condition package and iid
+finite-squared-row-moment max-leverage discharge. -/
+theorem ofRobustRemainder_identDistrib_memLp_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hRowMem : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ)
+    (hRowIdent : ∀ i,
+      IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  ofRemainder_identDistrib_memLp_rowNorm_sq h.toSampleMomentAssumption71 hc hRowMem hRowIdent
+
 /-- Build the HC2/HC3 feasible-condition package directly from scalar WLLN
 primitive hypotheses for the HC0/HC1 bounded weights plus the squared-row
 uniform-integrability max-leverage discharge. -/
