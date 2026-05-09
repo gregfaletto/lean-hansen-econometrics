@@ -18,6 +18,35 @@ namespace HansenEconometrics
 
 open Matrix
 
+section Consistency
+
+variable {Ω E : Type*} {mΩ : MeasurableSpace Ω}
+variable [PseudoEMetricSpace E]
+
+/-- **Hansen Definition 6.3, consistency.**
+
+An estimator sequence is consistent for `θ` when it converges to the constant
+limit `θ` in measure. This is a chapter-facing name for the Mathlib
+`TendstoInMeasure` idiom used throughout the asymptotic files. -/
+def Consistent (μ : Measure Ω) (θhat : ℕ → Ω → E) (θ : E) : Prop :=
+  TendstoInMeasure μ θhat atTop (fun _ => θ)
+
+/-- Unfolding lemma for the chapter-facing consistency definition. -/
+theorem consistent_iff_tendstoInMeasure
+    {μ : Measure Ω} {θhat : ℕ → Ω → E} {θ : E} :
+    Consistent μ θhat θ ↔ TendstoInMeasure μ θhat atTop (fun _ => θ) :=
+  Iff.rfl
+
+/-- Projection from the chapter-facing consistency definition to the underlying
+Mathlib convergence-in-measure statement. -/
+theorem Consistent.tendstoInMeasure
+    {μ : Measure Ω} {θhat : ℕ → Ω → E} {θ : E}
+    (h : Consistent μ θhat θ) :
+    TendstoInMeasure μ θhat atTop (fun _ => θ) :=
+  h
+
+end Consistency
+
 section IidCLT
 
 variable {Ω Ω' : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
