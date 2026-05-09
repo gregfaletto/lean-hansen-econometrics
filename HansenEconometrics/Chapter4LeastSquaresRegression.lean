@@ -171,6 +171,13 @@ theorem olsClusteredVarianceEstimator_linear_model
         ⅟ (Xᵀ * X) := by
   simp [olsClusteredVarianceEstimator]
 
+/-- Hansen's method-of-moments residual variance estimator
+`σ̂² = n⁻¹∑ᵢ êᵢ²`. -/
+noncomputable def olsSigmaSqHat
+    (X : Matrix n k ℝ) (y : n → ℝ) [DecidableEq n] [Invertible (Xᵀ * X)] : ℝ :=
+  (Fintype.card n : ℝ)⁻¹ *
+    dotProduct (annihilatorMatrix X *ᵥ y) (annihilatorMatrix X *ᵥ y)
+
 /-- Finite-sample residual variance estimator in the homoskedastic linear regression model. -/
 noncomputable def olsResidualVarianceEstimator
     (X : Matrix n k ℝ) (y : n → ℝ) [DecidableEq n] [Invertible (Xᵀ * X)] : ℝ :=
@@ -227,6 +234,18 @@ theorem olsResidualSumSquares_linear_model_quadratic_form
     olsResidualSumSquares X (X *ᵥ β + e) = e ⬝ᵥ (annihilatorMatrix X) *ᵥ e := by
   rw [olsResidualSumSquares_linear_model]
   exact residual_quadratic_form_of_linear_model X e
+
+/-- Under the linear model, Hansen's `σ̂² = n⁻¹∑ᵢ êᵢ²` is the annihilator
+quadratic form scaled by `1 / n`. -/
+theorem olsSigmaSqHat_linear_model_quadratic_form
+    (X : Matrix n k ℝ) (β : k → ℝ) (e : n → ℝ) [DecidableEq n] [Invertible (Xᵀ * X)] :
+    olsSigmaSqHat X (X *ᵥ β + e) =
+      (Fintype.card n : ℝ)⁻¹ * (e ⬝ᵥ (annihilatorMatrix X) *ᵥ e) := by
+  unfold olsSigmaSqHat
+  have hMXβ : annihilatorMatrix X *ᵥ (X *ᵥ β) = 0 := by
+    simpa [Matrix.mulVec_mulVec] using
+      congrArg (fun M : Matrix n k ℝ => M *ᵥ β) (annihilator_mul_X X)
+  rw [Matrix.mulVec_add, hMXβ, zero_add, residual_quadratic_form_of_linear_model]
 
 /-- Under the linear model, the residual variance estimator is the annihilator quadratic form
 divided by `n-k`. This is the deterministic identity underlying the chi-square step. -/
@@ -378,6 +397,68 @@ private theorem sum_quadratic_homoskedastic_eq_trace
     _ = σ2 * ∑ i, M i i := by
       rw [Finset.mul_sum]
       simp [mul_comm]
+
+/-- Private proof engine for Hansen (4.25): with diagonal conditional second moments,
+the quadratic-form double sum is the trace of `M D`. -/
+private theorem sum_quadratic_diagonal_eq_trace_mul
+    (M : Matrix n n ℝ) [DecidableEq n] (σ2 : n → ℝ) :
+    (∑ i, ∑ j, M i j * (Matrix.diagonal σ2) i j) =
+      Matrix.trace (M * Matrix.diagonal σ2) := by
+  classical
+  rw [Matrix.trace]
+  calc
+    (∑ i, ∑ j, M i j * (Matrix.diagonal σ2) i j) =
+        ∑ i, M i i * σ2 i := by
+          refine Finset.sum_congr rfl ?_
+          intro i _
+          rw [Finset.sum_eq_single i]
+          · simp
+          · intro j _ hji
+            simp [hji.symm]
+          · intro hi
+            simp at hi
+    _ = ∑ i, (M * Matrix.diagonal σ2) i i := by
+          refine Finset.sum_congr rfl ?_
+          intro i _
+          rw [Matrix.mul_apply, Finset.sum_eq_single i]
+          · simp
+          · intro j _ hji
+            simp [hji]
+          · intro hi
+            simp at hi
+
+/-- Hansen equation (4.25): under diagonal heteroskedastic conditional second moments,
+`E[σ̂² | X] = n⁻¹ tr(MD)` where `M` is the annihilator matrix and `D` is the
+diagonal matrix of conditional error variances. -/
+theorem ols_condExp_sigmaSqHat_eq_inv_card_trace_diagonal
+    (X : Matrix n k ℝ) (β : k → ℝ) (e : Ω → n → ℝ) (σ2 : n → ℝ)
+    [DecidableEq n] [Invertible (Xᵀ * X)] [IsProbabilityMeasure μ]
+    (hm : m ≤ m₀) [SigmaFinite (μ.trim hm)]
+    (hee_int : ∀ i j, Integrable (fun ω => e ω i * e ω j) μ)
+    (hD : ∀ i j,
+      μ[fun ω => e ω i * e ω j | m] =ᵐ[μ]
+        fun _ => (Matrix.diagonal σ2) i j) :
+    μ[fun ω => olsSigmaSqHat X (X *ᵥ β + e ω) | m]
+      =ᵐ[μ]
+        fun _ => (Fintype.card n : ℝ)⁻¹ *
+          Matrix.trace (annihilatorMatrix X * Matrix.diagonal σ2) := by
+  let M : Matrix n n ℝ := annihilatorMatrix X
+  let c : ℝ := (Fintype.card n : ℝ)⁻¹
+  have hrewrite : (fun ω => olsSigmaSqHat X (X *ᵥ β + e ω)) =
+      fun ω => c * (e ω ⬝ᵥ M *ᵥ e ω) := by
+    funext ω
+    simp [c, M, olsSigmaSqHat_linear_model_quadratic_form]
+  rw [hrewrite]
+  have hscale : μ[(fun ω => c * (e ω ⬝ᵥ M *ᵥ e ω)) | m] =ᵐ[μ]
+      fun ω => c * μ[fun ω => e ω ⬝ᵥ M *ᵥ e ω | m] ω := by
+    simpa [Pi.smul_apply, smul_eq_mul] using
+      (MeasureTheory.condExp_smul (μ := μ) (m := m) c
+        (fun ω => e ω ⬝ᵥ M *ᵥ e ω))
+  have hquad := condExp_quadratic_form_eq_sum (μ := μ) (m := m) (m₀ := m₀)
+    M e (Matrix.diagonal σ2) hm hee_int hD
+  exact hscale.trans <| by
+    filter_upwards [hquad] with ω hω
+    simp [c, M, hω, sum_quadratic_diagonal_eq_trace_mul]
 
 /-- Hansen equation (4.26): under a homoskedastic conditional second-moment assumption,
 `E[s² | X] = σ²`.  The hypothesis `hee_homo` is a second-moment condition on

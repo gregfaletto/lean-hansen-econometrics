@@ -187,10 +187,10 @@ Completed in `HansenEconometrics/Chapter4LeastSquaresRegression.lean`:
 - GLS algebra and the generalized Gauss-Markov weighted lower bound
 - HC0 / White, HC1, HC2, and HC3 covariance estimators
 - clustered base covariance estimator and linear-model rewrite
+- method-of-moments `σ̂²`, including the diagonal heteroskedastic `E[σ̂² | X] = n⁻¹ tr(MD)` trace formula
 - residual variance estimator `s²`, deterministic rewrites, and homoskedastic conditional/unconditional unbiasedness
 
 Explicitly deferred for now within Chapter 4:
-- heteroskedastic `E[σ̂² | X] = n⁻¹ tr(MD)` formula
 - HC2/HC3 ordering and unbiasedness refinements
 - clustered covariance asymptotics and richer partition infrastructure
 - HC4 and other leverage-adjustment families
