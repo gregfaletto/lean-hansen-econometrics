@@ -442,12 +442,81 @@ theorem realClipBoundedContinuousFunction_apply {R : ℝ} (hR : 0 ≤ R) (x : �
   rfl
 
 /-- Real clipping agrees with the identity inside the clipping interval. -/
+theorem realClip_eq_self_of_abs_le {R x : ℝ} (hx : |x| ≤ R) :
+    realClip R x = x := by
+  have hx_interval := abs_le.mp hx
+  rw [realClip, min_eq_left hx_interval.2, max_eq_right hx_interval.1]
+
+/-- Real clipping agrees with the identity inside the clipping interval. -/
 theorem realClipBoundedContinuousFunction_eq_self_of_abs_le
     {R x : ℝ} (hR : 0 ≤ R) (hx : |x| ≤ R) :
     realClipBoundedContinuousFunction R hR x = x := by
-  have hx_interval := abs_le.mp hx
-  rw [realClipBoundedContinuousFunction_apply, realClip, min_eq_left hx_interval.2,
-    max_eq_right hx_interval.1]
+  rw [realClipBoundedContinuousFunction_apply, realClip_eq_self_of_abs_le hx]
+
+/-- The clipped value stays in absolute value below the clipping radius. -/
+theorem abs_realClip_le (R x : ℝ) (hR : 0 ≤ R) :
+    |realClip R x| ≤ R := by
+  have hlo : -R ≤ realClip R x := by
+    rw [realClip]
+    exact le_max_left _ _
+  have hhi : realClip R x ≤ R := by
+    rw [realClip]
+    exact max_le (by linarith) (min_le_right _ _)
+  exact abs_le.mpr ⟨hlo, hhi⟩
+
+/-- Clipping cannot increase absolute value when the clipping radius is nonnegative. -/
+theorem abs_realClip_le_abs (R x : ℝ) (hR : 0 ≤ R) :
+    |realClip R x| ≤ |x| := by
+  by_cases hx : |x| ≤ R
+  · rw [realClip_eq_self_of_abs_le hx]
+  · exact (abs_realClip_le R x hR).trans (le_of_lt (lt_of_not_ge hx))
+
+/-- The clipping error is supported on the large-tail event, up to a factor two. -/
+theorem abs_sub_realClip_le_two_mul_tail_abs (R x : ℝ) (hR : 0 ≤ R) :
+    |x - realClip R x| ≤
+      2 * Set.indicator {y : ℝ | R ≤ |y|} (fun y => |y|) x := by
+  by_cases htail : x ∈ {y : ℝ | R ≤ |y|}
+  · rw [Set.indicator_of_mem htail]
+    calc
+      |x - realClip R x| ≤ |x| + |realClip R x| := by
+        simpa [sub_eq_add_neg] using abs_add_le x (-(realClip R x))
+      _ ≤ |x| + |x| := by
+        linarith [abs_realClip_le_abs R x hR]
+      _ = 2 * |x| := by ring
+  · rw [Set.indicator_of_notMem htail]
+    have hx : |x| ≤ R := le_of_not_ge htail
+    rw [realClip_eq_self_of_abs_le hx, sub_self, abs_zero, mul_zero]
+
+/-- Integral tail bound for replacing an integrable real variable by its clip. -/
+theorem abs_integral_sub_realClip_le_two_mul_integral_tail_abs
+    [IsFiniteMeasure μ] {Y : α → ℝ} (hY : Integrable Y μ) {R : ℝ} (hR : 0 ≤ R) :
+    |(∫ ω, Y ω ∂μ) - ∫ ω, realClip R (Y ω) ∂μ| ≤
+      2 * ∫ ω, Set.indicator {ω | R ≤ |Y ω|} (fun ω => |Y ω|) ω ∂μ := by
+  let clip := realClipBoundedContinuousFunction R hR
+  have hclip_int : Integrable (fun ω => realClip R (Y ω)) μ := by
+    have hmap : Integrable clip (μ.map Y) := clip.integrable (μ := μ.map Y)
+    simpa [clip, Function.comp_def, realClipBoundedContinuousFunction_apply] using
+      hmap.comp_aemeasurable hY.aemeasurable
+  have htail_null : NullMeasurableSet {ω | R ≤ |Y ω|} μ :=
+    nullMeasurableSet_le aemeasurable_const
+      (continuous_abs.measurable.comp_aemeasurable hY.aemeasurable)
+  have htail_int :
+      Integrable (Set.indicator {ω | R ≤ |Y ω|} (fun ω => |Y ω|)) μ := by
+    simpa [Real.norm_eq_abs] using hY.norm.indicator₀ htail_null
+  have hmono :
+      ∫ ω, |Y ω - realClip R (Y ω)| ∂μ ≤
+        ∫ ω, 2 * Set.indicator {ω | R ≤ |Y ω|} (fun ω => |Y ω|) ω ∂μ := by
+    refine integral_mono (hY.sub hclip_int).norm (htail_int.const_mul 2) ?_
+    intro ω
+    exact abs_sub_realClip_le_two_mul_tail_abs R (Y ω) hR
+  calc
+    |(∫ ω, Y ω ∂μ) - ∫ ω, realClip R (Y ω) ∂μ| =
+        |∫ ω, Y ω - realClip R (Y ω) ∂μ| := by
+      rw [integral_sub hY hclip_int]
+    _ ≤ ∫ ω, |Y ω - realClip R (Y ω)| ∂μ := abs_integral_le_integral_abs
+    _ ≤ ∫ ω, 2 * Set.indicator {ω | R ≤ |Y ω|} (fun ω => |Y ω|) ω ∂μ := hmono
+    _ = 2 * ∫ ω, Set.indicator {ω | R ≤ |Y ω|} (fun ω => |Y ω|) ω ∂μ := by
+      rw [integral_const_mul]
 
 /-- **Hansen Theorem 6.15, bounded continuous weak-moment face.**
 
