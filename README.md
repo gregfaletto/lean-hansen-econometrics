@@ -54,7 +54,7 @@ Legend:
 |---:|---|---|---|
 | 01 | Introduction | not started | text extracted and inventoried; mostly exposition |
 | 02 | Conditional Expectation and Projection | partial | conditional expectation, variance, and linear projection algebra completed |
-| 03 | The Algebra of Least Squares | partial | OLS algebra + projection/annihilator (incl. rank), leverage identities/bounds, reduced-Gram leave-one-out formulas, influence diagnostics, and FWL coefficient/residual core landed |
+| 03 | The Algebra of Least Squares | partial | OLS algebra + projection/annihilator (incl. rank), leverage identities/bounds, reduced-Gram and literal row-deleted leave-one-out formulas, influence diagnostics, and FWL coefficient/residual core landed |
 | 04 | Least Squares Regression | partial | OLS/GLS algebra, unbiasedness, covariance identities, Gauss-Markov lower bounds, `s²` unbiasedness, HC2/HC3, and clustered base covariance definitions landed |
 | 05 | Normal Regression | partial | multivariate-normal wrappers, normal-model scaffolding, finite-sample Gaussian/chi-square/Student-t/F laws, confidence intervals, and classical test results landed; Kinal moment threshold deferred |
 | 06 | A Review of Large Sample Asymptotics | partial | WLLN, iid scalar/vector CLT via Cramér-Wold, projection-level multivariate Lindeberg/heterogeneous-array CLT endpoints for 6.4/6.5, CMT in probability, O_p/o_p, Slutsky, Delta-method wrappers, smooth-function asymptotic wrappers, UI maximum bounds for 6.16, iid finite-power-moment and uniform higher-moment UI discharge for 6.14, and convergence-in-measure faces of 6.13/6.15 backed by Mathlib + AsymptoticUtils/Chapter6Asymptotics; remaining textbook-shaped gaps documented in the Ch 6 inventory |
@@ -131,13 +131,13 @@ Completed in `HansenEconometrics/Chapter3LeastSquaresAlgebra.lean`,
 - range projection facts and `M P = P M = 0`
 - fitted/residual orthogonality and the dot-product Pythagorean decomposition
 - centered analysis-of-variance and `R²` identities
-- leverage identities/bounds, reduced-Gram leave-one-out formulas, and Section 3.21 influence
-  diagnostics
+- leverage identities/bounds, reduced-Gram and literal row-deleted leave-one-out formulas, and
+  Section 3.21 influence diagnostics
 - FWL: partitioned normal equations, residualized regressors `M₁ X₂`, the sequential residual-maker
   identity, the coefficient identity, and residual equivalence
 
 Planned next within Chapter 3:
-- literal row-deletion matrix API for leave-one-out regression, if needed
+- no immediate Chapter 3 blocker; remaining issue #42 work is concentrated in Chapters 4, 6, and 7
 
 See also:
 - `inventory/ch2-inventory.md`

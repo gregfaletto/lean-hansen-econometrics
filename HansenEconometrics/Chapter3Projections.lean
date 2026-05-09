@@ -221,12 +221,70 @@ noncomputable def leaveOneOutGram (X : Matrix n k ℝ) (i : n) : Matrix k k ℝ 
 noncomputable def leaveOneOutCross (X : Matrix n k ℝ) (y : n → ℝ) (i : n) : k → ℝ :=
   Xᵀ *ᵥ y - y i • X i
 
+/-- Row index type for the sample with observation `i` deleted. -/
+abbrev LeaveOneOutIndex (i : n) := {j : n // j ≠ i}
+
+/-- Literal row-deleted regressor matrix for leave-one-out regression. -/
+def leaveOneOutDesign (X : Matrix n k ℝ) (i : n) : Matrix (LeaveOneOutIndex i) k ℝ :=
+  X.submatrix Subtype.val id
+
+/-- Literal row-deleted response vector for leave-one-out regression. -/
+def leaveOneOutResponse (y : n → ℝ) (i : n) : LeaveOneOutIndex i → ℝ :=
+  fun j => y j
+
+omit [Fintype k] [DecidableEq k] in
+/-- The literal row-deleted design has Gram matrix `X'X - XᵢXᵢ'`. -/
+theorem leaveOneOutDesign_transpose_mul
+    (X : Matrix n k ℝ) (i : n) [DecidableEq n] :
+    (leaveOneOutDesign X i)ᵀ * leaveOneOutDesign X i = leaveOneOutGram X i := by
+  ext a b
+  have hsum := Fintype.sum_eq_add_sum_subtype_ne
+    (fun j : n => X j a * X j b) i
+  unfold leaveOneOutDesign leaveOneOutGram
+  simp only [Matrix.mul_apply, Matrix.vecMulVec_apply, transpose_apply, submatrix_apply,
+    id_eq, ne_eq, transpose_submatrix, sub_apply] at hsum ⊢
+  rw [hsum]
+  ring
+
+omit [Fintype k] [DecidableEq k] in
+/-- The literal row-deleted design and response have cross-product `X'Y - XᵢYᵢ`. -/
+theorem leaveOneOutDesign_transpose_mulVec
+    (X : Matrix n k ℝ) (y : n → ℝ) (i : n) [DecidableEq n] :
+    (leaveOneOutDesign X i)ᵀ *ᵥ leaveOneOutResponse y i = leaveOneOutCross X y i := by
+  ext a
+  have hsum := Fintype.sum_eq_add_sum_subtype_ne
+    (fun j : n => X j a * y j) i
+  unfold leaveOneOutDesign leaveOneOutResponse leaveOneOutCross
+  simp only [Matrix.mulVec, dotProduct, transpose_apply, submatrix_apply, id_eq, ne_eq,
+    Pi.sub_apply, Pi.smul_apply, smul_eq_mul] at hsum ⊢
+  rw [hsum]
+  ring
+
 /-- Hansen equation (3.42): leave-one-out coefficient written with the reduced
 Gram matrix. -/
 noncomputable def leaveOneOutBeta
     (X : Matrix n k ℝ) (y : n → ℝ) (i : n) [Invertible (leaveOneOutGram X i)] :
     k → ℝ :=
   ⅟ (leaveOneOutGram X i) *ᵥ leaveOneOutCross X y i
+
+/-- Leave-one-out coefficient computed by running OLS on the literal row-deleted sample. -/
+noncomputable def leaveOneOutBetaDeleted
+    (X : Matrix n k ℝ) (y : n → ℝ) (i : n) [DecidableEq n]
+    [Invertible (leaveOneOutGram X i)] : k → ℝ :=
+  letI : Invertible ((leaveOneOutDesign X i)ᵀ * leaveOneOutDesign X i) :=
+    (inferInstance : Invertible (leaveOneOutGram X i)).copy _
+      (leaveOneOutDesign_transpose_mul X i)
+  olsBeta (leaveOneOutDesign X i) (leaveOneOutResponse y i)
+
+/-- The literal row-deleted OLS coefficient agrees with the reduced-Gram
+leave-one-out coefficient used in Hansen Theorem 3.7. -/
+theorem leaveOneOutBetaDeleted_eq_leaveOneOutBeta
+    (X : Matrix n k ℝ) (y : n → ℝ) (i : n) [DecidableEq n]
+    [Invertible (leaveOneOutGram X i)] :
+    leaveOneOutBetaDeleted X y i = leaveOneOutBeta X y i := by
+  unfold leaveOneOutBetaDeleted olsBeta leaveOneOutBeta
+  rw [leaveOneOutDesign_transpose_mulVec]
+  congr 1
 
 /-- Leave-one-out fitted value for observation `i`. -/
 noncomputable def leaveOneOutPrediction
