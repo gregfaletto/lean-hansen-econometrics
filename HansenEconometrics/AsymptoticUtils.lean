@@ -957,6 +957,41 @@ theorem BoundedInProbability.add
     _ ≤ δ / 2 + δ / 2 := add_le_add hnX hnY
     _ = δ := ENNReal.add_halves δ
 
+/-- Real-valued `Oₚ(1)` sequences are closed under multiplication. -/
+theorem BoundedInProbability.mul
+    {μ : Measure α} {X Y : ℕ → α → ℝ}
+    (hX : BoundedInProbability μ X)
+    (hY : BoundedInProbability μ Y) :
+    BoundedInProbability μ (fun n ω => X n ω * Y n ω) := by
+  intro δ hδ
+  have hδ2 : 0 < δ / 2 := ENNReal.div_pos hδ.ne' ENNReal.ofNat_ne_top
+  rcases hX (δ / 2) hδ2 with ⟨MX, hMXpos, hMX⟩
+  rcases hY (δ / 2) hδ2 with ⟨MY, hMYpos, hMY⟩
+  refine ⟨MX * MY, mul_pos hMXpos hMYpos, ?_⟩
+  filter_upwards [hMX, hMY] with n hnX hnY
+  have hcover :
+      {ω | MX * MY ≤ ‖X n ω * Y n ω‖} ⊆
+        {ω | MX ≤ ‖X n ω‖} ∪ {ω | MY ≤ ‖Y n ω‖} := by
+    intro ω hω
+    simp only [Set.mem_union, Set.mem_setOf_eq]
+    by_cases hXbig : MX ≤ ‖X n ω‖
+    · exact Or.inl hXbig
+    · right
+      have hXlt : ‖X n ω‖ < MX := not_le.mp hXbig
+      by_contra hYbig
+      have hYlt : ‖Y n ω‖ < MY := not_le.mp hYbig
+      have hprod_lt : ‖X n ω * Y n ω‖ < MX * MY := by
+        rw [norm_mul]
+        exact mul_lt_mul_of_lt_of_le_of_nonneg_of_pos
+          hXlt hYlt.le (norm_nonneg _) hMYpos
+      exact (not_le_of_gt hprod_lt) hω
+  calc
+    μ {ω | MX * MY ≤ ‖X n ω * Y n ω‖}
+        ≤ μ ({ω | MX ≤ ‖X n ω‖} ∪ {ω | MY ≤ ‖Y n ω‖}) := measure_mono hcover
+    _ ≤ μ {ω | MX ≤ ‖X n ω‖} + μ {ω | MY ≤ ‖Y n ω‖} := measure_union_le _ _
+    _ ≤ δ / 2 + δ / 2 := add_le_add hnX hnY
+    _ = δ := ENNReal.add_halves δ
+
 /-- **Portmanteau event-probability bridge for real distributional limits.**
 
 If `Xₙ ⇒ Z` and `E` is a Borel set whose frontier has zero mass under the
