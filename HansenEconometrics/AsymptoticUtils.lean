@@ -131,6 +131,21 @@ theorem TendstoInMeasure.sqrt_nonneg_zero_real
     simpa [Real.dist_eq, abs_of_nonneg (hX_nonneg n ω)] using hsquare
   exact hdist
 
+/-- **Hansen Theorem 6.13, convergence-in-measure bounded-moment wrapper.**
+
+If a real sequence converges in measure and has eventually bounded `L¹`
+seminorm, the limit has the same `L¹` bound. This is the
+convergence-in-measure face of Hansen's bounded-first-moment passage to the
+limit; the textbook weak-convergence statement is stronger. -/
+theorem eLpNorm_one_limit_le_of_tendstoInMeasure_bound
+    {Z : ℕ → α → ℝ} {Zlim : α → ℝ} {C : ℝ≥0∞}
+    (hBound : ∀ᶠ n in atTop, eLpNorm (Z n) 1 μ ≤ C)
+    (hZ : TendstoInMeasure μ Z atTop Zlim)
+    (hMeas : ∀ n, AEStronglyMeasurable (Z n) μ) :
+    eLpNorm Zlim 1 μ ≤ C := by
+  exact eLpNorm_le_of_tendstoInMeasure
+    (μ := μ) (f := Z) (g := Zlim) (p := (1 : ℝ≥0∞)) hBound hZ hMeas
+
 /-- **Hansen Theorem 6.15, convergence-in-measure UI moment wrapper.**
 
 If real random variables are uniformly integrable and converge in measure, then
