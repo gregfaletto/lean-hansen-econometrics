@@ -1,4 +1,5 @@
 import HansenEconometrics.Chapter2CondExp
+import HansenEconometrics.AsymptoticUtils.MaxBounds
 import HansenEconometrics.Chapter7Asymptotics.Consistency
 
 /-!
@@ -636,6 +637,81 @@ theorem maxLeverageStar_le_sampleGramInv_maxRowNorm_bound
   simpa [Real.norm_eq_abs, abs_of_nonneg (leverageStar_nonneg X i)] using
     hpoint.trans hfull
 
+omit [DecidableEq k] in
+/-- The stacked row-norm maximum is bounded by the Chapter 6 finite-maximum
+statistic applied to the squared row norms. -/
+theorem maxRowNorm_stackRegressors_sq_le_maxNNNorm_norm_sq
+    (X : ℕ → Ω → (k → ℝ)) (n : ℕ) (ω : Ω) :
+    maxRowNorm (stackRegressors X n ω) ^ 2 ≤
+      (maxNNNorm (fun i ω => ‖X i ω‖ ^ 2) n ω : ℝ) := by
+  let M : ℝ := (maxNNNorm (fun i ω => ‖X i ω‖ ^ 2) n ω : ℝ)
+  have hM_nonneg : 0 ≤ M := NNReal.coe_nonneg _
+  have hrow_le_sqrt : maxRowNorm (stackRegressors X n ω) ≤ Real.sqrt M := by
+    unfold maxRowNorm
+    refine (pi_norm_le_iff_of_nonneg (Real.sqrt_nonneg M)).2 ?_
+    intro i
+    have hi_range : i.val ∈ Finset.range n := Finset.mem_range.mpr i.isLt
+    have hle_nn : ‖(‖X i.val ω‖ ^ 2 : ℝ)‖₊ ≤
+        maxNNNorm (fun i ω => ‖X i ω‖ ^ 2) n ω := by
+      dsimp [maxNNNorm]
+      exact Finset.le_sup
+        (s := Finset.range n)
+        (f := fun j => ‖((fun i ω => ‖X i ω‖ ^ 2) j ω)‖₊)
+        hi_range
+    have hle_real : ‖X i.val ω‖ ^ 2 ≤ M := by
+      rw [← NNReal.coe_le_coe] at hle_nn
+      simpa [M, Real.nnnorm_of_nonneg (sq_nonneg (‖X i.val ω‖))] using hle_nn
+    have hcoord : ‖‖X i.val ω‖‖ ≤ Real.sqrt M := by
+      simpa [Real.norm_eq_abs, abs_of_nonneg (norm_nonneg (X i.val ω))] using
+        Real.le_sqrt_of_sq_le hle_real
+    simpa [stackRegressors] using hcoord
+  calc
+    maxRowNorm (stackRegressors X n ω) ^ 2
+        ≤ (Real.sqrt M) ^ 2 := by
+          exact pow_le_pow_left₀ (norm_nonneg _) hrow_le_sqrt 2
+    _ = M := Real.sq_sqrt hM_nonneg
+
+omit [DecidableEq k] in
+/-- **Hansen Theorem 7.17, Chapter 6 row-rate discharge.**
+
+Uniform integrability of the squared regressor row norms implies
+`n⁻¹ max_i ‖X_i‖² = oₚ(1)`, using the Chapter 6 maximum theorem. -/
+theorem scaledMaxRowNorm_sq_tendstoInMeasure_zero_of_uniformIntegrable_norm_sq
+    {μ : Measure Ω}
+    {X : ℕ → Ω → (k → ℝ)}
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        (Fintype.card (Fin n) : ℝ)⁻¹ *
+          maxRowNorm (stackRegressors X n ω) ^ 2)
+      atTop (fun _ => 0) := by
+  have hmax := max_norm_scaled_tendstoInMeasure_zero_of_uniformIntegrable_norm_r
+    (μ := μ) hUI
+  refine TendstoInMeasure.of_abs_le_zero_real hmax ?_
+  intro n ω
+  have hleft_nonneg : 0 ≤
+      (Fintype.card (Fin n) : ℝ)⁻¹ *
+        maxRowNorm (stackRegressors X n ω) ^ 2 := by
+    positivity
+  have hright_nonneg : 0 ≤
+      scaledMaxNNNorm (fun i ω => ‖X i ω‖ ^ 2) n ω := by
+    unfold scaledMaxNNNorm
+    positivity
+  have hle :
+      (Fintype.card (Fin n) : ℝ)⁻¹ *
+          maxRowNorm (stackRegressors X n ω) ^ 2 ≤
+        scaledMaxNNNorm (fun i ω => ‖X i ω‖ ^ 2) n ω := by
+    have hrow := maxRowNorm_stackRegressors_sq_le_maxNNNorm_norm_sq X n ω
+    calc
+      (Fintype.card (Fin n) : ℝ)⁻¹ *
+          maxRowNorm (stackRegressors X n ω) ^ 2
+          ≤ (Fintype.card (Fin n) : ℝ)⁻¹ *
+              (maxNNNorm (fun i ω => ‖X i ω‖ ^ 2) n ω : ℝ) := by
+            exact mul_le_mul_of_nonneg_left hrow (by positivity)
+      _ = scaledMaxNNNorm (fun i ω => ‖X i ω‖ ^ 2) n ω := by
+            simp [scaledMaxNNNorm]
+  simpa [abs_of_nonneg hleft_nonneg, abs_of_nonneg hright_nonneg] using hle
+
 /-- **Hansen Theorem 7.17, max-leverage rate packaging.**
 
 Once the Chapter 6 maximum-row-norm rate supplies
@@ -733,6 +809,27 @@ theorem scaledMaxLeverageStar_tendstoInMeasure_zero_of_scaled_maxRowNorm_sq
             simp [rowRate, invNorm]
             ring
   simpa [abs_of_nonneg hnonneg_left, abs_of_nonneg hright_nonneg] using hbound
+
+/-- **Hansen Theorem 7.17, primitive max-leverage rate.**
+
+Uniform integrability of the squared row norms gives the unscaled
+`max_i hᵢᵢ = oₚ(1)` leverage rate through the Chapter 6 maximum theorem and the
+sample-Gram consistency package. -/
+theorem maxLeverageStar_tendstoInMeasure_zero_of_uniformIntegrable_rowNorm_sq
+    {μ : Measure Ω} [IsFiniteMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ}
+    (h : SampleMomentAssumption71 μ X e)
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    TendstoInMeasure μ
+      (fun n ω => maxLeverageStar (stackRegressors X n ω))
+      atTop (fun _ => 0) := by
+  have hRowRate :=
+    scaledMaxRowNorm_sq_tendstoInMeasure_zero_of_uniformIntegrable_norm_sq
+      (μ := μ) (X := X) hUI
+  simpa using
+    (scaledMaxLeverageStar_tendstoInMeasure_zero_of_scaled_maxRowNorm_sq
+      (μ := μ) (X := X) (e := e) h (fun _ => (1 : ℝ))
+      (by intro n; norm_num) (by simpa using hRowRate))
 
 /-- **Hansen Theorem 7.17, finite-sample leverage trace identity.**
 
