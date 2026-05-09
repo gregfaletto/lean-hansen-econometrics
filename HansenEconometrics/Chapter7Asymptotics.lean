@@ -40,6 +40,7 @@ structures:
 * `ErrorVarianceConsistencyConditions`
 * `ScoreCLTConditions`
 * `RobustCovarianceConsistencyConditions`
+* `RobustFeasibleHCMomentConditions`
 * `HomoskedasticErrorVariance`
 
 Chapter 7 uses `olsBetaStar` as the total proof engine. `olsBetaOrZero` is the

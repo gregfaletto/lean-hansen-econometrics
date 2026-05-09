@@ -170,6 +170,19 @@ structure FeasibleHCMomentWLLNConditions (μ : Measure Ω) [IsProbabilityMeasure
   /-- Compact fourth-row-moment domination for feasible-HC quadratic weights. -/
   rowNorm_fourth_integrable : Integrable (fun ω => ‖X 0 ω‖ ^ 4) μ
 
+/-- Single public sufficient-condition package for robust feasible HC0--HC3 inference.
+
+This combines the robust covariance WLLN/CLT package with the compact feasible-HC
+moment package and the finite squared-row moment used to discharge maximal leverage.
+It is still a sufficient condition layer, not a literal minimal encoding of Hansen's
+Assumption 7.2. -/
+structure RobustFeasibleHCMomentConditions (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (X : ℕ → Ω → (k → ℝ)) (e y : ℕ → Ω → ℝ) (β : k → ℝ)
+    extends RobustCovarianceConsistencyConditions μ X e,
+      FeasibleHCMomentWLLNConditions μ X e y β where
+  /-- Finite first moment for squared row norms, used by the iid max-leverage discharge. -/
+  rowNorm_sq_memLp : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ
+
 omit [Fintype k] [DecidableEq k] in
 private lemma measurable_hcCrossWeightScalar (a b l : k) :
     Measurable (fun z : (k → ℝ) × ℝ =>
@@ -187,6 +200,11 @@ private lemma measurable_hcQuadWeightScalar (a b l m : k) :
     ((measurable_pi_apply m).comp measurable_fst)).mul
     ((measurable_pi_apply a).comp measurable_fst)).mul
     ((measurable_pi_apply b).comp measurable_fst)
+
+omit [DecidableEq k] in
+private lemma measurable_rowNormSq_fst :
+    Measurable (fun z : (k → ℝ) × ℝ => ‖z.1‖ ^ 2) := by
+  exact ((continuous_norm.comp continuous_fst).measurable).pow_const 2
 
 omit [DecidableEq k] in
 private theorem hcCrossWeight_integrable_of_absError_rowNorm_cubed
@@ -496,6 +514,40 @@ theorem toFeasibleHCRemainderConditions
 
 end FeasibleHCMomentWLLNConditions
 
+namespace RobustFeasibleHCMomentConditions
+
+/-- Joint-observation identical distribution implies identical distribution of
+squared row norms. -/
+theorem rowNorm_sq_identDistrib
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) (i : ℕ) :
+    IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ := by
+  have h := (hm.toFeasibleHCMomentWLLNConditions.joint_identDistrib i).comp
+    measurable_rowNormSq_fst
+  simpa [Function.comp] using h
+
+/-- The compact robust feasible-HC package discharges the HC0/HC1 feasible
+residual-substitution remainder package. -/
+theorem toFeasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    FeasibleHCRemainderConditions μ X e y β :=
+  hm.toFeasibleHCMomentWLLNConditions.toFeasibleHCRemainderConditions
+
+/-- Identically distributed squared row norms with a finite first moment are
+uniformly integrable in `L¹`. -/
+theorem rowNorm_sq_uniformIntegrable
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ :=
+  uniformIntegrable_one_of_identDistrib_memLp
+    hm.rowNorm_sq_memLp hm.rowNorm_sq_identDistrib
+
+end RobustFeasibleHCMomentConditions
+
 namespace FeasibleHCLeverageConditions
 
 /-- Build the HC2/HC3 feasible-condition package from the HC0/HC1 remainder
@@ -796,6 +848,22 @@ theorem toFeasibleHCLeverageConditions_robust_identDistrib_memLp_rowNorm_sq
     |>.toFeasibleHCLeverageConditions_robust_identDistrib_memLp_rowNorm_sq h hRowMem hRowIdent
 
 end FeasibleHCMomentWLLNConditions
+
+namespace RobustFeasibleHCMomentConditions
+
+/-- The compact robust feasible-HC package discharges the HC2/HC3 feasible
+leverage package via the iid finite-squared-row-moment max-leverage route. -/
+theorem toFeasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  hm.toFeasibleHCMomentWLLNConditions
+    |>.toFeasibleHCLeverageConditions_robust_identDistrib_memLp_rowNorm_sq
+      hm.toRobustCovarianceConsistencyConditions
+      hm.rowNorm_sq_memLp hm.rowNorm_sq_identDistrib
+
+end RobustFeasibleHCMomentConditions
 
 omit [Fintype k] [DecidableEq k] in
 /-- The ideal HC0 score covariance average of stacked samples is the range-indexed
