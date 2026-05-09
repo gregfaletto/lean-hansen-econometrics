@@ -1,5 +1,4 @@
 import HansenEconometrics.LinearAlgebraUtils
-import HansenEconometrics.Chapter2CondExp
 import HansenEconometrics.Chapter2LinearProjection
 
 open scoped Matrix
