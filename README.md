@@ -55,7 +55,7 @@ Legend:
 | 01 | Introduction | not started | text extracted and inventoried; mostly exposition |
 | 02 | Conditional Expectation and Projection | partial | conditional expectation, variance, and linear projection algebra completed |
 | 03 | The Algebra of Least Squares | partial | OLS algebra + projection/annihilator (incl. rank), leverage identities/bounds, reduced-Gram and literal row-deleted leave-one-out formulas, influence diagnostics, and FWL coefficient/residual core landed |
-| 04 | Least Squares Regression | partial | OLS/GLS algebra, unbiasedness, covariance identities, Gauss-Markov lower bounds, `s²` unbiasedness, HC2/HC3, and clustered base covariance definitions landed |
+| 04 | Least Squares Regression | partial | OLS/GLS algebra, unbiasedness, covariance identities, Gauss-Markov lower bounds, `s²` unbiasedness, HC2/HC3, and clustered covariance definitions/finite-sample adjustment landed |
 | 05 | Normal Regression | partial | multivariate-normal wrappers, normal-model scaffolding, finite-sample Gaussian/chi-square/Student-t/F laws, confidence intervals, and classical test results landed; Kinal moment threshold deferred |
 | 06 | A Review of Large Sample Asymptotics | partial | WLLN, iid scalar/vector CLT via Cramér-Wold, projection-level multivariate Lindeberg/heterogeneous-array CLT endpoints for 6.4/6.5, CMT in probability, O_p/o_p, Slutsky, Delta-method wrappers, smooth-function asymptotic wrappers, UI maximum bounds for 6.16, iid finite-power-moment and uniform higher-moment UI discharge for 6.14, and convergence-in-measure faces of 6.13/6.15 backed by Mathlib + AsymptoticUtils/Chapter6Asymptotics; remaining textbook-shaped gaps documented in the Ch 6 inventory |
 | 07 | Asymptotic Theory for Least Squares | partial | Theorems 7.1-7.5 have totalized/ordinary OLS consistency, score CLT, vector CLT, and variance/covariance consistency wrappers; 7.6-7.14 have robust covariance, nonlinear Delta, t/CI/Wald wrappers at the current assumption layer, with packaged feasible HC0/HC1/HC2/HC3 remainder/leverage conditions; 7.16 and 7.17 have max-residual/max-leverage rate packaging with iid finite-squared-row-moment UI discharge; feasible HC bounded-weight hypotheses now have scalar WLLN primitive constructors, scalar/joint/compact moment condition bundles, and direct HC2/HC3 leverage-package constructors from those bundles; Edgeworth has a generic first-order CDF-expansion interface, with the concrete expansion proof still pending |
@@ -188,7 +188,8 @@ Completed in `HansenEconometrics/Chapter4LeastSquaresRegression.lean`:
 - classical Gauss-Markov lower bound
 - GLS algebra and the generalized Gauss-Markov weighted lower bound
 - HC0 / White, HC1, HC2, and HC3 covariance estimators
-- clustered base covariance estimator and linear-model rewrite
+- clustered covariance estimator, finite-sample adjustment, singleton HC0/HC1 identities, and
+  linear-model rewrite
 - method-of-moments `σ̂²`, including the diagonal heteroskedastic `E[σ̂² | X] = n⁻¹ tr(MD)` trace formula
 - residual variance estimator `s²`, deterministic rewrites, and homoskedastic conditional/unconditional unbiasedness
 

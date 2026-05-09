@@ -243,6 +243,36 @@ noncomputable def olsClusteredVarianceEstimator
     (∑ g, Matrix.vecMulVec (s g) (s g)) *
     ⅟ (Xᵀ * X)
 
+/-- Hansen equation (4.51): Stata-style finite-sample cluster adjustment
+`((n - 1) / (n - k)) * (G / (G - 1))`. -/
+noncomputable def clusterFiniteSampleAdjustment
+    (n k G : Type*) [Fintype n] [Fintype k] [Fintype G] : ℝ :=
+  ((Fintype.card n : ℝ) - 1) / ((Fintype.card n : ℝ) - Fintype.card k) *
+    ((Fintype.card G : ℝ) / ((Fintype.card G : ℝ) - 1))
+
+/-- Hansen equation (4.50): cluster-robust covariance estimator with the
+finite-sample adjustment from equation (4.51). -/
+noncomputable def olsClusteredVarianceEstimatorAdjusted
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G)
+    [DecidableEq n] [Invertible (Xᵀ * X)] : Matrix k k ℝ :=
+  clusterFiniteSampleAdjustment n k G • olsClusteredVarianceEstimator X y cluster
+
+omit [DecidableEq k] in
+/-- When every observation is its own cluster, Hansen's finite-sample cluster
+adjustment reduces to the HC1 degrees-of-freedom adjustment. -/
+theorem clusterFiniteSampleAdjustment_singleton
+    (hcard : 1 < Fintype.card n) :
+    clusterFiniteSampleAdjustment n k n =
+      (Fintype.card n : ℝ) / ((Fintype.card n : ℝ) - Fintype.card k) := by
+  unfold clusterFiniteSampleAdjustment
+  have hn_minus_one_ne_zero : (Fintype.card n : ℝ) - 1 ≠ 0 := by
+    have hcard_real : (1 : ℝ) < Fintype.card n := by exact_mod_cast hcard
+    linarith
+  by_cases hden : (Fintype.card n : ℝ) - Fintype.card k = 0
+  · simp [hden]
+  · field_simp [hn_minus_one_ne_zero, hden]
+
 /-- Singleton clusters reduce the clustered sandwich to HC0. -/
 theorem olsClusteredVarianceEstimator_singleton
     (X : Matrix n k ℝ) (y : n → ℝ)
@@ -279,6 +309,18 @@ theorem olsClusteredVarianceEstimator_singleton
         ⅟ (Xᵀ * X)
   rw [hmiddle]
   simp [Matrix.mul_assoc]
+
+/-- With singleton clusters, the finite-sample adjusted clustered estimator is
+exactly HC1. -/
+theorem olsClusteredVarianceEstimatorAdjusted_singleton
+    (X : Matrix n k ℝ) (y : n → ℝ)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    (hcard : 1 < Fintype.card n) :
+    olsClusteredVarianceEstimatorAdjusted X y (fun i : n => i) =
+      olsHuberWhiteHC1VarianceEstimator X y := by
+  unfold olsClusteredVarianceEstimatorAdjusted olsHuberWhiteHC1VarianceEstimator
+  rw [olsClusteredVarianceEstimator_singleton]
+  rw [clusterFiniteSampleAdjustment_singleton (n := n) (k := k) hcard]
 
 /-- In the linear model, HC2 uses annihilator-transformed errors. -/
 theorem olsHuberWhiteHC2VarianceEstimator_linear_model
