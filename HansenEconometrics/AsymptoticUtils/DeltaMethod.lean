@@ -1,5 +1,6 @@
 import Mathlib.Analysis.Calculus.FDeriv.Basic
 import Mathlib.Analysis.Calculus.FDeriv.Pow
+import Mathlib.Analysis.Calculus.Deriv.Inv
 import HansenEconometrics.AsymptoticUtils
 import HansenEconometrics.AsymptoticUtils.StochasticOrder
 import HansenEconometrics.ProbabilityUtils
@@ -155,6 +156,99 @@ theorem coordinateSquareDerivativeMatrix_hasLaw_multivariateGaussian_zero
   simpa using
     hasLaw_multivariateGaussian_zero_linearMap (n := k) (q := Fin 1) hS
       (coordinateSquareDerivativeMatrix j β)
+
+/-- Scalar reciprocal derivative, packaged as a Fréchet derivative. -/
+theorem scalarInv_hasFDerivAt {θ : ℝ} (hθ : θ ≠ 0) :
+    HasFDerivAt (fun x : ℝ => x⁻¹)
+      (ContinuousLinearMap.toSpanSingleton ℝ (-(θ ^ 2)⁻¹)) θ := by
+  simpa using (hasFDerivAt_inv (𝕜 := ℝ) hθ)
+
+/-- Scalar reciprocal Delta-method remainder. -/
+theorem scalarInv_deltaMethod_remainder_isLittleO {θ : ℝ} (hθ : θ ≠ 0) :
+    (fun x : ℝ =>
+      x⁻¹ - θ⁻¹ -
+        (ContinuousLinearMap.toSpanSingleton ℝ (-(θ ^ 2)⁻¹)) (x - θ))
+        =o[𝓝 θ] (fun x => x - θ) :=
+  deltaMethod_remainder_isLittleO (scalarInv_hasFDerivAt hθ)
+
+set_option linter.unusedFintypeInType false in
+/-- Coordinate-reciprocal derivative for a finite-dimensional parameter vector. -/
+theorem coordinateInv_hasFDerivAt (j : k) {β : k → ℝ} (hβj : β j ≠ 0) :
+    HasFDerivAt (fun b : k → ℝ => (b j)⁻¹)
+      ((ContinuousLinearMap.toSpanSingleton ℝ (-(β j ^ 2)⁻¹)).comp
+        (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) j)) β := by
+  have hinv := scalarInv_hasFDerivAt hβj
+  simpa [Function.comp_def] using
+    hinv.comp β
+      (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) j).hasFDerivAt
+
+/-- Coordinate-reciprocal Delta-method remainder. -/
+theorem coordinateInv_deltaMethod_remainder_isLittleO (j : k) {β : k → ℝ}
+    (hβj : β j ≠ 0) :
+    (fun b : k → ℝ =>
+      (b j)⁻¹ - (β j)⁻¹ -
+        ((ContinuousLinearMap.toSpanSingleton ℝ (-(β j ^ 2)⁻¹)).comp
+          (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) j))
+          (b - β))
+        =o[𝓝 β] (fun b => b - β) :=
+  deltaMethod_remainder_isLittleO (coordinateInv_hasFDerivAt j hβj)
+
+set_option linter.unusedFintypeInType false in
+/-- One-dimensional vector-valued coordinate-reciprocal derivative. -/
+theorem coordinateInvVector_hasFDerivAt (j : k) {β : k → ℝ} (hβj : β j ≠ 0) :
+    HasFDerivAt (fun b : k → ℝ => fun _ : Fin 1 => (b j)⁻¹)
+      (ContinuousLinearMap.pi fun _ : Fin 1 =>
+        (ContinuousLinearMap.toSpanSingleton ℝ (-(β j ^ 2)⁻¹)).comp
+          (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) j)) β := by
+  rw [hasFDerivAt_pi]
+  intro _
+  simpa using coordinateInv_hasFDerivAt j hβj
+
+/-- One-dimensional vector-valued coordinate-reciprocal Delta-method remainder. -/
+theorem coordinateInvVector_deltaMethod_remainder_isLittleO (j : k) {β : k → ℝ}
+    (hβj : β j ≠ 0) :
+    (fun b : k → ℝ =>
+      (fun _ : Fin 1 => (b j)⁻¹) - (fun _ : Fin 1 => (β j)⁻¹) -
+        (ContinuousLinearMap.pi fun _ : Fin 1 =>
+          (ContinuousLinearMap.toSpanSingleton ℝ (-(β j ^ 2)⁻¹)).comp
+            (ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : k => ℝ) j))
+          (b - β))
+        =o[𝓝 β] (fun b => b - β) :=
+  deltaMethod_remainder_isLittleO (coordinateInvVector_hasFDerivAt j hβj)
+
+/-- Matrix row for the derivative of the coordinate-reciprocal transform `β ↦ β_j⁻¹`. -/
+noncomputable def coordinateInvDerivativeMatrix {k : Type*} [DecidableEq k]
+    (j : k) (β : k → ℝ) : Matrix (Fin 1) k ℝ :=
+  fun _ => Pi.single j (-(β j ^ 2)⁻¹)
+
+/-- Applying the coordinate-reciprocal derivative row is scalar multiplication
+of the selected coordinate. -/
+theorem coordinateInvDerivativeMatrix_mulVec {k : Type*} [Fintype k] [DecidableEq k]
+    (j : k) (β v : k → ℝ) :
+    (coordinateInvDerivativeMatrix j β *ᵥ v) 0 = (-(β j ^ 2)⁻¹) * v j := by
+  simp [coordinateInvDerivativeMatrix, Matrix.mulVec]
+
+/-- Euclidean-space application form of `coordinateInvDerivativeMatrix_mulVec`. -/
+theorem matrixContinuousLinearMap_coordinateInvDerivativeMatrix_apply
+    {k : Type*} [Fintype k] [DecidableEq k]
+    (j : k) (β : k → ℝ) (v : EuclideanSpace ℝ k) :
+    (matrixContinuousLinearMap (coordinateInvDerivativeMatrix j β) v).ofLp 0 =
+      (-(β j ^ 2)⁻¹) * v.ofLp j := by
+  simp [coordinateInvDerivativeMatrix, matrixContinuousLinearMap_apply, Matrix.mulVec]
+
+/-- Gaussian image law for the coordinate-reciprocal derivative row. -/
+theorem coordinateInvDerivativeMatrix_hasLaw_multivariateGaussian_zero
+    {k : Type*} [Fintype k] [DecidableEq k]
+    {S : Matrix k k ℝ} (hS : S.PosSemidef) (j : k) (β : k → ℝ) :
+    HasLaw
+      (fun z : EuclideanSpace ℝ k =>
+        matrixContinuousLinearMap (coordinateInvDerivativeMatrix j β) z)
+      (multivariateGaussian 0
+        (coordinateInvDerivativeMatrix j β * S * (coordinateInvDerivativeMatrix j β)ᵀ))
+      (multivariateGaussian 0 S) := by
+  simpa using
+    hasLaw_multivariateGaussian_zero_linearMap (n := k) (q := Fin 1) hS
+      (coordinateInvDerivativeMatrix j β)
 
 end ConcreteTransforms
 
