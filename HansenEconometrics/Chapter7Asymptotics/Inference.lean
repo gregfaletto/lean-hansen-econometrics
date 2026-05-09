@@ -251,6 +251,60 @@ theorem pointwise_scaled_remainder_tendsto_zero
       atTop (𝓝 0) := by
   simpa using h.uniform_scaled_remainder_tendsto_zero.tendsto_at x
 
+omit [Fintype k] [DecidableEq k] in
+/-- A second-order Edgeworth expansion implies the first-order Edgeworth
+interface, with correction `p1(x) * density(x)`. -/
+theorem toFirstOrderEdgeworthExpansion
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {T : ℕ → Ω → ℝ} {baseCDF density p1 p2 : ℝ → ℝ}
+    (h : SecondOrderEdgeworthExpansion μ T baseCDF density p1 p2) :
+    FirstOrderEdgeworthExpansion μ T baseCDF (fun x => p1 x * density x) where
+  scaled_cdf_error_tendsto := by
+    intro x
+    let A : ℝ := p1 x * density x
+    let B : ℝ := p2 x * density x
+    let R : ℕ → ℝ := fun n =>
+      (n : ℝ) *
+        (statisticCDFReal μ T n x - baseCDF x -
+          (Real.sqrt (n : ℝ))⁻¹ * A -
+          (n : ℝ)⁻¹ * B)
+    have hR : Tendsto R atTop (𝓝 0) := by
+      simpa [R, A, B] using h.pointwise_scaled_remainder_tendsto_zero x
+    have hinv_sqrt : Tendsto (fun n : ℕ => (Real.sqrt (n : ℝ))⁻¹)
+        atTop (𝓝 (0 : ℝ)) := by
+      exact tendsto_inv_atTop_zero.comp
+        (Real.tendsto_sqrt_atTop.comp tendsto_natCast_atTop_atTop)
+    have hB : Tendsto (fun n : ℕ => (Real.sqrt (n : ℝ))⁻¹ * B)
+        atTop (𝓝 0) :=
+      by simpa using hinv_sqrt.mul (tendsto_const_nhds (x := B))
+    have hRem : Tendsto (fun n : ℕ => (Real.sqrt (n : ℝ))⁻¹ * R n)
+        atTop (𝓝 0) :=
+      by simpa using hinv_sqrt.mul hR
+    have hsum : Tendsto
+        (fun n : ℕ => A + (Real.sqrt (n : ℝ))⁻¹ * B +
+          (Real.sqrt (n : ℝ))⁻¹ * R n)
+        atTop (𝓝 A) := by
+      simpa using
+        ((tendsto_const_nhds (x := A)).add hB).add hRem
+    have heq :
+        (fun n : ℕ =>
+          Real.sqrt (n : ℝ) * (statisticCDFReal μ T n x - baseCDF x)) =ᶠ[atTop]
+        (fun n : ℕ => A + (Real.sqrt (n : ℝ))⁻¹ * B +
+          (Real.sqrt (n : ℝ))⁻¹ * R n) := by
+      filter_upwards [eventually_ge_atTop 1] with n hn
+      have hnpos : (0 : ℝ) < n := by exact_mod_cast hn
+      have hsqrt_ne : Real.sqrt (n : ℝ) ≠ 0 :=
+        Real.sqrt_ne_zero'.mpr hnpos
+      have hsqrt_sq : Real.sqrt (n : ℝ) ^ 2 = (n : ℝ) :=
+        Real.sq_sqrt hnpos.le
+      dsimp [R, A, B]
+      rw [← hsqrt_sq]
+      field_simp [hsqrt_ne]
+      rw [Real.sqrt_sq_eq_abs, abs_of_nonneg (Real.sqrt_nonneg _)]
+      ring
+    rw [tendsto_congr' heq]
+    simpa [A] using hsum
+
 end SecondOrderEdgeworthExpansion
 
 omit [DecidableEq k] in
