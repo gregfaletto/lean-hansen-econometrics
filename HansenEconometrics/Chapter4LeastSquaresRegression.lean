@@ -84,6 +84,20 @@ theorem olsConditionalVarianceMatrix_eq_Atranspose_D_A
   rw [Matrix.transpose_mul, inv_gram_transpose]
   simp [Matrix.mul_assoc]
 
+/-- Entrywise form of a diagonal covariance sandwich. -/
+theorem olsConditionalVarianceMatrix_diagonal_apply
+    (X : Matrix n k ℝ) (d : n → ℝ) (a b : k) [DecidableEq n] [Invertible (Xᵀ * X)] :
+    olsConditionalVarianceMatrix X (Matrix.diagonal d) a b =
+      ∑ i, (((⅟ (Xᵀ * X)) * Xᵀ) a i * ((⅟ (Xᵀ * X)) * Xᵀ) b i) * d i := by
+  let w : Matrix k n ℝ := ⅟ (Xᵀ * X) * Xᵀ
+  have hrepr : olsConditionalVarianceMatrix X (Matrix.diagonal d) = w * Matrix.diagonal d * wᵀ := by
+    unfold olsConditionalVarianceMatrix
+    dsimp [w]
+    rw [Matrix.transpose_mul, Matrix.transpose_transpose, inv_gram_transpose]
+    simp [Matrix.mul_assoc]
+  rw [hrepr]
+  simp [w, Matrix.mul_apply, Matrix.transpose_apply, Matrix.diagonal, mul_assoc, mul_comm]
+
 /-- Hansen Theorem 4.2 homoskedastic simplification: `D = σ² I`. -/
 theorem olsConditionalVarianceMatrix_homoskedastic
     (X : Matrix n k ℝ) (σ2 : ℝ) [DecidableEq n] [Invertible (Xᵀ * X)] :
@@ -125,20 +139,20 @@ noncomputable def olsHuberWhiteHC3VarianceEstimator
     (X : Matrix n k ℝ) (y : n → ℝ)
     [DecidableEq n] [Invertible (Xᵀ * X)] : Matrix k k ℝ :=
   olsConditionalVarianceMatrix X
-    (Matrix.diagonal fun i => ((1 - hatMatrix X i i)⁻¹)^2 * residual X y i ^ 2)
+    (Matrix.diagonal fun i => ((1 - hatMatrix X i i)⁻¹) ^ 2 * residual X y i ^ 2)
 
 /-- HC leverage-weight ordering on the nonsaturated textbook range.
 
 If a leverage value satisfies `0 ≤ h < 1`, then the HC2 scalar weight
 `(1 - h)⁻¹` is at least the HC0 weight `1`, and the HC3 scalar weight
-`((1 - h)⁻¹)^2` is at least the HC2 weight. This is the scalar deterministic
+`((1 - h)⁻¹) ^ 2` is at least the HC2 weight. This is the scalar deterministic
 core behind finite-sample HC0/HC2/HC3 ordering statements. -/
 theorem hc_leverage_weight_ordering {h : ℝ} (h_nonneg : 0 ≤ h) (h_lt_one : h < 1) :
-    1 ≤ (1 - h)⁻¹ ∧ (1 - h)⁻¹ ≤ ((1 - h)⁻¹)^2 := by
+    1 ≤ (1 - h)⁻¹ ∧ (1 - h)⁻¹ ≤ ((1 - h)⁻¹) ^ 2 := by
   have ht_pos : 0 < 1 - h := sub_pos.mpr h_lt_one
   have ht_le_one : 1 - h ≤ 1 := by linarith
   have h_hc2 : 1 ≤ (1 - h)⁻¹ := (one_le_inv₀ ht_pos).2 ht_le_one
-  have h_hc3 : (1 - h)⁻¹ ≤ ((1 - h)⁻¹)^2 := by
+  have h_hc3 : (1 - h)⁻¹ ≤ ((1 - h)⁻¹) ^ 2 := by
     simpa [pow_two] using
       (Bound.le_self_pow_of_pos h_hc2 (show 0 < (2 : ℕ) by norm_num))
   exact ⟨h_hc2, h_hc3⟩
@@ -211,7 +225,7 @@ theorem olsHuberWhiteHC2VarianceEstimator_le_HC3_posSemidef
   refine olsConditionalVarianceMatrix_diagonal_mono_posSemidef
     (X := X)
     (d₁ := fun i => (1 - hatMatrix X i i)⁻¹ * residual X y i ^ 2)
-    (d₂ := fun i => ((1 - hatMatrix X i i)⁻¹)^2 * residual X y i ^ 2)
+    (d₂ := fun i => ((1 - hatMatrix X i i)⁻¹) ^ 2 * residual X y i ^ 2)
     ?_
   intro i
   exact mul_le_mul_of_nonneg_right
@@ -246,8 +260,30 @@ theorem olsHuberWhiteHC3VarianceEstimator_linear_model
     olsHuberWhiteHC3VarianceEstimator X (X *ᵥ β + e) =
       olsConditionalVarianceMatrix X
         (Matrix.diagonal fun i =>
-          ((1 - hatMatrix X i i)⁻¹)^2 * (annihilatorMatrix X *ᵥ e) i ^ 2) := by
+          ((1 - hatMatrix X i i)⁻¹) ^ 2 * (annihilatorMatrix X *ᵥ e) i ^ 2) := by
   simp [olsHuberWhiteHC3VarianceEstimator]
+
+/-- Diagonal entries of the annihilator are `1 - hᵢᵢ`. -/
+theorem annihilatorMatrix_diag_eq_one_sub_hat
+    (X : Matrix n k ℝ) [DecidableEq n] [Invertible (Xᵀ * X)] (i : n) :
+    annihilatorMatrix X i i = 1 - hatMatrix X i i := by
+  simp [annihilatorMatrix]
+
+/-- For a symmetric idempotent annihilator matrix, each row's squared norm is its diagonal
+entry. -/
+theorem annihilatorMatrix_row_sq_sum_eq_diag
+    (X : Matrix n k ℝ) [DecidableEq n] [Invertible (Xᵀ * X)] (i : n) :
+    (∑ j, annihilatorMatrix X i j * annihilatorMatrix X i j) =
+      annihilatorMatrix X i i := by
+  let M : Matrix n n ℝ := annihilatorMatrix X
+  calc
+    (∑ j, annihilatorMatrix X i j * annihilatorMatrix X i j) =
+        (M * Mᵀ) i i := by
+          simp [M, Matrix.mul_apply, Matrix.transpose_apply]
+    _ = (M * M) i i := by
+          rw [show Mᵀ = M by simpa [M] using annihilatorMatrix_transpose X]
+    _ = M i i := by
+          rw [show M * M = M by simpa [M] using annihilatorMatrix_idempotent X]
 
 /-- In the linear model, clustered covariance uses cluster-summed annihilator scores. -/
 theorem olsClusteredVarianceEstimator_linear_model
@@ -488,6 +524,270 @@ private theorem sum_quadratic_homoskedastic_eq_trace
     _ = σ2 * ∑ i, M i i := by
       rw [Finset.mul_sum]
       simp [mul_comm]
+
+/-- Under homoskedastic conditional second moments, the conditional expectation of a squared
+annihilator-row residual is `σ²(1-hᵢᵢ)`. -/
+theorem condExp_annihilator_row_sq_eq_homoskedastic
+    (X : Matrix n k ℝ) (e : Ω → n → ℝ) (σ2 : ℝ) (i : n)
+    [DecidableEq n] [Invertible (Xᵀ * X)] [IsProbabilityMeasure μ]
+    (hm : m ≤ m₀) [SigmaFinite (μ.trim hm)]
+    (hee_int : ∀ r s, Integrable (fun ω => e ω r * e ω s) μ)
+    (hee_homo : ∀ r s,
+      μ[fun ω => e ω r * e ω s | m] =ᵐ[μ]
+        fun _ => σ2 * (1 : Matrix n n ℝ) r s) :
+    μ[fun ω => (annihilatorMatrix X *ᵥ e ω) i ^ 2 | m] =ᵐ[μ]
+      fun _ => σ2 * (1 - hatMatrix X i i) := by
+  let M : Matrix n n ℝ := annihilatorMatrix X
+  let A : Matrix n n ℝ := Matrix.vecMulVec (M i) (M i)
+  have hrepr : (fun ω => (annihilatorMatrix X *ᵥ e ω) i ^ 2) =
+      fun ω => e ω ⬝ᵥ A *ᵥ e ω := by
+    funext ω
+    simp [A, M, Matrix.mulVec, Matrix.vecMulVec, dotProduct, pow_two,
+      Finset.mul_sum, mul_assoc, mul_left_comm, mul_comm]
+  rw [hrepr]
+  have hquad := condExp_quadratic_form_eq_sum (μ := μ) (m := m) (m₀ := m₀)
+    A e (σ2 • (1 : Matrix n n ℝ)) hm hee_int
+    (fun r s => by simpa [Pi.smul_apply, smul_eq_mul] using hee_homo r s)
+  refine hquad.trans ?_
+  filter_upwards [] with ω
+  calc
+    (∑ r, ∑ s, A r s * (σ2 • (1 : Matrix n n ℝ)) r s)
+        = σ2 * ∑ r, M i r * M i r := by
+          have hdiag :
+              (∑ r, ∑ s, A r s * (σ2 • (1 : Matrix n n ℝ)) r s) =
+                ∑ r, σ2 * (M i r * M i r) := by
+            refine Finset.sum_congr rfl ?_
+            intro r _
+            rw [Finset.sum_eq_single r]
+            · simp [A, Matrix.vecMulVec, smul_eq_mul, mul_comm]
+            · intro s _ hsr
+              have hone : (1 : Matrix n n ℝ) r s = 0 := by
+                simp [hsr.symm]
+              simp [A, Matrix.vecMulVec, smul_eq_mul, hone]
+            · intro hr
+              simp at hr
+          rw [hdiag, Finset.mul_sum]
+    _ = σ2 * (1 - hatMatrix X i i) := by
+          rw [annihilatorMatrix_row_sq_sum_eq_diag X i]
+          simp [annihilatorMatrix_diag_eq_one_sub_hat]
+
+/-- HC2's leverage adjustment is conditionally unbiased for the homoskedastic variance at each
+row when `hᵢᵢ ≠ 1`. -/
+theorem condExp_HC2_adjusted_annihilator_row_sq_eq_sigmaSq
+    (X : Matrix n k ℝ) (e : Ω → n → ℝ) (σ2 : ℝ) (i : n)
+    [DecidableEq n] [Invertible (Xᵀ * X)] [IsProbabilityMeasure μ]
+    (hm : m ≤ m₀) [SigmaFinite (μ.trim hm)]
+    (hee_int : ∀ r s, Integrable (fun ω => e ω r * e ω s) μ)
+    (hee_homo : ∀ r s,
+      μ[fun ω => e ω r * e ω s | m] =ᵐ[μ]
+        fun _ => σ2 * (1 : Matrix n n ℝ) r s)
+    (hlev_ne : 1 - hatMatrix X i i ≠ 0) :
+    μ[fun ω =>
+        (1 - hatMatrix X i i)⁻¹ * (annihilatorMatrix X *ᵥ e ω) i ^ 2 | m]
+      =ᵐ[μ] fun _ => σ2 := by
+  have hscale :
+      μ[fun ω =>
+          (1 - hatMatrix X i i)⁻¹ * (annihilatorMatrix X *ᵥ e ω) i ^ 2 | m]
+        =ᵐ[μ]
+          fun ω => (1 - hatMatrix X i i)⁻¹ *
+            μ[fun ω => (annihilatorMatrix X *ᵥ e ω) i ^ 2 | m] ω := by
+    simpa [Pi.smul_apply, smul_eq_mul] using
+      (MeasureTheory.condExp_smul (μ := μ) (m := m) (1 - hatMatrix X i i)⁻¹
+        (fun ω => (annihilatorMatrix X *ᵥ e ω) i ^ 2))
+  have hrow :=
+    condExp_annihilator_row_sq_eq_homoskedastic
+      (μ := μ) (m := m) X e σ2 i hm hee_int hee_homo
+  refine hscale.trans ?_
+  filter_upwards [hrow] with ω hω
+  rw [hω]
+  field_simp [hlev_ne]
+
+/-- HC3's leverage adjustment has one extra inverse-leverage factor in the homoskedastic row
+expectation. -/
+theorem condExp_HC3_adjusted_annihilator_row_sq_eq_sigmaSq_mul_inv
+    (X : Matrix n k ℝ) (e : Ω → n → ℝ) (σ2 : ℝ) (i : n)
+    [DecidableEq n] [Invertible (Xᵀ * X)] [IsProbabilityMeasure μ]
+    (hm : m ≤ m₀) [SigmaFinite (μ.trim hm)]
+    (hee_int : ∀ r s, Integrable (fun ω => e ω r * e ω s) μ)
+    (hee_homo : ∀ r s,
+      μ[fun ω => e ω r * e ω s | m] =ᵐ[μ]
+        fun _ => σ2 * (1 : Matrix n n ℝ) r s)
+    (hlev_ne : 1 - hatMatrix X i i ≠ 0) :
+    μ[fun ω =>
+        ((1 - hatMatrix X i i)⁻¹) ^ 2 * (annihilatorMatrix X *ᵥ e ω) i ^ 2 | m]
+      =ᵐ[μ] fun _ => σ2 * (1 - hatMatrix X i i)⁻¹ := by
+  let c : ℝ := ((1 - hatMatrix X i i)⁻¹) ^ 2
+  have hscale :
+      μ[fun ω =>
+          ((1 - hatMatrix X i i)⁻¹) ^ 2 * (annihilatorMatrix X *ᵥ e ω) i ^ 2 | m]
+        =ᵐ[μ]
+          fun ω => ((1 - hatMatrix X i i)⁻¹) ^ 2 *
+            μ[fun ω => (annihilatorMatrix X *ᵥ e ω) i ^ 2 | m] ω := by
+    simpa [c, Pi.smul_apply, smul_eq_mul] using
+      (MeasureTheory.condExp_smul (μ := μ) (m := m) c
+        (fun ω => (annihilatorMatrix X *ᵥ e ω) i ^ 2))
+  have hrow :=
+    condExp_annihilator_row_sq_eq_homoskedastic
+      (μ := μ) (m := m) X e σ2 i hm hee_int hee_homo
+  refine hscale.trans ?_
+  filter_upwards [hrow] with ω hω
+  rw [hω]
+  field_simp [hlev_ne]
+
+/-- Conditional expectation commutes with a deterministic diagonal covariance sandwich.
+
+If each random diagonal entry has conditional expectation `dᵢ`, then the whole matrix-valued
+sandwich has conditional expectation given by the deterministic diagonal matrix `diag(d)`. -/
+theorem condExp_olsConditionalVarianceMatrix_diagonal_eq
+    (X : Matrix n k ℝ) (z : Ω → n → ℝ) (d : n → ℝ)
+    [DecidableEq n] [Invertible (Xᵀ * X)] [IsProbabilityMeasure μ]
+    (hz_int : ∀ i, Integrable (fun ω => z ω i) μ)
+    (hz : ∀ i, μ[fun ω => z ω i | m] =ᵐ[μ] fun _ => d i) :
+    μ[(fun ω => fun a b => olsConditionalVarianceMatrix X (Matrix.diagonal (z ω)) a b) | m]
+      =ᵐ[μ] fun _ a b => olsConditionalVarianceMatrix X (Matrix.diagonal d) a b := by
+  let f : Ω → k → k → ℝ := fun ω a b =>
+    olsConditionalVarianceMatrix X (Matrix.diagonal (z ω)) a b
+  let w : Matrix k n ℝ := ⅟ (Xᵀ * X) * Xᵀ
+  have hentry : ∀ (ω : Ω) (a b : k),
+      f ω a b = ∑ i, (w a i * w b i) * z ω i := by
+    intro ω a b
+    simp [f, w, olsConditionalVarianceMatrix_diagonal_apply]
+  have hf_int : Integrable f μ := by
+    refine Integrable.of_eval ?_
+    intro a
+    refine Integrable.of_eval ?_
+    intro b
+    have hrepr : (fun ω => f ω a b) = fun ω => ∑ i, (w a i * w b i) * z ω i := by
+      funext ω
+      exact hentry ω a b
+    rw [hrepr]
+    exact MeasureTheory.integrable_finset_sum (s := Finset.univ)
+      (f := fun i ω => (w a i * w b i) * z ω i)
+      (fun i _ => (hz_int i).const_mul (w a i * w b i))
+  rw [Filter.EventuallyEq]
+  change ∀ᵐ ω ∂μ, μ[f | m] ω = fun a b => olsConditionalVarianceMatrix X (Matrix.diagonal d) a b
+  have hcoord : ∀ a b : k, ∀ᵐ ω ∂μ,
+      μ[f | m] ω a b = olsConditionalVarianceMatrix X (Matrix.diagonal d) a b := by
+    intro a b
+    have hrepr : (fun ω => f ω a b) = fun ω => ∑ i, (w a i * w b i) * z ω i := by
+      funext ω
+      exact hentry ω a b
+    have hsum :
+        μ[(fun ω => f ω a b) | m] =ᵐ[μ]
+          fun _ => olsConditionalVarianceMatrix X (Matrix.diagonal d) a b := by
+      rw [hrepr]
+      have hsum_ce :
+          μ[(fun ω => ∑ i, (w a i * w b i) * z ω i) | m] =ᵐ[μ]
+            ∑ i, μ[(fun ω => (w a i * w b i) * z ω i) | m] := by
+        have hsum_repr :
+            (fun ω => ∑ i, (w a i * w b i) * z ω i) =
+              ∑ i, fun ω => (w a i * w b i) * z ω i := by
+          funext ω
+          simp
+        rw [hsum_repr]
+        simpa using MeasureTheory.condExp_finset_sum (μ := μ) (m := m)
+          (s := Finset.univ)
+          (f := fun i ω => (w a i * w b i) * z ω i)
+          (fun i _ => (hz_int i).const_mul (w a i * w b i))
+      have hcoord_smul : ∀ i,
+          μ[(fun ω => (w a i * w b i) * z ω i) | m] =ᵐ[μ]
+            fun _ => (w a i * w b i) * d i := by
+        intro i
+        refine (MeasureTheory.condExp_smul (μ := μ) (m := m) (w a i * w b i)
+          (fun ω => z ω i)).trans ?_
+        filter_upwards [hz i] with ω hω
+        simp [Pi.smul_apply, smul_eq_mul, hω]
+      have hall : ∀ᵐ ω ∂μ, ∀ i,
+          μ[(fun ω => (w a i * w b i) * z ω i) | m] ω =
+            (w a i * w b i) * d i := by
+        exact ae_all_iff.2 fun i => hcoord_smul i
+      exact hsum_ce.trans <| by
+        filter_upwards [hall] with ω hω
+        calc
+          ((∑ i, μ[(fun ω => (w a i * w b i) * z ω i) | m]) : Ω → ℝ) ω =
+              ∑ i, μ[(fun ω => (w a i * w b i) * z ω i) | m] ω := by
+                simp
+          _ =
+              ∑ i, (w a i * w b i) * d i := by
+                exact Finset.sum_congr rfl fun i _ => hω i
+          _ = olsConditionalVarianceMatrix X (Matrix.diagonal d) a b := by
+                symm
+                simp [w, olsConditionalVarianceMatrix_diagonal_apply]
+    exact (condExp_apply_apply (m := m) (μ := μ) (f := f) hf_int a b).trans hsum
+  have hall : ∀ᵐ ω ∂μ, ∀ a b : k,
+      μ[f | m] ω a b = olsConditionalVarianceMatrix X (Matrix.diagonal d) a b := by
+    exact ae_all_iff.2 fun a => ae_all_iff.2 fun b => hcoord a b
+  exact hall.mono fun ω hω => by
+    funext a b
+    exact hω a b
+
+/-- Matrix-valued conditional expectation of HC2 under homoskedastic second moments.
+
+The rowwise leverage adjustment exactly removes the homoskedastic residual shrinkage, so the
+conditional expectation is the usual homoskedastic covariance matrix. -/
+theorem condExp_olsHuberWhiteHC2VarianceEstimator_eq_homoskedastic
+    (X : Matrix n k ℝ) (β : k → ℝ) (e : Ω → n → ℝ) (σ2 : ℝ)
+    [DecidableEq n] [Invertible (Xᵀ * X)] [IsProbabilityMeasure μ]
+    (hm : m ≤ m₀) [SigmaFinite (μ.trim hm)]
+    (hee_int : ∀ r s, Integrable (fun ω => e ω r * e ω s) μ)
+    (hee_homo : ∀ r s,
+      μ[fun ω => e ω r * e ω s | m] =ᵐ[μ]
+        fun _ => σ2 * (1 : Matrix n n ℝ) r s)
+    (hlev_ne : ∀ i, 1 - hatMatrix X i i ≠ 0)
+    (hhc2_int : ∀ i,
+      Integrable
+        (fun ω => (1 - hatMatrix X i i)⁻¹ * (annihilatorMatrix X *ᵥ e ω) i ^ 2) μ) :
+    μ[(fun ω => fun a b =>
+        olsHuberWhiteHC2VarianceEstimator X (X *ᵥ β + e ω) a b) | m]
+      =ᵐ[μ] fun _ a b => olsConditionalVarianceMatrix X (σ2 • (1 : Matrix n n ℝ)) a b := by
+  let z : Ω → n → ℝ := fun ω i =>
+    (1 - hatMatrix X i i)⁻¹ * (annihilatorMatrix X *ᵥ e ω) i ^ 2
+  have hz : ∀ i, μ[fun ω => z ω i | m] =ᵐ[μ] fun _ => σ2 := by
+    intro i
+    simpa [z] using
+      condExp_HC2_adjusted_annihilator_row_sq_eq_sigmaSq
+        (μ := μ) (m := m) X e σ2 i hm hee_int hee_homo (hlev_ne i)
+  have hdiag :=
+    condExp_olsConditionalVarianceMatrix_diagonal_eq
+      (μ := μ) (m := m) X z (fun _ : n => σ2) hhc2_int hz
+  have hconstdiag : Matrix.diagonal (fun _ : n => σ2) = σ2 • (1 : Matrix n n ℝ) := by
+    ext i j
+    by_cases hij : i = j <;> simp [Matrix.diagonal, hij, smul_eq_mul]
+  simpa [z, olsHuberWhiteHC2VarianceEstimator_linear_model, hconstdiag] using hdiag
+
+/-- Matrix-valued conditional expectation of HC3 under homoskedastic second moments.
+
+Relative to HC2, HC3 retains one extra inverse-leverage factor in each diagonal entry. -/
+theorem condExp_olsHuberWhiteHC3VarianceEstimator_eq_homoskedastic_inflated
+    (X : Matrix n k ℝ) (β : k → ℝ) (e : Ω → n → ℝ) (σ2 : ℝ)
+    [DecidableEq n] [Invertible (Xᵀ * X)] [IsProbabilityMeasure μ]
+    (hm : m ≤ m₀) [SigmaFinite (μ.trim hm)]
+    (hee_int : ∀ r s, Integrable (fun ω => e ω r * e ω s) μ)
+    (hee_homo : ∀ r s,
+      μ[fun ω => e ω r * e ω s | m] =ᵐ[μ]
+        fun _ => σ2 * (1 : Matrix n n ℝ) r s)
+    (hlev_ne : ∀ i, 1 - hatMatrix X i i ≠ 0)
+    (hhc3_int : ∀ i,
+      Integrable
+        (fun ω => ((1 - hatMatrix X i i)⁻¹) ^ 2 *
+          (annihilatorMatrix X *ᵥ e ω) i ^ 2) μ) :
+    μ[(fun ω => fun a b =>
+        olsHuberWhiteHC3VarianceEstimator X (X *ᵥ β + e ω) a b) | m]
+      =ᵐ[μ] fun _ a b =>
+        olsConditionalVarianceMatrix X
+          (Matrix.diagonal fun i => σ2 * (1 - hatMatrix X i i)⁻¹) a b := by
+  let z : Ω → n → ℝ := fun ω i =>
+    ((1 - hatMatrix X i i)⁻¹) ^ 2 * (annihilatorMatrix X *ᵥ e ω) i ^ 2
+  let d : n → ℝ := fun i => σ2 * (1 - hatMatrix X i i)⁻¹
+  have hz : ∀ i, μ[fun ω => z ω i | m] =ᵐ[μ] fun _ => d i := by
+    intro i
+    simpa [z, d] using
+      condExp_HC3_adjusted_annihilator_row_sq_eq_sigmaSq_mul_inv
+        (μ := μ) (m := m) X e σ2 i hm hee_int hee_homo (hlev_ne i)
+  have hdiag :=
+    condExp_olsConditionalVarianceMatrix_diagonal_eq
+      (μ := μ) (m := m) X z d hhc3_int hz
+  simpa [z, d, olsHuberWhiteHC3VarianceEstimator_linear_model, Matrix.diagonal] using hdiag
 
 /-- Private proof engine for Hansen (4.25): with diagonal conditional second moments,
 the quadratic-form double sum is the trace of `M D`. -/
