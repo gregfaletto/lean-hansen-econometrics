@@ -141,6 +141,56 @@ theorem sum_leverageValue_eq_card
     _ = (Fintype.card k : ℝ) := by
       simpa using hatMatrix_trace (X := X)
 
+private lemma sum_sq_le_card_mul_dotProduct_self (r : n → ℝ) :
+    (∑ j, r j) ^ 2 ≤ (r ⬝ᵥ r) * (Fintype.card n : ℝ) := by
+  have h := real_inner_mul_inner_self_le (WithLp.toLp 2 r : EuclideanSpace ℝ n)
+    (WithLp.toLp 2 (1 : n → ℝ))
+  change ((1 : n → ℝ) ⬝ᵥ r) * ((1 : n → ℝ) ⬝ᵥ r) ≤
+      (r ⬝ᵥ r) * ((1 : n → ℝ) ⬝ᵥ (1 : n → ℝ)) at h
+  rw [one_dotProduct, one_dotProduct_one] at h
+  simpa [pow_two] using h
+
+private lemma hatMatrix_row_dot_self_eq_diag
+    (X : Matrix n k ℝ) [Invertible (Xᵀ * X)] (i : n) :
+    (hatMatrix X i) ⬝ᵥ (hatMatrix X i) = hatMatrix X i i := by
+  have hid := congrArg (fun M : Matrix n n ℝ => M i i) (hatMatrix_idempotent X)
+  have hsymm : ∀ j : n, hatMatrix X j i = hatMatrix X i j := by
+    intro j
+    have h := congrArg (fun M : Matrix n n ℝ => M j i) (hatMatrix_transpose X)
+    simpa [Matrix.transpose_apply] using h.symm
+  simpa [Matrix.mul_apply, dotProduct, hsymm] using hid
+
+/-- If the regressor matrix contains an intercept, the hat matrix fixes the
+constant vector. -/
+theorem hatMatrix_mulVec_one_of_intercept
+    (X : Matrix n k ℝ) [Invertible (Xᵀ * X)] {c : k → ℝ} (hc : X *ᵥ c = 1) :
+    hatMatrix X *ᵥ (1 : n → ℝ) = 1 := by
+  calc
+    hatMatrix X *ᵥ (1 : n → ℝ) = hatMatrix X *ᵥ (X *ᵥ c) := by rw [← hc]
+    _ = (hatMatrix X * X) *ᵥ c := by rw [Matrix.mulVec_mulVec]
+    _ = X *ᵥ c := by rw [hat_mul_X]
+    _ = 1 := hc
+
+/-- Hansen Theorem 3.6.2: if `X` contains an intercept, every leverage value is at least
+`1 / n`. -/
+theorem inv_card_le_leverageValue_of_intercept
+    (X : Matrix n k ℝ) [Invertible (Xᵀ * X)] {c : k → ℝ} (hc : X *ᵥ c = 1) (i : n) :
+    (Fintype.card n : ℝ)⁻¹ ≤ leverageValue X i := by
+  have hrow_sum : ∑ j : n, hatMatrix X i j = 1 := by
+    have h := congrFun (hatMatrix_mulVec_one_of_intercept (X := X) hc) i
+    rw [← dotProduct_one (hatMatrix X i)]
+    simpa [Matrix.mulVec] using h
+  have hcauchy := sum_sq_le_card_mul_dotProduct_self (hatMatrix X i)
+  rw [hrow_sum, hatMatrix_row_dot_self_eq_diag] at hcauchy
+  have hmul : 1 ≤ leverageValue X i * (Fintype.card n : ℝ) := by
+    simpa [leverageValue, pow_two, mul_comm] using hcauchy
+  have hcard_pos : 0 < (Fintype.card n : ℝ) := by
+    exact_mod_cast (Fintype.card_pos_iff.mpr ⟨i⟩ : 0 < Fintype.card n)
+  have hdiv : (1 : ℝ) / (Fintype.card n : ℝ) ≤ leverageValue X i := by
+    rw [div_le_iff₀ hcard_pos]
+    simpa [mul_comm] using hmul
+  simpa [one_div] using hdiv
+
 /-- Hansen Section 3.12 / Exercise 3.8: the annihilator matrix is idempotent. -/
 theorem annihilatorMatrix_idempotent
     (X : Matrix n k ℝ) [DecidableEq n] [Invertible (Xᵀ * X)] :
