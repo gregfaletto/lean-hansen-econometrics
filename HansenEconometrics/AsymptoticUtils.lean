@@ -877,6 +877,37 @@ theorem BoundedInProbability.of_eventually_integral_norm_bound
     exact hratio
   exact htail_ofReal.trans htail_delta
 
+/-- Scaled first absolute-moment bounds imply scaled scalar `Oₚ(1)`.
+
+This is the `δ = 1` scaled face of Hansen Theorem 6.12: if the first absolute
+moment of `Xₙ` is eventually bounded by a positive deterministic scale `aₙ`,
+then `aₙ⁻¹ Xₙ` is bounded in probability. -/
+theorem BoundedInProbability.of_eventually_integral_norm_scaled_bound
+    [IsFiniteMeasure μ] {X : ℕ → α → ℝ} {a : ℕ → ℝ} {C : ℝ}
+    (hC : 0 ≤ C)
+    (ha : ∀ᶠ n in atTop, 0 < a n)
+    (hInt : ∀ n, Integrable (fun ω => ‖X n ω‖) μ)
+    (hBound : ∀ᶠ n in atTop, ∫ ω, ‖X n ω‖ ∂μ ≤ C * a n) :
+    BoundedInProbability μ (fun n ω => (a n)⁻¹ * X n ω) := by
+  refine BoundedInProbability.of_eventually_integral_norm_bound (C := C) hC ?_ ?_
+  · intro n
+    simpa [norm_mul, mul_comm, mul_left_comm, mul_assoc] using
+      (hInt n).const_mul ‖(a n)⁻¹‖
+  · filter_upwards [ha, hBound] with n hapos hn
+    have hscale_nonneg : 0 ≤ ‖(a n)⁻¹‖ := norm_nonneg _
+    calc
+      ∫ ω, ‖(a n)⁻¹ * X n ω‖ ∂μ
+          = ∫ ω, ‖(a n)⁻¹‖ * ‖X n ω‖ ∂μ := by
+            congr 1
+            ext ω
+            simp [norm_mul]
+      _ = ‖(a n)⁻¹‖ * ∫ ω, ‖X n ω‖ ∂μ := by
+            rw [integral_const_mul]
+      _ ≤ ‖(a n)⁻¹‖ * (C * a n) := mul_le_mul_of_nonneg_left hn hscale_nonneg
+      _ = C := by
+            rw [Real.norm_eq_abs, abs_of_pos (inv_pos.mpr hapos)]
+            field_simp [hapos.ne']
+
 /-- A pointwise absolute bound transfers boundedness in probability. -/
 theorem BoundedInProbability.of_abs_le
     {μ : Measure α} {X Y : ℕ → α → ℝ}
