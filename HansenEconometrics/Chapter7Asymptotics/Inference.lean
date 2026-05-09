@@ -210,6 +210,49 @@ theorem cdf_tendsto_base
 
 end FirstOrderEdgeworthExpansion
 
+omit [Fintype k] [DecidableEq k] in
+/-- Second-order uniform Edgeworth expansion interface for scalar statistics.
+
+This is the theorem-facing shape of Hansen Theorem 7.15: the CDF of a scalar
+statistic is approximated uniformly in the cutoff `x` by a base CDF plus
+`n^{-1/2}` and `n^{-1}` correction terms. For the textbook t-ratio application,
+`baseCDF` is the standard-normal CDF, `density` is the standard-normal density,
+and `p1`, `p2` are the Edgeworth polynomials. The structure records the
+expansion statement; the concrete cumulant/polynomial calculation remains a
+separate proof obligation. -/
+structure SecondOrderEdgeworthExpansion
+    (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (T : ℕ → Ω → ℝ) (baseCDF density p1 p2 : ℝ → ℝ) where
+  /-- The second-order Edgeworth remainder is `o(n^{-1})` uniformly in `x`. -/
+  uniform_scaled_remainder_tendsto_zero :
+    TendstoUniformly
+      (fun (n : ℕ) x =>
+        (n : ℝ) *
+          (statisticCDFReal μ T n x - baseCDF x -
+            (Real.sqrt (n : ℝ))⁻¹ * (p1 x * density x) -
+            (n : ℝ)⁻¹ * (p2 x * density x)))
+      (fun _ : ℝ => 0) atTop
+
+namespace SecondOrderEdgeworthExpansion
+
+omit [Fintype k] [DecidableEq k] in
+/-- A uniform second-order Edgeworth expansion gives the corresponding
+pointwise scaled-remainder convergence at every cutoff. -/
+theorem pointwise_scaled_remainder_tendsto_zero
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {T : ℕ → Ω → ℝ} {baseCDF density p1 p2 : ℝ → ℝ}
+    (h : SecondOrderEdgeworthExpansion μ T baseCDF density p1 p2) (x : ℝ) :
+    Tendsto
+      (fun n : ℕ =>
+        (n : ℝ) *
+          (statisticCDFReal μ T n x - baseCDF x -
+            (Real.sqrt (n : ℝ))⁻¹ * (p1 x * density x) -
+            (n : ℝ)⁻¹ * (p2 x * density x)))
+      atTop (𝓝 0) := by
+  simpa using h.uniform_scaled_remainder_tendsto_zero.tendsto_at x
+
+end SecondOrderEdgeworthExpansion
+
 omit [DecidableEq k] in
 /-- Numerator of the scalar t-statistic for totalized OLS. -/
 @[reducible]
