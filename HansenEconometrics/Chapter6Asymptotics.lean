@@ -781,6 +781,37 @@ theorem integral_sq_tail_le_integral_even_moment_div_threshold
   have hle := MeasureTheory.integral_mono h_tail h_rhs_int hmono
   simpa [MeasureTheory.integral_div] using hle
 
+/-- Finite-row version of the expected Lyapunov tail bound, matching the
+finite sums in triangular-array Lindeberg conditions. -/
+theorem sum_integral_sq_tail_le_sum_integral_even_moment_div_threshold
+    {ι : Type*} [Fintype ι]
+    (μ : Measure Ω) (X : ι → Ω → ℝ) (c : ℝ) (m : ℕ) (hc : 0 < c)
+    (h_tail : ∀ i, Integrable
+      (fun ω => Set.indicator {y : ℝ | c ≤ y ^ 2} (fun y => y ^ 2) (X i ω)) μ)
+    (h_moment : ∀ i, Integrable (fun ω => |X i ω| ^ (2 + 2 * m)) μ) :
+    (∑ i, ∫ ω, Set.indicator {y : ℝ | c ≤ y ^ 2} (fun y => y ^ 2) (X i ω) ∂μ) ≤
+      ∑ i, (∫ ω, |X i ω| ^ (2 + 2 * m) ∂μ) / c ^ m := by
+  exact Finset.sum_le_sum fun i _ =>
+    integral_sq_tail_le_integral_even_moment_div_threshold μ (X i) c m hc
+      (h_tail i) (h_moment i)
+
+/-- Normalized finite-row Lyapunov tail bound. This is the direct algebraic
+shape of the scalar Lindeberg expression once the normalization is fixed. -/
+theorem normalized_sum_integral_sq_tail_le_normalized_even_moment_bound
+    {ι : Type*} [Fintype ι]
+    (μ : Measure Ω) (X : ι → Ω → ℝ) (c scale : ℝ) (m : ℕ)
+    (hc : 0 < c) (hscale : 0 ≤ scale)
+    (h_tail : ∀ i, Integrable
+      (fun ω => Set.indicator {y : ℝ | c ≤ y ^ 2} (fun y => y ^ 2) (X i ω)) μ)
+    (h_moment : ∀ i, Integrable (fun ω => |X i ω| ^ (2 + 2 * m)) μ) :
+    scale * (∑ i,
+      ∫ ω, Set.indicator {y : ℝ | c ≤ y ^ 2} (fun y => y ^ 2) (X i ω) ∂μ) ≤
+        scale * ∑ i, (∫ ω, |X i ω| ^ (2 + 2 * m) ∂μ) / c ^ m := by
+  exact mul_le_mul_of_nonneg_left
+    (sum_integral_sq_tail_le_sum_integral_even_moment_div_threshold
+      μ X c m hc h_tail h_moment)
+    hscale
+
 /-- Projection-level sufficient condition package for Hansen's multivariate
 Lindeberg CLT.
 
