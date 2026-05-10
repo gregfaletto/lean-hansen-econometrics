@@ -241,9 +241,6 @@ structure IidRobustFeasibleHCMomentConditions (μ : Measure Ω) [IsProbabilityMe
   /-- Integrability of the true-error score outer product. -/
   int_score_outer :
     Integrable (fun ω => Matrix.vecMulVec (e 0 ω • X 0 ω) (e 0 ω • X 0 ω)) μ
-  /-- Compact third-moment domination for feasible-HC cross weights. -/
-  absError_rowNorm_cubed_integrable :
-    Integrable (fun ω => |e 0 ω| * ‖X 0 ω‖ ^ 3) μ
   /-- Compact fourth-row-moment domination for feasible-HC quadratic weights. -/
   rowNorm_fourth_integrable : Integrable (fun ω => ‖X 0 ω‖ ^ 4) μ
 
@@ -259,6 +256,20 @@ theorem rowNorm_sq_memLp
   exact memLp_one_iff_integrable.mpr
     (integrable_norm_pow_of_le (f := X 0) (μ := μ) (h.x_aestronglyMeasurable 0)
       (show (2 : ℕ) ≤ 4 by norm_num) h.rowNorm_fourth_integrable)
+
+/-- Fourth-row-moment integrability supplies the squared-row `L²` moment used with
+the score `L²` moment in the feasible-HC third-weight discharge. -/
+theorem rowNorm_sq_memLp_two
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    MemLp (fun ω => ‖X 0 ω‖ ^ 2) 2 μ := by
+  have hmeas : AEStronglyMeasurable (fun ω => ‖X 0 ω‖ ^ 2) μ :=
+    ((h.x_aestronglyMeasurable 0).norm.aemeasurable.pow_const 2).aestronglyMeasurable
+  refine (memLp_two_iff_integrable_sq hmeas).2 ?_
+  convert h.rowNorm_fourth_integrable using 1
+  ext ω
+  ring
 
 end IidRobustFeasibleHCMomentConditions
 
@@ -435,6 +446,16 @@ theorem scoreCoordinate_memLp_two
     ((continuous_apply j).comp_aestronglyMeasurable
       (IidRobustFeasibleHCMomentConditions.score_aestronglyMeasurable h))).2 hsq
 
+/-- Integrability of the score outer product supplies vector-valued score
+square-integrability. -/
+theorem score_memLp_two
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    MemLp (fun ω => e 0 ω • X 0 ω) 2 μ :=
+  MemLp.of_eval
+    (fun j => IidRobustFeasibleHCMomentConditions.scoreCoordinate_memLp_two h j)
+
 /-- Integrability of the score outer product supplies integrability of the score vector. -/
 theorem int_cross
     {μ : Measure Ω} [IsProbabilityMeasure μ]
@@ -442,8 +463,7 @@ theorem int_cross
     (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
     Integrable (fun ω => e 0 ω • X 0 ω) μ := by
   have hscore : MemLp (fun ω => e 0 ω • X 0 ω) 2 μ :=
-    MemLp.of_eval
-      (fun j => IidRobustFeasibleHCMomentConditions.scoreCoordinate_memLp_two h j)
+    IidRobustFeasibleHCMomentConditions.score_memLp_two h
   exact memLp_one_iff_integrable.mp (hscore.mono_exponent one_le_two)
 
 /-- Integrability of the score outer product supplies square-integrability of
@@ -461,6 +481,25 @@ theorem memLp_cross_projection
     using 1
   ext ω
   simp [dotProduct]
+
+/-- The iid score second moment and fourth row moment imply the compact third-moment
+domination used by the feasible-HC cross weights. -/
+theorem absError_rowNorm_cubed_integrable
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    Integrable (fun ω => |e 0 ω| * ‖X 0 ω‖ ^ 3) μ := by
+  have hscore : MemLp (fun ω => ‖e 0 ω • X 0 ω‖) 2 μ :=
+    (IidRobustFeasibleHCMomentConditions.score_memLp_two h).norm
+  have hrow : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 2 μ :=
+    IidRobustFeasibleHCMomentConditions.rowNorm_sq_memLp_two h
+  have hprod : Integrable
+      ((fun ω => ‖e 0 ω • X 0 ω‖) * (fun ω => ‖X 0 ω‖ ^ 2)) μ :=
+    hscore.integrable_mul hrow
+  convert hprod using 1
+  ext ω
+  simp [Pi.mul_apply, norm_smul, Real.norm_eq_abs]
+  ring
 
 /-- IID joint observations imply pairwise independence of the regressor outer
 products used by the least-squares consistency package. -/
@@ -633,7 +672,8 @@ theorem toFeasibleHCMomentWLLNConditions
   e_aestronglyMeasurable := h.e_aestronglyMeasurable
   joint_pairwise_indep := joint_pairwise_indep h
   joint_identDistrib := h.joint_identDistrib
-  absError_rowNorm_cubed_integrable := h.absError_rowNorm_cubed_integrable
+  absError_rowNorm_cubed_integrable :=
+    IidRobustFeasibleHCMomentConditions.absError_rowNorm_cubed_integrable h
   rowNorm_fourth_integrable := h.rowNorm_fourth_integrable
 
 /-- The iid joint-observation package discharges the combined robust feasible-HC
