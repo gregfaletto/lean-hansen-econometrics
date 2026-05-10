@@ -81,7 +81,13 @@ PSD theorem for that CR3-style estimator. It now names the CR3 cluster score
 score API, and includes both the deterministic conservativeness bridge
 `olsClusteredCR3VarianceEstimator_conservative_of_middle` and the conditional lift
 `condExp_olsClusteredCR3VarianceEstimator_conservative_of_middle`: middle-matrix PSD dominance
-implies sandwich-level PSD dominance. The multi-observation cluster block layer now also has the
+implies sandwich-level PSD dominance. The block monotonicity lemmas
+`clusterCovarianceMiddle_mono_posSemidef` and
+`olsClusterConditionalVarianceMatrix_mono_posSemidef` now reduce middle/sandwich dominance to
+clusterwise block dominance, and
+`condExp_olsClusteredCR3VarianceEstimator_conservative_of_block_middle` specializes the CR3
+conditional conservativeness lift to conditional CR3 middle blocks `Γ_g` that dominate `Σ_g`.
+The multi-observation cluster block layer now also has the
 finite partition identity `clusterIndex_sum_eq_sum`, entrywise Gram/cross-product rewrites, cluster
 Gram and cross-product decompositions back to `Xᵀ * X` and `Xᵀ *ᵥ y`, the sandwich rewrite
 `olsClusteredVarianceEstimator_eq_clusterScore`, and the residual cluster-score identities
@@ -102,14 +108,14 @@ For the current pass we are intentionally not pushing Chapter 4 to applied-compl
 The following are explicitly deferred unless they become prerequisite later:
 - clustered covariance asymptotics beyond the finite covariance-middle/block and conditional-sandwich
   identities now proved
-- the raw CR3 middle-moment comparison needed to discharge the conditional conservativeness bridge
-  from primitive cluster error assumptions
+- the raw CR3 middle-moment identification needed to build the conditional CR3 block covariance
+  matrices `Γ_g` from primitive cluster error assumptions
 
 Reason: these are lower-priority extensions beyond the finite-sample estimator layer landed here.
 
 ## Immediate target
-If continuing Chapter 4, the next target is the CR3 middle-moment comparison under explicit cluster
-error assumptions, or a genuine clustered asymptotic consistency theorem beyond the finite
+If continuing Chapter 4, the next target is identifying the CR3 conditional block covariances
+`Γ_g` under explicit cluster error assumptions, or a genuine clustered asymptotic theorem beyond the finite
 conditional covariance API; otherwise continue to the remaining Chapter 6 and Chapter 7 asymptotic gaps.
 
 ## LaTeX / Lean Crosswalk
@@ -160,6 +166,8 @@ Conventions:
 - [hc_leverage_weight_ordering](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L150): on `0 ≤ h < 1`, the HC2 scalar leverage weight dominates HC0 and the HC3 scalar leverage weight dominates HC2.
 - [olsConditionalVarianceMatrix_diagonal_mono_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L164): monotone diagonal covariance weights induce a positive-semidefinite sandwich difference.
 - [olsSandwichMiddle_mono_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L195): middle-matrix PSD dominance is preserved by the OLS sandwich.
+- [clusterCovarianceMiddle_mono_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): clusterwise block PSD dominance is preserved by Hansen's clustered covariance middle matrix.
+- [olsClusterConditionalVarianceMatrix_mono_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): clusterwise block PSD dominance is preserved by the clustered OLS covariance sandwich.
 - [condExp_deterministic_sandwich_eq](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): entrywise conditional expectations for a random middle matrix lift through a deterministic sandwich.
 - [olsHuberWhiteVarianceEstimator_le_HC2_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L219): finite-sample HC2 dominates HC0 in PSD order on the nonsaturated leverage range.
 - [olsHuberWhiteHC2VarianceEstimator_le_HC3_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L240): finite-sample HC3 dominates HC2 in PSD order on the nonsaturated leverage range.
@@ -185,6 +193,7 @@ Conventions:
 - [olsClusteredCR3VarianceEstimator_conservative_of_middle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L803): middle-matrix dominance implies CR3 sandwich conservativeness.
 - [condExp_olsClusteredCR3VarianceEstimator_eq_sandwich_of_middle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): conditional expected CR3 sandwich from a conditional expected CR3 middle matrix.
 - [condExp_olsClusteredCR3VarianceEstimator_conservative_of_middle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): conditional expected CR3 sandwich conservativeness from conditional expected CR3 middle dominance over Hansen's clustered covariance middle.
+- [condExp_olsClusteredCR3VarianceEstimator_conservative_of_block_middle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): conditional CR3 conservativeness from blockwise dominance of conditional CR3 middle blocks `Γ_g` over target blocks `Σ_g`.
 - [olsClusteredCR3VarianceEstimator_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L827): CR3-style clustered covariance estimator is PSD.
 - [clusterIndex_sum_eq_sum](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L389): finite cluster partition identity for sums over observations.
 - [sum_clusterGramContribution_eq_gram](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L478): cluster Gram blocks add to `Xᵀ * X`.
@@ -206,5 +215,5 @@ Conventions:
 - Chapter 4 has strong deterministic and conditional-expectation coverage already, so this file is
   mostly a map from Hansen's notation into the matrix-valued Lean API.
 - The remaining covariance-estimator gaps are clustered asymptotics beyond these finite block
-  identities and the raw CR3 middle-moment comparison needed to feed the conditional
-  conservativeness lift.
+  identities and the raw CR3 middle-moment identification needed to construct the conditional
+  CR3 block covariances `Γ_g` from primitive cluster error assumptions.

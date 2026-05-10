@@ -201,11 +201,15 @@ $k<n$ and $G>1$.  The CR3-style leave-cluster-out layer now has
 \lean{olsClusteredCR3VarianceEstimator_conservative_of_middle},
 \lean{condExp_deterministic_sandwich_eq},
 \lean{condExp_olsClusteredCR3VarianceEstimator_eq_sandwich_of_middle},
-\lean{condExp_olsClusteredCR3VarianceEstimator_conservative_of_middle}, and
+\lean{condExp_olsClusteredCR3VarianceEstimator_conservative_of_middle},
+\lean{condExp_olsClusteredCR3VarianceEstimator_conservative_of_block_middle}, and
 \lean{olsClusteredCR3VarianceEstimator_posSemidef}, covering the deterministic
 equations (4.52), (4.53), and (4.54) at the estimator-definition/named-score/PSD
 level and reducing deterministic and conditional CR3 conservativeness to
-middle-matrix PSD dominance.  This
+middle-matrix PSD dominance.  The block monotonicity lemmas
+\lean{clusterCovarianceMiddle_mono_posSemidef} and
+\lean{olsClusterConditionalVarianceMatrix_mono_posSemidef} reduce that dominance
+to clusterwise block dominance.  This
 tightens the finite-sample Gauss--Markov and covariance-estimator proof layer.
 The cluster-block layer now also proves the finite partition identity
 \lean{clusterIndex_sum_eq_sum}, the Gram and cross-product decompositions
@@ -586,8 +590,8 @@ remaining gaps are:
 Area & Remaining work \\
 \midrule
 Chapter 4 & Clustered covariance asymptotics beyond the finite cluster-block
-identities; raw CR3 middle-moment comparison needed to feed the conditional
-conservativeness lift from primitive cluster error assumptions. \\
+identities; raw CR3 middle-moment identification needed to construct the
+conditional CR3 block covariances from primitive cluster error assumptions. \\
 Chapter 5 & Exact random-design Kinal theorem 5.5 inverse-Gram moment threshold. \\
 Chapter 6 & Scalar triangular-array Lindeberg/Lyapunov sufficient-condition
 probability-engine discharge for Theorems 6.4 and 6.5 beyond the deterministic

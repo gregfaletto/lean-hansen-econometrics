@@ -467,6 +467,43 @@ theorem clusterCovarianceMiddle_posSemidef
     (hSigma g) (clusterDesign X cluster g)
   simpa [Matrix.conjTranspose_eq_transpose_of_trivial, Matrix.mul_assoc] using hpsd
 
+omit [Fintype k] [DecidableEq k] in
+/-- Blockwise positive-semidefinite dominance of cluster covariance blocks is
+preserved by Hansen's clustered covariance middle matrix. -/
+theorem clusterCovarianceMiddle_mono_posSemidef
+    [Finite k]
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (cluster : n → G)
+    (Sigma₁ Sigma₂ :
+      ∀ g, Matrix (ClusterIndex cluster g) (ClusterIndex cluster g) ℝ)
+    (hSigma : ∀ g, (Sigma₂ g - Sigma₁ g).PosSemidef) :
+    (clusterCovarianceMiddle X cluster Sigma₂ -
+      clusterCovarianceMiddle X cluster Sigma₁).PosSemidef := by
+  have hmiddle :
+      (∑ g, (clusterDesign X cluster g)ᵀ * (Sigma₂ g - Sigma₁ g) *
+        clusterDesign X cluster g).PosSemidef := by
+    refine Finset.sum_induction
+      (fun g => (clusterDesign X cluster g)ᵀ * (Sigma₂ g - Sigma₁ g) *
+        clusterDesign X cluster g)
+      (fun M : Matrix k k ℝ => M.PosSemidef)
+      (fun _ _ hA hB => Matrix.PosSemidef.add hA hB)
+      Matrix.PosSemidef.zero
+      ?_
+    intro g _
+    have hpsd := Matrix.PosSemidef.conjTranspose_mul_mul_same
+      (hSigma g) (clusterDesign X cluster g)
+    simpa [Matrix.conjTranspose_eq_transpose_of_trivial, Matrix.mul_assoc] using hpsd
+  have hdiff :
+      clusterCovarianceMiddle X cluster Sigma₂ -
+        clusterCovarianceMiddle X cluster Sigma₁ =
+        ∑ g, (clusterDesign X cluster g)ᵀ * (Sigma₂ g - Sigma₁ g) *
+          clusterDesign X cluster g := by
+    rw [clusterCovarianceMiddle, clusterCovarianceMiddle, ← Finset.sum_sub_distrib]
+    refine Finset.sum_congr rfl ?_
+    intro g _
+    rw [← Matrix.sub_mul, ← Matrix.mul_sub]
+  simpa [hdiff] using hmiddle
+
 /-- Positive-semidefinite cluster covariance blocks give a positive-semidefinite
 clustered OLS covariance sandwich. -/
 theorem olsClusterConditionalVarianceMatrix_posSemidef
@@ -484,6 +521,24 @@ theorem olsClusterConditionalVarianceMatrix_posSemidef
   simpa [olsClusterConditionalVarianceMatrix,
     Matrix.conjTranspose_eq_transpose_of_trivial, hinvT, Matrix.mul_assoc]
     using hpsd
+
+/-- Blockwise positive-semidefinite dominance of cluster covariance blocks is
+preserved by the clustered OLS covariance sandwich. -/
+theorem olsClusterConditionalVarianceMatrix_mono_posSemidef
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (cluster : n → G)
+    (Sigma₁ Sigma₂ :
+      ∀ g, Matrix (ClusterIndex cluster g) (ClusterIndex cluster g) ℝ)
+    [Invertible (Xᵀ * X)]
+    (hSigma : ∀ g, (Sigma₂ g - Sigma₁ g).PosSemidef) :
+    (olsClusterConditionalVarianceMatrix X cluster Sigma₂ -
+      olsClusterConditionalVarianceMatrix X cluster Sigma₁).PosSemidef := by
+  simpa [olsClusterConditionalVarianceMatrix] using
+    olsSandwichMiddle_mono_posSemidef
+      (X := X)
+      (M₁ := clusterCovarianceMiddle X cluster Sigma₁)
+      (M₂ := clusterCovarianceMiddle X cluster Sigma₂)
+      (clusterCovarianceMiddle_mono_posSemidef X cluster Sigma₁ Sigma₂ hSigma)
 
 omit [Fintype k] [DecidableEq k] in
 /-- A block outer-product middle matrix can be rewritten as a sum of cluster
@@ -1607,6 +1662,35 @@ theorem condExp_olsClusteredCR3VarianceEstimator_conservative_of_middle
       (M₁ := clusterCovarianceMiddle X cluster Sigma)
       (M₂ := Mcr3)
       hmiddle
+
+/-- Conditional CR3 conservativeness from blockwise covariance dominance.
+
+If the conditional expected CR3 score middle is represented by cluster blocks
+`Γ_g`, and each `Γ_g` dominates Hansen's target block `Σ_g`, then the
+conditional expected CR3 sandwich dominates the clustered OLS covariance matrix. -/
+theorem condExp_olsClusteredCR3VarianceEstimator_conservative_of_block_middle
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : Ω → n → ℝ) (cluster : n → G)
+    (Sigma Gamma : ∀ g, Matrix (ClusterIndex cluster g) (ClusterIndex cluster g) ℝ)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    (hInv : ∀ g, Invertible (clusterLeaveOutAdjustmentMatrix X cluster g))
+    [IsProbabilityMeasure μ]
+    (hmiddle_int : ∀ a b : k,
+      Integrable (fun ω => clusterCR3ScoreMiddle X (y ω) cluster hInv a b) μ)
+    (hmiddle_cond : ∀ a b : k,
+      μ[(fun ω => clusterCR3ScoreMiddle X (y ω) cluster hInv a b) | m] =ᵐ[μ]
+        fun _ => clusterCovarianceMiddle X cluster Gamma a b)
+    (hGamma : ∀ g, (Gamma g - Sigma g).PosSemidef) :
+    ∀ᵐ ω ∂μ,
+      (Matrix.of (fun a b =>
+        μ[(fun ω => fun a b =>
+          olsClusteredCR3VarianceEstimator X (y ω) cluster hInv a b) | m] ω a b) -
+        olsClusterConditionalVarianceMatrix X cluster Sigma).PosSemidef :=
+  condExp_olsClusteredCR3VarianceEstimator_conservative_of_middle
+    (μ := μ) (m := m) X y cluster Sigma hInv
+    (clusterCovarianceMiddle X cluster Gamma)
+    hmiddle_int hmiddle_cond
+    (clusterCovarianceMiddle_mono_posSemidef X cluster Sigma Gamma hGamma)
 
 /-- Private proof engine. Conditional expectation of the random quadratic form `e' M e`
 reduces to the deterministic double sum `∑ᵢⱼ Mᵢⱼ Dᵢⱼ` whenever the entrywise second-moment
