@@ -761,6 +761,26 @@ theorem sq_tail_indicator_le_even_moment_div_threshold
     rw [Set.indicator_of_notMem hxnot]
     exact div_nonneg (pow_nonneg (abs_nonneg x) _) (pow_nonneg hc.le m)
 
+/-- Expected-tail form of the even-moment Lyapunov bound. This is the scalar
+estimate used to turn a higher even moment into a Lindeberg tail bound once the
+array normalization supplies the threshold `c`. -/
+theorem integral_sq_tail_le_integral_even_moment_div_threshold
+    (μ : Measure Ω) (X : Ω → ℝ) (c : ℝ) (m : ℕ) (hc : 0 < c)
+    (h_tail : Integrable
+      (fun ω => Set.indicator {y : ℝ | c ≤ y ^ 2} (fun y => y ^ 2) (X ω)) μ)
+    (h_moment : Integrable (fun ω => |X ω| ^ (2 + 2 * m)) μ) :
+    ∫ ω, Set.indicator {y : ℝ | c ≤ y ^ 2} (fun y => y ^ 2) (X ω) ∂μ ≤
+      (∫ ω, |X ω| ^ (2 + 2 * m) ∂μ) / c ^ m := by
+  have h_rhs_int : Integrable (fun ω => |X ω| ^ (2 + 2 * m) / c ^ m) μ :=
+    h_moment.div_const (c ^ m)
+  have hmono :
+      (fun ω => Set.indicator {y : ℝ | c ≤ y ^ 2} (fun y => y ^ 2) (X ω)) ≤
+        fun ω => |X ω| ^ (2 + 2 * m) / c ^ m := by
+    intro ω
+    exact sq_tail_indicator_le_even_moment_div_threshold (X ω) c m hc
+  have hle := MeasureTheory.integral_mono h_tail h_rhs_int hmono
+  simpa [MeasureTheory.integral_div] using hle
+
 /-- Projection-level sufficient condition package for Hansen's multivariate
 Lindeberg CLT.
 

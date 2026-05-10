@@ -270,9 +270,10 @@ Lindeberg triangular-array CLTs:
 endpoints.  The scalar Lyapunov-to-Lindeberg algebra now includes
 \lean{sq_le_even_moment_div_threshold} and
 \lean{sq_tail_indicator_le_even_moment_div_threshold}, which bound the scalar
-Lindeberg tail summand by an even higher moment over the threshold power; the
-remaining scalar triangular-array probability engine remains outside this
-branch.
+Lindeberg tail summand by an even higher moment over the threshold power, plus
+\lean{integral_sq_tail_le_integral_even_moment_div_threshold}, which lifts that
+bound to expectations.  The remaining scalar triangular-array probability
+engine remains outside this branch.
 
 \subsection{Delta Method}
 
@@ -563,8 +564,8 @@ conservativeness theorem. \\
 Chapter 5 & Exact random-design Kinal theorem 5.5 inverse-Gram moment threshold. \\
 Chapter 6 & Scalar triangular-array Lindeberg/Lyapunov sufficient-condition
 probability-engine discharge for Theorems 6.4 and 6.5 beyond the deterministic
-even-moment tail inequality; arbitrary-unbiased-estimator lower bound for
-Theorem 6.11. \\
+and expected even-moment tail inequalities; arbitrary-unbiased-estimator lower
+bound for Theorem 6.11. \\
 Chapter 7 & Further tightening of the remaining public condition packages to the
 literal textbook iid/moment assumptions; concrete high-moment cumulant
 expansion for Theorem 7.15. \\
