@@ -560,6 +560,11 @@ def clusterResponse {G : Type*} (y : n → ℝ) (cluster : n → G) (g : G) :
     ClusterIndex cluster g → ℝ :=
   fun i => y i
 
+/-- Cluster-level model error block `e_g`. -/
+def clusterError {G : Type*} (e : n → ℝ) (cluster : n → G) (g : G) :
+    ClusterIndex cluster g → ℝ :=
+  fun i => e i
+
 /-- Cluster contribution `X_g'X_g` to the full Gram matrix. -/
 noncomputable def clusterGramContribution
     {G : Type*} [DecidableEq G] (X : Matrix n k ℝ) (cluster : n → G) (g : G) :
@@ -571,6 +576,12 @@ noncomputable def clusterCrossContribution
     {G : Type*} [DecidableEq G] (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G) (g : G) :
     k → ℝ :=
   (clusterDesign X cluster g)ᵀ *ᵥ clusterResponse y cluster g
+
+/-- Cluster score `X_g'e_g` for the true model errors. -/
+noncomputable def clusterErrorScore
+    {G : Type*} [DecidableEq G] (X : Matrix n k ℝ) (e : n → ℝ) (cluster : n → G)
+    (g : G) : k → ℝ :=
+  (clusterDesign X cluster g)ᵀ *ᵥ clusterError e cluster g
 
 omit [Fintype k] [DecidableEq k] in
 /-- Entrywise form of the cluster Gram contribution. -/
@@ -589,6 +600,15 @@ theorem clusterCrossContribution_apply
     clusterCrossContribution X y cluster g a =
       ∑ i : ClusterIndex cluster g, X i.1 a * y i.1 := by
   simp [clusterCrossContribution, clusterDesign, clusterResponse, Matrix.mulVec, dotProduct]
+
+omit [Fintype k] [DecidableEq k] in
+/-- Entrywise form of the true-error cluster score. -/
+theorem clusterErrorScore_apply
+    {G : Type*} [DecidableEq G] (X : Matrix n k ℝ) (e : n → ℝ) (cluster : n → G)
+    (g : G) (a : k) :
+    clusterErrorScore X e cluster g a =
+      ∑ i : ClusterIndex cluster g, X i.1 a * e i.1 := by
+  simp [clusterErrorScore, clusterDesign, clusterError, Matrix.mulVec, dotProduct]
 
 omit [Fintype k] [DecidableEq k] in
 /-- The cluster Gram contributions add back to the full Gram matrix `X'X`. -/
@@ -628,6 +648,51 @@ theorem sum_clusterCrossContribution_eq_cross
               (f := fun i => X i a * y i))
     _ = (Xᵀ *ᵥ y) a := by
           simp [Matrix.mulVec, dotProduct, Matrix.transpose_apply]
+
+omit [Fintype k] [DecidableEq k] in
+/-- The true-error cluster scores add back to `X'e`. -/
+theorem sum_clusterErrorScore_eq_transpose_mulVec_error
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (e : n → ℝ) (cluster : n → G) :
+    (∑ g, clusterErrorScore X e cluster g) = Xᵀ *ᵥ e := by
+  ext a
+  calc
+    (∑ g, clusterErrorScore X e cluster g) a =
+        ∑ g, ∑ i : ClusterIndex cluster g, X i.1 a * e i.1 := by
+          simp [clusterErrorScore_apply, Finset.sum_apply]
+    _ = ∑ i, X i a * e i := by
+          simpa using
+            (clusterIndex_sum_eq_sum (cluster := cluster)
+              (f := fun i => X i a * e i))
+    _ = (Xᵀ *ᵥ e) a := by
+          simp [Matrix.mulVec, dotProduct, Matrix.transpose_apply]
+
+/-- Hansen clustered OLS decomposition:
+`β_hat - β = (X'X)^{-1} ∑_g X_g'e_g`. -/
+theorem olsBeta_linear_decomposition_clusterScores
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (β : k → ℝ) (e : n → ℝ) (cluster : n → G)
+    [Invertible (Xᵀ * X)] :
+    olsBeta X (X *ᵥ β + e) =
+      β + ⅟ (Xᵀ * X) *ᵥ (∑ g, clusterErrorScore X e cluster g) := by
+  rw [olsBeta_linear_decomposition]
+  rw [sum_clusterErrorScore_eq_transpose_mulVec_error]
+
+omit [Fintype k] [DecidableEq k] in
+/-- The infeasible true-error block outer-product middle matrix is the same
+object as the true-error cluster-score middle matrix. -/
+theorem clusterCovarianceMiddle_errorOuter_eq_clusterErrorScoreMiddle
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (e : n → ℝ) (cluster : n → G) :
+    clusterCovarianceMiddle X cluster
+        (fun g => Matrix.vecMulVec (clusterError e cluster g)
+          (clusterError e cluster g)) =
+      ∑ g, Matrix.vecMulVec (clusterErrorScore X e cluster g)
+        (clusterErrorScore X e cluster g) := by
+  simpa [clusterErrorScore] using
+    (clusterCovarianceMiddle_outer_eq_scoreMiddle
+      (X := X) (cluster := cluster)
+      (u := fun g => clusterError e cluster g))
 
 /-- Cluster score `X_g' \hat e_g` for the full-sample OLS residuals. -/
 noncomputable def clusterScore
