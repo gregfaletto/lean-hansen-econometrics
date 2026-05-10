@@ -397,6 +397,123 @@ def clusterDesign {G : Type*} (X : Matrix n k ℝ) (cluster : n → G) (g : G) :
     Matrix (ClusterIndex cluster g) k ℝ :=
   X.submatrix Subtype.val id
 
+/-- Hansen equation (4.46): the clustered score covariance middle matrix
+`Ωₙ = ∑_g X_g' Σ_g X_g`.  The cluster covariance block `Σ_g` is indexed by the
+rows belonging to cluster `g`, so the statement supports unequal cluster sizes. -/
+noncomputable def clusterCovarianceMiddle
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (cluster : n → G)
+    (Sigma : ∀ g, Matrix (ClusterIndex cluster g) (ClusterIndex cluster g) ℝ) :
+    Matrix k k ℝ :=
+  ∑ g, (clusterDesign X cluster g)ᵀ * Sigma g * clusterDesign X cluster g
+
+/-- Hansen equation (4.47): clustered conditional covariance matrix of the OLS
+coefficient, using the clustered middle matrix from equation (4.46). -/
+noncomputable def olsClusterConditionalVarianceMatrix
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (cluster : n → G)
+    (Sigma : ∀ g, Matrix (ClusterIndex cluster g) (ClusterIndex cluster g) ℝ)
+    [Invertible (Xᵀ * X)] : Matrix k k ℝ :=
+  ⅟ (Xᵀ * X) * clusterCovarianceMiddle X cluster Sigma * ⅟ (Xᵀ * X)
+
+omit [Fintype k] [DecidableEq k] in
+/-- Entrywise form of the clustered covariance middle matrix. -/
+theorem clusterCovarianceMiddle_apply
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (cluster : n → G)
+    (Sigma : ∀ g, Matrix (ClusterIndex cluster g) (ClusterIndex cluster g) ℝ)
+    (a b : k) :
+    clusterCovarianceMiddle X cluster Sigma a b =
+      ∑ g, ∑ i, ∑ j, X i.1 a * (X j.1 b * Sigma g i j) := by
+  rw [clusterCovarianceMiddle, Matrix.sum_apply]
+  refine Finset.sum_congr rfl ?_
+  intro g _
+  calc
+    ((clusterDesign X cluster g)ᵀ * Sigma g * clusterDesign X cluster g) a b =
+        ∑ j, (∑ i, X i.1 a * Sigma g i j) * X j.1 b := by
+          simp [clusterDesign, Matrix.mul_apply]
+    _ = ∑ j, ∑ i, X i.1 a * Sigma g i j * X j.1 b := by
+          refine Finset.sum_congr rfl ?_
+          intro j _
+          rw [Finset.sum_mul]
+    _ = ∑ i, ∑ j, X i.1 a * Sigma g i j * X j.1 b := by
+          rw [Finset.sum_comm]
+    _ = ∑ i, ∑ j, X i.1 a * (X j.1 b * Sigma g i j) := by
+          refine Finset.sum_congr rfl ?_
+          intro i _
+          refine Finset.sum_congr rfl ?_
+          intro j _
+          ring
+
+omit [Fintype k] [DecidableEq k] in
+/-- Positive-semidefinite cluster covariance blocks give a positive-semidefinite
+clustered covariance middle matrix. -/
+theorem clusterCovarianceMiddle_posSemidef
+    [Finite k]
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (cluster : n → G)
+    (Sigma : ∀ g, Matrix (ClusterIndex cluster g) (ClusterIndex cluster g) ℝ)
+    (hSigma : ∀ g, (Sigma g).PosSemidef) :
+    (clusterCovarianceMiddle X cluster Sigma).PosSemidef := by
+  unfold clusterCovarianceMiddle
+  refine Finset.sum_induction
+    (fun g => (clusterDesign X cluster g)ᵀ * Sigma g * clusterDesign X cluster g)
+    (fun M : Matrix k k ℝ => M.PosSemidef)
+    (fun _ _ hA hB => Matrix.PosSemidef.add hA hB)
+    Matrix.PosSemidef.zero
+    ?_
+  intro g _
+  have hpsd := Matrix.PosSemidef.conjTranspose_mul_mul_same
+    (hSigma g) (clusterDesign X cluster g)
+  simpa [Matrix.conjTranspose_eq_transpose_of_trivial, Matrix.mul_assoc] using hpsd
+
+/-- Positive-semidefinite cluster covariance blocks give a positive-semidefinite
+clustered OLS covariance sandwich. -/
+theorem olsClusterConditionalVarianceMatrix_posSemidef
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (cluster : n → G)
+    (Sigma : ∀ g, Matrix (ClusterIndex cluster g) (ClusterIndex cluster g) ℝ)
+    [Invertible (Xᵀ * X)]
+    (hSigma : ∀ g, (Sigma g).PosSemidef) :
+    (olsClusterConditionalVarianceMatrix X cluster Sigma).PosSemidef := by
+  have hmiddle := clusterCovarianceMiddle_posSemidef X cluster Sigma hSigma
+  have hpsd := Matrix.PosSemidef.conjTranspose_mul_mul_same
+    hmiddle (⅟ (Xᵀ * X))
+  have hinvT : ((Xᵀ * X)⁻¹)ᵀ = (Xᵀ * X)⁻¹ := by
+    rw [Matrix.transpose_nonsing_inv, gram_transpose]
+  simpa [olsClusterConditionalVarianceMatrix,
+    Matrix.conjTranspose_eq_transpose_of_trivial, hinvT, Matrix.mul_assoc]
+    using hpsd
+
+omit [Fintype k] [DecidableEq k] in
+/-- A block outer-product middle matrix can be rewritten as a sum of cluster
+score outer products.  This is the deterministic algebra behind the three
+equivalent expressions in Hansen equation (4.49). -/
+theorem clusterCovarianceMiddle_outer_eq_scoreMiddle
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (cluster : n → G)
+    (u : ∀ g, ClusterIndex cluster g → ℝ) :
+    clusterCovarianceMiddle X cluster (fun g => Matrix.vecMulVec (u g) (u g)) =
+      ∑ g, Matrix.vecMulVec ((clusterDesign X cluster g)ᵀ *ᵥ u g)
+        ((clusterDesign X cluster g)ᵀ *ᵥ u g) := by
+  unfold clusterCovarianceMiddle
+  refine Finset.sum_congr rfl ?_
+  intro g _
+  let C : Matrix (ClusterIndex cluster g) k ℝ := clusterDesign X cluster g
+  have hvec : (u g) ᵥ* C = Cᵀ *ᵥ u g := by
+    exact (Matrix.mulVec_transpose C (u g)).symm
+  calc
+    (clusterDesign X cluster g)ᵀ * Matrix.vecMulVec (u g) (u g) *
+        clusterDesign X cluster g =
+        Cᵀ * Matrix.vecMulVec (u g) (u g) * C := rfl
+    _ = Matrix.vecMulVec (Cᵀ *ᵥ u g) (u g) * C := by
+          rw [Matrix.mul_vecMulVec]
+    _ = Matrix.vecMulVec (Cᵀ *ᵥ u g) ((u g) ᵥ* C) := by
+          rw [Matrix.vecMulVec_mul]
+    _ = Matrix.vecMulVec ((clusterDesign X cluster g)ᵀ *ᵥ u g)
+          ((clusterDesign X cluster g)ᵀ *ᵥ u g) := by
+          rw [hvec]
+
 /-- Cluster-level full-sample OLS residual block `e_hat_g`. -/
 noncomputable def clusterResidual
     {G : Type*} (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G) (g : G)
@@ -599,6 +716,37 @@ theorem sum_clusterScore_eq_zero
   rw [sum_clusterScore_eq_transpose_mulVec_residual]
   exact normal_equations X y
 
+/-- The residual block outer-product middle matrix is the same object as the
+cluster-score middle matrix in the Arellano estimator. -/
+theorem clusterCovarianceMiddle_residualOuter_eq_clusterScoreMiddle
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G)
+    [Invertible (Xᵀ * X)] :
+    clusterCovarianceMiddle X cluster
+        (fun g => Matrix.vecMulVec (clusterResidual X y cluster g)
+          (clusterResidual X y cluster g)) =
+      ∑ g, Matrix.vecMulVec (clusterScore X y cluster g)
+        (clusterScore X y cluster g) := by
+  simpa [clusterScore] using
+    (clusterCovarianceMiddle_outer_eq_scoreMiddle
+      (X := X) (cluster := cluster)
+      (u := fun g => clusterResidual X y cluster g))
+
+/-- Hansen equation (4.50) with the residual block outer-product expression
+for `Ω_hat_n`. -/
+theorem olsClusteredVarianceEstimator_eq_clusterCovarianceMiddle_residualOuter
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G)
+    [DecidableEq n] [Invertible (Xᵀ * X)] :
+    olsClusteredVarianceEstimator X y cluster =
+      ⅟ (Xᵀ * X) *
+        clusterCovarianceMiddle X cluster
+          (fun g => Matrix.vecMulVec (clusterResidual X y cluster g)
+            (clusterResidual X y cluster g)) *
+        ⅟ (Xᵀ * X) := by
+  rw [olsClusteredVarianceEstimator_eq_clusterScore]
+  rw [clusterCovarianceMiddle_residualOuter_eq_clusterScoreMiddle]
+
 /-- Reduced Gram matrix after removing cluster `g`, written as
 `X'X - X_g'X_g`. -/
 noncomputable def clusterLeaveOutGram
@@ -796,6 +944,47 @@ theorem olsClusteredCR3VarianceEstimator_eq_clusterCR3Score
     ext a
     exact (clusterCR3Score_apply X y cluster g a).symm
   simp [hscore]
+
+/-- The CR3 block outer-product middle matrix is the same object as the
+CR3 cluster-score middle matrix. -/
+theorem clusterCovarianceMiddle_cr3Outer_eq_clusterCR3ScoreMiddle
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    (hInv : ∀ g, Invertible (clusterLeaveOutAdjustmentMatrix X cluster g)) :
+    clusterCovarianceMiddle X cluster
+        (fun g =>
+          letI : Invertible (clusterLeaveOutAdjustmentMatrix X cluster g) := hInv g
+          Matrix.vecMulVec (clusterCR3Residual X y cluster g)
+            (clusterCR3Residual X y cluster g)) =
+      ∑ g,
+        letI : Invertible (clusterLeaveOutAdjustmentMatrix X cluster g) := hInv g
+        Matrix.vecMulVec (clusterCR3Score X y cluster g)
+          (clusterCR3Score X y cluster g) := by
+  simpa [clusterCR3Score] using
+    (clusterCovarianceMiddle_outer_eq_scoreMiddle
+      (X := X) (cluster := cluster)
+      (u := fun g =>
+        letI : Invertible (clusterLeaveOutAdjustmentMatrix X cluster g) := hInv g
+        clusterCR3Residual X y cluster g))
+
+/-- Hansen equation (4.54) with the CR3 residual block outer-product expression
+for the clustered middle matrix. -/
+theorem olsClusteredCR3VarianceEstimator_eq_clusterCovarianceMiddle_cr3Outer
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    (hInv : ∀ g, Invertible (clusterLeaveOutAdjustmentMatrix X cluster g)) :
+    olsClusteredCR3VarianceEstimator X y cluster hInv =
+      ⅟ (Xᵀ * X) *
+        clusterCovarianceMiddle X cluster
+          (fun g =>
+            letI : Invertible (clusterLeaveOutAdjustmentMatrix X cluster g) := hInv g
+            Matrix.vecMulVec (clusterCR3Residual X y cluster g)
+              (clusterCR3Residual X y cluster g)) *
+        ⅟ (Xᵀ * X) := by
+  rw [olsClusteredCR3VarianceEstimator_eq_clusterCR3Score]
+  rw [clusterCovarianceMiddle_cr3Outer_eq_clusterCR3ScoreMiddle]
 
 /-- CR3 conservativeness bridge. If the CR3 cluster-score middle matrix
 dominates a target middle matrix in positive-semidefinite order, then the full

@@ -207,6 +207,13 @@ The cluster-block layer now also proves the finite partition identity
 \lean{sum_clusterCrossContribution_eq_cross}, the named-score sandwich rewrite
 \lean{olsClusteredVarianceEstimator_eq_clusterScore}, and the residual
 cluster-score normal-equation consequence \lean{sum_clusterScore_eq_zero}.
+It also names Hansen's clustered covariance middle and sandwich formulas through
+\lean{clusterCovarianceMiddle} and
+\lean{olsClusterConditionalVarianceMatrix}, proves PSD inheritance from PSD
+cluster covariance blocks, and records the block outer-product/score-middle
+bridges \lean{clusterCovarianceMiddle_outer_eq_scoreMiddle},
+\lean{olsClusteredVarianceEstimator_eq_clusterCovarianceMiddle_residualOuter},
+and \lean{olsClusteredCR3VarianceEstimator_eq_clusterCovarianceMiddle_cr3Outer}.
 
 \section{Chapter 5: Normal-Regression Moment Face}
 
