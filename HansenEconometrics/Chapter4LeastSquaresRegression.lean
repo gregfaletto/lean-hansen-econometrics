@@ -984,6 +984,18 @@ noncomputable def olsClusteredCR3VarianceEstimator
     (∑ g, Matrix.vecMulVec (s g) (s g)) *
     ⅟ (Xᵀ * X)
 
+/-- CR3 cluster-score middle matrix, `∑_g (X_g' \tilde e_g)(X_g' \tilde e_g)'`. -/
+noncomputable def clusterCR3ScoreMiddle
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    (hInv : ∀ g, Invertible (clusterLeaveOutAdjustmentMatrix X cluster g)) :
+    Matrix k k ℝ :=
+  ∑ g,
+    letI : Invertible (clusterLeaveOutAdjustmentMatrix X cluster g) := hInv g
+    Matrix.vecMulVec (clusterCR3Score X y cluster g)
+      (clusterCR3Score X y cluster g)
+
 /-- The CR3 clustered sandwich written with the named CR3 cluster-score API. -/
 theorem olsClusteredCR3VarianceEstimator_eq_clusterCR3Score
     {G : Type*} [Fintype G] [DecidableEq G]
@@ -1009,6 +1021,17 @@ theorem olsClusteredCR3VarianceEstimator_eq_clusterCR3Score
     ext a
     exact (clusterCR3Score_apply X y cluster g a).symm
   simp [hscore]
+
+/-- The CR3 clustered sandwich written through the named CR3 score-middle matrix. -/
+theorem olsClusteredCR3VarianceEstimator_eq_clusterCR3ScoreMiddle
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    (hInv : ∀ g, Invertible (clusterLeaveOutAdjustmentMatrix X cluster g)) :
+    olsClusteredCR3VarianceEstimator X y cluster hInv =
+      ⅟ (Xᵀ * X) * clusterCR3ScoreMiddle X y cluster hInv * ⅟ (Xᵀ * X) := by
+  simpa [clusterCR3ScoreMiddle] using
+    olsClusteredCR3VarianceEstimator_eq_clusterCR3Score X y cluster hInv
 
 /-- The CR3 block outer-product middle matrix is the same object as the
 CR3 cluster-score middle matrix. -/
@@ -1346,6 +1369,244 @@ open MeasureTheory
 
 variable {Ω : Type*}
 variable {m m₀ : MeasurableSpace Ω} {μ : Measure Ω}
+
+omit [DecidableEq k] in
+/-- Conditional expectation commutes with a deterministic matrix sandwich.
+
+If every entry of the random middle matrix has conditional expectation equal to
+the corresponding entry of `M₀`, then the deterministic sandwich `A M A` has
+conditional expectation `A M₀ A`. -/
+theorem condExp_deterministic_sandwich_eq
+    (A : Matrix k k ℝ) (M : Ω → Matrix k k ℝ) (M₀ : Matrix k k ℝ)
+    [IsProbabilityMeasure μ]
+    (hM_int : ∀ c d : k, Integrable (fun ω => M ω c d) μ)
+    (hM_cond : ∀ c d : k,
+      μ[(fun ω => M ω c d) | m] =ᵐ[μ] fun _ => M₀ c d) :
+    μ[(fun ω => fun a b => (A * M ω * A) a b) | m] =ᵐ[μ]
+      fun _ a b => (A * M₀ * A) a b := by
+  let f : Ω → k → k → ℝ := fun ω a b => (A * M ω * A) a b
+  have hentry : ∀ (ω : Ω) (a b : k),
+      f ω a b = ∑ c, ∑ d, (A a c * A d b) * M ω c d := by
+    intro ω a b
+    calc
+      f ω a b =
+          ∑ d, (∑ c, A a c * M ω c d) * A d b := by
+            simp [f, Matrix.mul_apply]
+      _ = ∑ d, ∑ c, (A a c * M ω c d) * A d b := by
+            refine Finset.sum_congr rfl ?_
+            intro d _
+            rw [Finset.sum_mul]
+      _ = ∑ c, ∑ d, (A a c * M ω c d) * A d b := by
+            rw [Finset.sum_comm]
+      _ = ∑ c, ∑ d, (A a c * A d b) * M ω c d := by
+            refine Finset.sum_congr rfl ?_
+            intro c _
+            refine Finset.sum_congr rfl ?_
+            intro d _
+            ring
+  have htarget_entry : ∀ a b : k,
+      (A * M₀ * A) a b = ∑ c, ∑ d, (A a c * A d b) * M₀ c d := by
+    intro a b
+    calc
+      (A * M₀ * A) a b =
+          ∑ d, (∑ c, A a c * M₀ c d) * A d b := by
+            simp [Matrix.mul_apply]
+      _ = ∑ d, ∑ c, (A a c * M₀ c d) * A d b := by
+            refine Finset.sum_congr rfl ?_
+            intro d _
+            rw [Finset.sum_mul]
+      _ = ∑ c, ∑ d, (A a c * M₀ c d) * A d b := by
+            rw [Finset.sum_comm]
+      _ = ∑ c, ∑ d, (A a c * A d b) * M₀ c d := by
+            refine Finset.sum_congr rfl ?_
+            intro c _
+            refine Finset.sum_congr rfl ?_
+            intro d _
+            ring
+  have hf_int : Integrable f μ := by
+    refine Integrable.of_eval ?_
+    intro a
+    refine Integrable.of_eval ?_
+    intro b
+    have hrepr :
+        (fun ω => f ω a b) =
+          fun ω => ∑ c, ∑ d, (A a c * A d b) * M ω c d := by
+      funext ω
+      exact hentry ω a b
+    rw [hrepr]
+    exact MeasureTheory.integrable_finset_sum (s := Finset.univ)
+      (f := fun c ω => ∑ d, (A a c * A d b) * M ω c d)
+      (fun c _ =>
+        MeasureTheory.integrable_finset_sum (s := Finset.univ)
+          (f := fun d ω => (A a c * A d b) * M ω c d)
+          (fun d _ => (hM_int c d).const_mul (A a c * A d b)))
+  rw [Filter.EventuallyEq]
+  change ∀ᵐ ω ∂μ, μ[f | m] ω = fun a b => (A * M₀ * A) a b
+  have hcoord : ∀ a b : k, ∀ᵐ ω ∂μ,
+      μ[f | m] ω a b = (A * M₀ * A) a b := by
+    intro a b
+    have hrepr :
+        (fun ω => f ω a b) =
+          fun ω => ∑ c, ∑ d, (A a c * A d b) * M ω c d := by
+      funext ω
+      exact hentry ω a b
+    have hsum :
+        μ[(fun ω => f ω a b) | m] =ᵐ[μ]
+          fun _ => (A * M₀ * A) a b := by
+      rw [hrepr]
+      have houter :
+          μ[(fun ω => ∑ c, ∑ d, (A a c * A d b) * M ω c d) | m] =ᵐ[μ]
+            ∑ c, μ[(fun ω => ∑ d, (A a c * A d b) * M ω c d) | m] := by
+        have hsum_repr :
+            (fun ω => ∑ c, ∑ d, (A a c * A d b) * M ω c d) =
+              ∑ c, fun ω => ∑ d, (A a c * A d b) * M ω c d := by
+          funext ω
+          simp
+        rw [hsum_repr]
+        simpa using MeasureTheory.condExp_finset_sum (μ := μ) (m := m)
+          (s := Finset.univ)
+          (f := fun c ω => ∑ d, (A a c * A d b) * M ω c d)
+          (fun c _ =>
+            MeasureTheory.integrable_finset_sum (s := Finset.univ)
+              (f := fun d ω => (A a c * A d b) * M ω c d)
+              (fun d _ => (hM_int c d).const_mul (A a c * A d b)))
+      have hinner : ∀ c,
+          μ[(fun ω => ∑ d, (A a c * A d b) * M ω c d) | m] =ᵐ[μ]
+            fun _ => ∑ d, (A a c * A d b) * M₀ c d := by
+        intro c
+        have hinner_sum :
+            μ[(fun ω => ∑ d, (A a c * A d b) * M ω c d) | m] =ᵐ[μ]
+              ∑ d, μ[(fun ω => (A a c * A d b) * M ω c d) | m] := by
+          have hsum_repr :
+              (fun ω => ∑ d, (A a c * A d b) * M ω c d) =
+                ∑ d, fun ω => (A a c * A d b) * M ω c d := by
+            funext ω
+            simp
+          rw [hsum_repr]
+          simpa using MeasureTheory.condExp_finset_sum (μ := μ) (m := m)
+            (s := Finset.univ)
+            (f := fun d ω => (A a c * A d b) * M ω c d)
+            (fun d _ => (hM_int c d).const_mul (A a c * A d b))
+        have hcoord_smul : ∀ d,
+            μ[(fun ω => (A a c * A d b) * M ω c d) | m] =ᵐ[μ]
+              fun _ => (A a c * A d b) * M₀ c d := by
+          intro d
+          refine (MeasureTheory.condExp_smul (μ := μ) (m := m)
+            (A a c * A d b) (fun ω => M ω c d)).trans ?_
+          filter_upwards [hM_cond c d] with ω hω
+          simp [Pi.smul_apply, smul_eq_mul, hω]
+        refine hinner_sum.trans ?_
+        have hall : ∀ᵐ ω ∂μ, ∀ d,
+            μ[(fun ω => (A a c * A d b) * M ω c d) | m] ω =
+              (A a c * A d b) * M₀ c d := by
+          exact ae_all_iff.2 fun d => hcoord_smul d
+        filter_upwards [hall] with ω hω
+        calc
+          ((∑ d, μ[(fun ω => (A a c * A d b) * M ω c d) | m]) : Ω → ℝ) ω =
+              ∑ d, μ[(fun ω => (A a c * A d b) * M ω c d) | m] ω := by
+                simp
+          _ = ∑ d, (A a c * A d b) * M₀ c d := by
+                exact Finset.sum_congr rfl fun d _ => hω d
+      refine houter.trans ?_
+      have hall : ∀ᵐ ω ∂μ, ∀ c,
+          μ[(fun ω => ∑ d, (A a c * A d b) * M ω c d) | m] ω =
+            ∑ d, (A a c * A d b) * M₀ c d := by
+        exact ae_all_iff.2 fun c => hinner c
+      filter_upwards [hall] with ω hω
+      calc
+        ((∑ c, μ[(fun ω => ∑ d, (A a c * A d b) * M ω c d) | m]) :
+            Ω → ℝ) ω =
+            ∑ c, μ[(fun ω => ∑ d, (A a c * A d b) * M ω c d) | m] ω := by
+              simp
+        _ = ∑ c, ∑ d, (A a c * A d b) * M₀ c d := by
+              exact Finset.sum_congr rfl fun c _ => hω c
+        _ = (A * M₀ * A) a b := by
+              exact (htarget_entry a b).symm
+    exact (condExp_apply_apply (m := m) (μ := μ) (f := f) hf_int a b).trans hsum
+  have hall : ∀ᵐ ω ∂μ, ∀ a b : k,
+      μ[f | m] ω a b = (A * M₀ * A) a b := by
+    exact ae_all_iff.2 fun a => ae_all_iff.2 fun b => hcoord a b
+  exact hall.mono fun ω hω => by
+    funext a b
+    exact hω a b
+
+/-- Conditional expectation of the CR3 clustered sandwich from a conditional
+expectation for its CR3 score-middle matrix. -/
+theorem condExp_olsClusteredCR3VarianceEstimator_eq_sandwich_of_middle
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : Ω → n → ℝ) (cluster : n → G)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    (hInv : ∀ g, Invertible (clusterLeaveOutAdjustmentMatrix X cluster g))
+    [IsProbabilityMeasure μ]
+    (Mcr3 : Matrix k k ℝ)
+    (hmiddle_int : ∀ a b : k,
+      Integrable (fun ω => clusterCR3ScoreMiddle X (y ω) cluster hInv a b) μ)
+    (hmiddle_cond : ∀ a b : k,
+      μ[(fun ω => clusterCR3ScoreMiddle X (y ω) cluster hInv a b) | m] =ᵐ[μ]
+        fun _ => Mcr3 a b) :
+    μ[(fun ω => fun a b =>
+      olsClusteredCR3VarianceEstimator X (y ω) cluster hInv a b) | m] =ᵐ[μ]
+      fun _ a b => (⅟ (Xᵀ * X) * Mcr3 * ⅟ (Xᵀ * X)) a b := by
+  let A : Matrix k k ℝ := ⅟ (Xᵀ * X)
+  let middle : Ω → Matrix k k ℝ := fun ω => clusterCR3ScoreMiddle X (y ω) cluster hInv
+  have hsandwich := condExp_deterministic_sandwich_eq
+    (μ := μ) (m := m) A middle Mcr3 hmiddle_int hmiddle_cond
+  have hleft :
+      (fun ω => fun a b =>
+        olsClusteredCR3VarianceEstimator X (y ω) cluster hInv a b) =
+        fun ω => fun a b => (A * middle ω * A) a b := by
+    funext ω a b
+    have h :=
+      olsClusteredCR3VarianceEstimator_eq_clusterCR3ScoreMiddle X (y ω) cluster hInv
+    simpa [A, middle] using congrFun (congrFun h a) b
+  rw [hleft]
+  simpa [A, middle]
+    using hsandwich
+
+/-- Conditional CR3 conservativeness bridge for the clustered covariance target.
+
+Once the conditional expected CR3 score middle dominates Hansen's clustered
+covariance middle, the conditional expected CR3 sandwich dominates the
+clustered OLS covariance matrix from equation (4.47). -/
+theorem condExp_olsClusteredCR3VarianceEstimator_conservative_of_middle
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : Ω → n → ℝ) (cluster : n → G)
+    (Sigma : ∀ g, Matrix (ClusterIndex cluster g) (ClusterIndex cluster g) ℝ)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    (hInv : ∀ g, Invertible (clusterLeaveOutAdjustmentMatrix X cluster g))
+    [IsProbabilityMeasure μ]
+    (Mcr3 : Matrix k k ℝ)
+    (hmiddle_int : ∀ a b : k,
+      Integrable (fun ω => clusterCR3ScoreMiddle X (y ω) cluster hInv a b) μ)
+    (hmiddle_cond : ∀ a b : k,
+      μ[(fun ω => clusterCR3ScoreMiddle X (y ω) cluster hInv a b) | m] =ᵐ[μ]
+        fun _ => Mcr3 a b)
+    (hmiddle :
+      (Mcr3 - clusterCovarianceMiddle X cluster Sigma).PosSemidef) :
+    ∀ᵐ ω ∂μ,
+      (Matrix.of (fun a b =>
+        μ[(fun ω => fun a b =>
+          olsClusteredCR3VarianceEstimator X (y ω) cluster hInv a b) | m] ω a b) -
+        olsClusterConditionalVarianceMatrix X cluster Sigma).PosSemidef := by
+  have hcond := condExp_olsClusteredCR3VarianceEstimator_eq_sandwich_of_middle
+    (μ := μ) (m := m) X y cluster hInv Mcr3 hmiddle_int hmiddle_cond
+  filter_upwards [hcond] with ω hω
+  have hmatrix :
+      Matrix.of (fun a b =>
+        μ[(fun ω => fun a b =>
+          olsClusteredCR3VarianceEstimator X (y ω) cluster hInv a b) | m] ω a b) =
+        ⅟ (Xᵀ * X) * Mcr3 * ⅟ (Xᵀ * X) := by
+    ext a b
+    exact congrFun (congrFun hω a) b
+  rw [hmatrix]
+  change ((⅟ (Xᵀ * X) * Mcr3 * ⅟ (Xᵀ * X)) -
+    olsClusterConditionalVarianceMatrix X cluster Sigma).PosSemidef
+  simpa [olsClusterConditionalVarianceMatrix] using
+    olsSandwichMiddle_mono_posSemidef
+      (X := X)
+      (M₁ := clusterCovarianceMiddle X cluster Sigma)
+      (M₂ := Mcr3)
+      hmiddle
 
 /-- Private proof engine. Conditional expectation of the random quadratic form `e' M e`
 reduces to the deterministic double sum `∑ᵢⱼ Mᵢⱼ Dᵢⱼ` whenever the entrywise second-moment
