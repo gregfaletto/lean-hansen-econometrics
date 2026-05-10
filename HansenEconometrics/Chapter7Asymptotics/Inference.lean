@@ -233,6 +233,34 @@ structure SecondOrderEdgeworthExpansion
             (n : ℝ)⁻¹ * (p2 x * density x)))
       (fun _ : ℝ => 0) atTop
 
+omit [Fintype k] [DecidableEq k] in
+/-- The even quadratic polynomial shape appearing as `p₁` in Hansen's
+Theorem 7.15 Edgeworth expansion.  The concrete coefficients are cumulant
+functions of the regression moments; this definition records the textbook
+polynomial order and parity. -/
+@[reducible]
+def edgeworthP1Polynomial (a0 a2 x : ℝ) : ℝ :=
+  a0 + a2 * x ^ 2
+
+omit [Fintype k] [DecidableEq k] in
+/-- The odd degree-five polynomial shape appearing as `p₂` in Hansen's
+Theorem 7.15 Edgeworth expansion. -/
+@[reducible]
+def edgeworthP2Polynomial (b1 b3 b5 x : ℝ) : ℝ :=
+  b1 * x + b3 * x ^ 3 + b5 * x ^ 5
+
+omit [Fintype k] [DecidableEq k] in
+@[simp]
+theorem edgeworthP1Polynomial_neg (a0 a2 x : ℝ) :
+    edgeworthP1Polynomial a0 a2 (-x) = edgeworthP1Polynomial a0 a2 x := by
+  simp [edgeworthP1Polynomial]
+
+omit [Fintype k] [DecidableEq k] in
+@[simp]
+theorem edgeworthP2Polynomial_neg (b1 b3 b5 x : ℝ) :
+    edgeworthP2Polynomial b1 b3 b5 (-x) = -edgeworthP2Polynomial b1 b3 b5 x := by
+  ring
+
 namespace SecondOrderEdgeworthExpansion
 
 omit [Fintype k] [DecidableEq k] in
@@ -345,6 +373,51 @@ theorem cdf_tendsto_base
     (h : SecondOrderEdgeworthExpansion μ T baseCDF density p1 p2) (x : ℝ) :
     Tendsto (fun n : ℕ => statisticCDFReal μ T n x) atTop (𝓝 (baseCDF x)) :=
   h.toFirstOrderEdgeworthExpansion.cdf_tendsto_base x
+
+omit [Fintype k] [DecidableEq k] in
+/-- Symmetric two-sided Edgeworth expansion consequence.
+
+For a symmetric interval, the `n^{-1/2}` correction cancels when `p₁` is even
+and the density is even, while the odd `p₂` term contributes twice its positive
+cutoff value. This is the formal version of Hansen's explanation after
+Theorem 7.15 that two-sided intervals remove the first-order Edgeworth
+coverage error. -/
+theorem symmetric_interval_scaled_remainder_tendsto_zero
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {T : ℕ → Ω → ℝ} {baseCDF density p1 p2 : ℝ → ℝ}
+    (h : SecondOrderEdgeworthExpansion μ T baseCDF density p1 p2) (c : ℝ)
+    (hp1 : p1 (-c) = p1 c) (hp2 : p2 (-c) = -p2 c)
+    (hdensity : density (-c) = density c) :
+    Tendsto
+      (fun n : ℕ =>
+        (n : ℝ) *
+          ((statisticCDFReal μ T n c - statisticCDFReal μ T n (-c)) -
+            (baseCDF c - baseCDF (-c)) -
+            (n : ℝ)⁻¹ * (2 * (p2 c * density c))))
+      atTop (𝓝 0) := by
+  have hc := h.pointwise_scaled_remainder_tendsto_zero c
+  have hneg := h.pointwise_scaled_remainder_tendsto_zero (-c)
+  have hdiff := hc.sub hneg
+  have heq :
+      (fun n : ℕ =>
+        (n : ℝ) *
+            (statisticCDFReal μ T n c - baseCDF c -
+              (Real.sqrt (n : ℝ))⁻¹ * (p1 c * density c) -
+              (n : ℝ)⁻¹ * (p2 c * density c)) -
+          (n : ℝ) *
+            (statisticCDFReal μ T n (-c) - baseCDF (-c) -
+              (Real.sqrt (n : ℝ))⁻¹ * (p1 (-c) * density (-c)) -
+              (n : ℝ)⁻¹ * (p2 (-c) * density (-c)))) =ᶠ[atTop]
+      (fun n : ℕ =>
+        (n : ℝ) *
+          ((statisticCDFReal μ T n c - statisticCDFReal μ T n (-c)) -
+            (baseCDF c - baseCDF (-c)) -
+            (n : ℝ)⁻¹ * (2 * (p2 c * density c)))) := by
+    filter_upwards with n
+    rw [hp1, hp2, hdensity]
+    ring
+  rw [tendsto_congr' heq] at hdiff
+  simpa using hdiff
 
 end SecondOrderEdgeworthExpansion
 

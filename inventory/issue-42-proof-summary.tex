@@ -504,19 +504,24 @@ those public packages.
 
 \subsection{Edgeworth Interface}
 
-The branch does not prove Hansen's concrete high-moment Edgeworth expansion.
-It does add generic interfaces that future work can instantiate:
+The branch does not prove Hansen's concrete high-moment cumulant expansion.
+It does add generic interfaces and the polynomial-shape layer that future work
+can instantiate:
 \begin{itemize}
   \item \lean{FirstOrderEdgeworthExpansion};
   \item \lean{SecondOrderEdgeworthExpansion};
   \item scaled-remainder consequences;
   \item unscaled second-order approximation-error consequences;
   \item CDF convergence consequences;
-  \item a bridge from the second-order interface to the first-order interface.
+  \item a bridge from the second-order interface to the first-order interface;
+  \item \lean{edgeworthP1Polynomial} and \lean{edgeworthP2Polynomial}, recording
+    the even quadratic and odd degree-five textbook shapes;
+  \item \lean{SecondOrderEdgeworthExpansion.symmetric_interval_scaled_remainder_tendsto_zero},
+    proving the two-sided cancellation of the $n^{-1/2}$ Edgeworth term.
 \end{itemize}
 
-Thus Theorem 7.15 has a reusable formal target shape, but not the cumulant or
-polynomial expansion proof.
+Thus Theorem 7.15 has a reusable formal target shape and the central-interval
+cancellation consequence, but not the high-moment cumulant coefficient proof.
 
 \section{Remaining Gaps}
 
@@ -535,7 +540,7 @@ Chapter 6 & Scalar triangular-array Lindeberg/Lyapunov sufficient-condition
 discharge for Theorems 6.4 and 6.5; arbitrary-unbiased-estimator lower bound
 for Theorem 6.11. \\
 Chapter 7 & Further tightening of the remaining public condition packages to the
-literal textbook iid/moment assumptions; concrete cumulant/polynomial Edgeworth
+literal textbook iid/moment assumptions; concrete high-moment cumulant
 expansion for Theorem 7.15. \\
 \bottomrule
 \end{longtable}
