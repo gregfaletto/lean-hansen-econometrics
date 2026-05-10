@@ -360,6 +360,16 @@ theorem olsClusteredVarianceEstimatorAdjusted_posSemidef_of_card
 abbrev ClusterIndex {G : Type*} (cluster : n → G) (g : G) :=
   {i : n // cluster i = g}
 
+omit [Fintype k] [DecidableEq k] in
+/-- Summing first within clusters and then over clusters is the same as summing
+over observations. This is the finite partition identity behind the clustered
+block notation. -/
+theorem clusterIndex_sum_eq_sum
+    {G M : Type*} [Fintype G] [DecidableEq G] [AddCommMonoid M]
+    (cluster : n → G) (f : n → M) :
+    (∑ g, ∑ i : ClusterIndex cluster g, f i.1) = ∑ i, f i := by
+  simpa [ClusterIndex] using (Fintype.sum_fiberwise cluster f)
+
 /-- Cluster-level regressor block `X_g`. -/
 def clusterDesign {G : Type*} (X : Matrix n k ℝ) (cluster : n → G) (g : G) :
     Matrix (ClusterIndex cluster g) k ℝ :=
@@ -422,6 +432,150 @@ noncomputable def clusterCrossContribution
     {G : Type*} [DecidableEq G] (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G) (g : G) :
     k → ℝ :=
   (clusterDesign X cluster g)ᵀ *ᵥ clusterResponse y cluster g
+
+omit [Fintype k] [DecidableEq k] in
+/-- Entrywise form of the cluster Gram contribution. -/
+theorem clusterGramContribution_apply
+    {G : Type*} [DecidableEq G] (X : Matrix n k ℝ) (cluster : n → G) (g : G)
+    (a b : k) :
+    clusterGramContribution X cluster g a b =
+      ∑ i : ClusterIndex cluster g, X i.1 a * X i.1 b := by
+  simp [clusterGramContribution, clusterDesign, Matrix.mul_apply]
+
+omit [Fintype k] [DecidableEq k] in
+/-- Entrywise form of the cluster cross-product contribution. -/
+theorem clusterCrossContribution_apply
+    {G : Type*} [DecidableEq G] (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G) (g : G)
+    (a : k) :
+    clusterCrossContribution X y cluster g a =
+      ∑ i : ClusterIndex cluster g, X i.1 a * y i.1 := by
+  simp [clusterCrossContribution, clusterDesign, clusterResponse, Matrix.mulVec, dotProduct]
+
+omit [Fintype k] [DecidableEq k] in
+/-- The cluster Gram contributions add back to the full Gram matrix `X'X`. -/
+theorem sum_clusterGramContribution_eq_gram
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (cluster : n → G) :
+    (∑ g, clusterGramContribution X cluster g) = Xᵀ * X := by
+  ext a b
+  calc
+    (∑ g, clusterGramContribution X cluster g) a b =
+        ∑ g, ∑ i : ClusterIndex cluster g, X i.1 a * X i.1 b := by
+          rw [Matrix.sum_apply]
+          exact Finset.sum_congr rfl fun g _ =>
+            clusterGramContribution_apply X cluster g a b
+    _ = ∑ i, X i a * X i b := by
+          simpa using
+            (clusterIndex_sum_eq_sum (cluster := cluster)
+              (f := fun i => X i a * X i b))
+    _ = (Xᵀ * X) a b := by
+          simp [Matrix.mul_apply, Matrix.transpose_apply]
+
+omit [Fintype k] [DecidableEq k] in
+/-- The cluster cross-product contributions add back to the full cross product
+`X'Y`. -/
+theorem sum_clusterCrossContribution_eq_cross
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G) :
+    (∑ g, clusterCrossContribution X y cluster g) = Xᵀ *ᵥ y := by
+  ext a
+  calc
+    (∑ g, clusterCrossContribution X y cluster g) a =
+        ∑ g, ∑ i : ClusterIndex cluster g, X i.1 a * y i.1 := by
+          simp [clusterCrossContribution_apply]
+    _ = ∑ i, X i a * y i := by
+          simpa using
+            (clusterIndex_sum_eq_sum (cluster := cluster)
+              (f := fun i => X i a * y i))
+    _ = (Xᵀ *ᵥ y) a := by
+          simp [Matrix.mulVec, dotProduct, Matrix.transpose_apply]
+
+/-- Cluster score `X_g' \hat e_g` for the full-sample OLS residuals. -/
+noncomputable def clusterScore
+    {G : Type*} [DecidableEq G] (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G) (g : G)
+    [Invertible (Xᵀ * X)] : k → ℝ :=
+  (clusterDesign X cluster g)ᵀ *ᵥ clusterResidual X y cluster g
+
+/-- Entrywise form of the full-sample residual cluster score. -/
+theorem clusterScore_apply
+    {G : Type*} [DecidableEq G] (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G) (g : G)
+    [Invertible (Xᵀ * X)] (a : k) :
+    clusterScore X y cluster g a =
+      ∑ i : ClusterIndex cluster g, X i.1 a * residual X y i.1 := by
+  simp [clusterScore, clusterDesign, clusterResidual, Matrix.mulVec, dotProduct]
+
+/-- The named cluster score agrees with the indicator-sum score used in the
+clustered sandwich definition. -/
+theorem clusterScore_eq_indicator_sum
+    {G : Type*} [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G) (g : G)
+    [Invertible (Xᵀ * X)] :
+    clusterScore X y cluster g =
+      fun a => ∑ i, (if cluster i = g then residual X y i * X i a else 0) := by
+  ext a
+  rw [clusterScore_apply]
+  calc
+    (∑ i : ClusterIndex cluster g, X i.1 a * residual X y i.1) =
+        ∑ i : ClusterIndex cluster g, residual X y i.1 * X i.1 a := by
+          refine Finset.sum_congr rfl ?_
+          intro i _
+          ring
+    _ = ∑ i : n, (if cluster i = g then residual X y i * X i a else 0) := by
+          let f : n → ℝ := fun i => residual X y i * X i a
+          have hsub :
+              (∑ i ∈ Finset.univ.filter (fun i : n => cluster i = g), f i) =
+                ∑ i : ClusterIndex cluster g, f i.1 := by
+            refine Finset.sum_subtype
+              (Finset.univ.filter (fun i : n => cluster i = g)) ?_ f
+            intro i
+            simp
+          have hfilter :
+              (∑ i ∈ Finset.univ.filter (fun i : n => cluster i = g), f i) =
+                ∑ i : n, (if cluster i = g then f i else 0) := by
+            simpa using
+              (Finset.sum_filter
+                (s := Finset.univ) (p := fun i : n => cluster i = g) (f := f))
+          simpa [f] using hsub.symm.trans hfilter
+
+/-- Clustered sandwich covariance written with the named residual cluster-score
+API. -/
+theorem olsClusteredVarianceEstimator_eq_clusterScore
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G)
+    [DecidableEq n] [Invertible (Xᵀ * X)] :
+    olsClusteredVarianceEstimator X y cluster =
+      ⅟ (Xᵀ * X) *
+        (∑ g, Matrix.vecMulVec (clusterScore X y cluster g) (clusterScore X y cluster g)) *
+        ⅟ (Xᵀ * X) := by
+  unfold olsClusteredVarianceEstimator
+  simp_rw [clusterScore_eq_indicator_sum]
+
+/-- The full-sample residual cluster scores add back to `X'\hat e`. -/
+theorem sum_clusterScore_eq_transpose_mulVec_residual
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G)
+    [Invertible (Xᵀ * X)] :
+    (∑ g, clusterScore X y cluster g) = Xᵀ *ᵥ residual X y := by
+  ext a
+  calc
+    (∑ g, clusterScore X y cluster g) a =
+        ∑ g, ∑ i : ClusterIndex cluster g, X i.1 a * residual X y i.1 := by
+          simp [clusterScore_apply, Finset.sum_apply]
+    _ = ∑ i, X i a * residual X y i := by
+          simpa using
+            (clusterIndex_sum_eq_sum (cluster := cluster)
+              (f := fun i => X i a * residual X y i))
+    _ = (Xᵀ *ᵥ residual X y) a := by
+          simp [Matrix.mulVec, dotProduct, Matrix.transpose_apply]
+
+/-- The residual cluster scores sum to zero by the OLS normal equations. -/
+theorem sum_clusterScore_eq_zero
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G)
+    [Invertible (Xᵀ * X)] :
+    (∑ g, clusterScore X y cluster g) = 0 := by
+  rw [sum_clusterScore_eq_transpose_mulVec_residual]
+  exact normal_equations X y
 
 /-- Reduced Gram matrix after removing cluster `g`, written as
 `X'X - X_g'X_g`. -/
