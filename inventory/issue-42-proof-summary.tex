@@ -199,6 +199,16 @@ $k<n$ and $G>1$.  The CR3-style leave-cluster-out layer now has
 equations (4.52), (4.53), and (4.54) at the estimator-definition/PSD level.  This
 tightens the finite-sample Gauss--Markov and covariance-estimator proof layer.
 
+\section{Chapter 5: Normal-Regression Moment Face}
+
+The exact random-design Kinal threshold is still not proved.  The branch does
+now record the fixed-design finite-moment consequence of the Gaussian
+coefficient law: \lean{olsBeta_memLp_of_error_gaussian} shows that, once $X$ is
+fixed and nonsingular and the error vector is Gaussian, the OLS coefficient
+vector belongs to every finite $L^p$ space.  This isolates the remaining Kinal
+work as the inverse random-Gram tail threshold rather than the Gaussian
+finite-moment part.
+
 \section{Chapter 6: Asymptotic Infrastructure}
 
 Chapter 6 is the main infrastructure layer for issue 42.  The branch adds or
@@ -536,8 +546,7 @@ Area & Remaining work \\
 \midrule
 Chapter 4 & Clustered covariance asymptotics and multi-observation cluster
 partition infrastructure; CR3 conditional conservativeness theorem. \\
-Chapter 5 & Kinal theorem 5.5, deferred unless a downstream theorem needs the
-exact moment-existence threshold. \\
+Chapter 5 & Exact random-design Kinal theorem 5.5 inverse-Gram moment threshold. \\
 Chapter 6 & Scalar triangular-array Lindeberg/Lyapunov sufficient-condition
 discharge for Theorems 6.4 and 6.5; arbitrary-unbiased-estimator lower bound
 for Theorem 6.11. \\
