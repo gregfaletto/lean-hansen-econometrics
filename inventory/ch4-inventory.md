@@ -226,3 +226,9 @@ Conventions:
   identities and the raw CR3 middle-moment identification needed to construct the conditional
   covariance matrices `Γ_g` for adjusted annihilator-error blocks from primitive cluster error
   assumptions.
+- Hansen's CR3 conservativeness sentence in Section 4.23 appears to be a finite-sample
+  conditional-on-`X` claim, by analogy with the preceding HC3 proof. The deferred Lean target is
+  therefore not an asymptotic statement: it should identify
+  `E[\tilde e_g \tilde e_gᵀ | X] = Σ_g + X_g E[(β̂_(-g)-β)(β̂_(-g)-β)ᵀ | X] X_gᵀ`
+  from leave-cluster independence and then feed the resulting blockwise PSD dominance into the
+  existing CR3 sandwich bridge.
