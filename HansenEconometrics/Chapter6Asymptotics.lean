@@ -638,6 +638,84 @@ theorem iidSampleMean_covMat_eq_inv_card_smul_of_identDistrib
   iidSampleMean_covMat_eq_inv_card_smul (μ := μ) (j := j) hZ hindep
     (fun i a b => identDistrib_covariance_apply_eq (hident i) a b)
 
+/-- **Hansen Theorem 6.11, scalar orthogonal-residual efficiency face.**
+
+If a square-integrable scalar estimator decomposes into the sample mean plus a
+residual that is uncorrelated with the sample mean, then its variance dominates
+the sample-mean variance `n⁻¹ Var[Z_j]`. This composes the sharp sample-mean
+variance identity with the orthogonal-residual variance algebra; the remaining
+arbitrary-estimator task is to derive this orthogonality from a theorem-facing
+unbiasedness/completeness condition. -/
+theorem iidEstimator_variance_ge_sampleMean_of_mean_add_uncorrelated
+    [IsProbabilityMeasure μ] [Fintype ι] [Nonempty ι]
+    {Z : ι → Ω → ℝ} {T R : Ω → ℝ} (j : ι)
+    (hZ : ∀ i, MemLp (Z i) 2 μ)
+    (hindep : Pairwise (fun i l => Z i ⟂ᵢ[μ] Z l))
+    (hident : ∀ i, IdentDistrib (Z i) (Z j) μ μ)
+    (hR : MemLp R 2 μ)
+    (hT : ∀ ω, T ω = (Fintype.card ι : ℝ)⁻¹ * ∑ i, Z i ω + R ω)
+    (hcov : cov[fun ω => (Fintype.card ι : ℝ)⁻¹ * ∑ i, Z i ω, R; μ] = 0) :
+    (Fintype.card ι : ℝ)⁻¹ * Var[Z j; μ] ≤ Var[T; μ] := by
+  classical
+  let M : Ω → ℝ := fun ω => (Fintype.card ι : ℝ)⁻¹ * ∑ i, Z i ω
+  have hM : MemLp M 2 μ := by
+    convert (memLp_finset_sum' (s := Finset.univ)
+      (f := fun i ω => (Fintype.card ι : ℝ)⁻¹ * Z i ω)
+      (fun i _ => (hZ i).const_mul (Fintype.card ι : ℝ)⁻¹)) using 1
+    ext ω
+    simp [M, Finset.mul_sum]
+  have hlower := variance_le_of_eq_add_uncorrelated
+    (μ := μ) (T := T) (M := M) (R := R) hM hR
+    (fun ω => by simpa [M] using hT ω)
+    (by simpa [M] using hcov)
+  have hsample :
+      Var[M; μ] = (Fintype.card ι : ℝ)⁻¹ * Var[Z j; μ] := by
+    simpa [M] using
+      iidSampleMean_variance_eq_inv_card_mul
+        (μ := μ) (j := j) hZ hindep hident
+  rwa [← hsample]
+
+/-- **Hansen Theorem 6.11, vector orthogonal-residual efficiency face.**
+
+If a finite-dimensional estimator decomposes into the vector sample mean plus a
+square-integrable residual whose every linear projection is uncorrelated with
+the corresponding sample-mean projection, then its covariance matrix dominates
+`n⁻¹ covMat(Z_j)` in positive-semidefinite order. This is the vector form of the
+orthogonal-residual route to Hansen's best-unbiased-estimation bound. -/
+theorem iidEstimator_covMat_sub_sampleMean_posSemidef_of_mean_add_uncorrelated
+    {k : Type*} [Fintype k]
+    [IsProbabilityMeasure μ] [Fintype ι] [Nonempty ι]
+    {Z : ι → Ω → k → ℝ} {T R : Ω → k → ℝ} (j : ι)
+    (hZ : ∀ i, MemLp (Z i) 2 μ)
+    (hindep : ∀ a b, Pairwise (fun i l =>
+      (fun ω => Z i ω a) ⟂ᵢ[μ] (fun ω => Z l ω b)))
+    (hident : ∀ i, IdentDistrib (Z i) (Z j) μ μ)
+    (hR : MemLp R 2 μ)
+    (hT : ∀ ω, T ω =
+      (fun a => (Fintype.card ι : ℝ)⁻¹ * ∑ i, Z i ω a) + R ω)
+    (hcov : ∀ a : k → ℝ,
+      cov[fun ω => ((fun b => (Fintype.card ι : ℝ)⁻¹ * ∑ i, Z i ω b) ⬝ᵥ a),
+        fun ω => R ω ⬝ᵥ a; μ] = 0) :
+    (covMat μ T - (Fintype.card ι : ℝ)⁻¹ • covMat μ (Z j)).PosSemidef := by
+  classical
+  let M : Ω → k → ℝ := fun ω a => (Fintype.card ι : ℝ)⁻¹ * ∑ i, Z i ω a
+  have hM : MemLp M 2 μ := by
+    convert (memLp_finset_sum' (s := Finset.univ)
+      (f := fun i ω => (Fintype.card ι : ℝ)⁻¹ • Z i ω)
+      (fun i _ => (hZ i).const_smul (Fintype.card ι : ℝ)⁻¹)) using 1
+    ext ω a
+    simp [M, Finset.mul_sum]
+  have hpsd := covMat_sub_posSemidef_of_eq_add_uncorrelated
+    (μ := μ) (T := T) (M := M) (R := R) hM hR
+    (fun ω => by simpa [M] using hT ω)
+    (fun a => by simpa [M] using hcov a)
+  have hsample :
+      covMat μ M = (Fintype.card ι : ℝ)⁻¹ • covMat μ (Z j) := by
+    simpa [M] using
+      iidSampleMean_covMat_eq_inv_card_smul_of_identDistrib
+        (μ := μ) (j := j) (fun i a => (hZ i).eval a) hindep hident
+  rwa [hsample] at hpsd
+
 end BestUnbiased
 
 section ArrayCLT
