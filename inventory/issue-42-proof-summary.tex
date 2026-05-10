@@ -194,10 +194,12 @@ whenever its finite-sample scale factor is nonnegative, and
 $k<n$ and $G>1$.  The CR3-style leave-cluster-out layer now has
 \lean{ClusterIndex}, \lean{clusterDesign}, \lean{clusterCR3Residual},
 \lean{clusterLeaveOutBeta_eq_olsBeta_sub_invGram_mulVec_cr3Residual},
-\lean{olsClusteredCR3VarianceEstimator}, and
+\lean{clusterCR3Score}, \lean{olsClusteredCR3VarianceEstimator},
+\lean{olsClusteredCR3VarianceEstimator_eq_clusterCR3Score}, and
 \lean{olsClusteredCR3VarianceEstimator_posSemidef}, covering the deterministic
-equations (4.52), (4.53), and (4.54) at the estimator-definition/PSD level.  This
-tightens the finite-sample Gauss--Markov and covariance-estimator proof layer.
+equations (4.52), (4.53), and (4.54) at the estimator-definition/named-score/PSD
+level.  This tightens the finite-sample Gauss--Markov and covariance-estimator
+proof layer.
 The cluster-block layer now also proves the finite partition identity
 \lean{clusterIndex_sum_eq_sum}, the Gram and cross-product decompositions
 \lean{sum_clusterGramContribution_eq_gram} and

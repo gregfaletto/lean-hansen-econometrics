@@ -716,6 +716,24 @@ theorem clusterLeaveOutBeta_eq_olsBeta_sub_invGram_mulVec_cr3Residual
     _ = β - d := by
           rw [Matrix.mulVec_mulVec, invOf_mul_self, Matrix.one_mulVec]
 
+/-- CR3 cluster score `X_g' \tilde e_g`. -/
+noncomputable def clusterCR3Score
+    {G : Type*} [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G) (g : G)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    [Invertible (clusterLeaveOutAdjustmentMatrix X cluster g)] : k → ℝ :=
+  (clusterDesign X cluster g)ᵀ *ᵥ clusterCR3Residual X y cluster g
+
+/-- Entrywise form of the CR3 cluster score. -/
+theorem clusterCR3Score_apply
+    {G : Type*} [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G) (g : G)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    [Invertible (clusterLeaveOutAdjustmentMatrix X cluster g)] (a : k) :
+    clusterCR3Score X y cluster g a =
+      ∑ i : ClusterIndex cluster g, X i.1 a * clusterCR3Residual X y cluster g i := by
+  simp [clusterCR3Score, clusterDesign, Matrix.mulVec, dotProduct]
+
 /-- Hansen equation (4.54): CR3-style cluster-robust covariance estimator using
 leave-cluster-out prediction errors. -/
 noncomputable def olsClusteredCR3VarianceEstimator
@@ -730,6 +748,32 @@ noncomputable def olsClusteredCR3VarianceEstimator
   ⅟ (Xᵀ * X) *
     (∑ g, Matrix.vecMulVec (s g) (s g)) *
     ⅟ (Xᵀ * X)
+
+/-- The CR3 clustered sandwich written with the named CR3 cluster-score API. -/
+theorem olsClusteredCR3VarianceEstimator_eq_clusterCR3Score
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    (hInv : ∀ g, Invertible (clusterLeaveOutAdjustmentMatrix X cluster g)) :
+    olsClusteredCR3VarianceEstimator X y cluster hInv =
+      ⅟ (Xᵀ * X) *
+        (∑ g,
+          letI : Invertible (clusterLeaveOutAdjustmentMatrix X cluster g) := hInv g
+          Matrix.vecMulVec (clusterCR3Score X y cluster g)
+            (clusterCR3Score X y cluster g)) *
+        ⅟ (Xᵀ * X) := by
+  unfold olsClusteredCR3VarianceEstimator
+  apply congrArg (fun M => ⅟ (Xᵀ * X) * M * ⅟ (Xᵀ * X))
+  refine Finset.sum_congr rfl ?_
+  intro g _
+  letI : Invertible (clusterLeaveOutAdjustmentMatrix X cluster g) := hInv g
+  have hscore :
+      (fun a : k =>
+        ∑ i : ClusterIndex cluster g, X i.1 a * clusterCR3Residual X y cluster g i) =
+          clusterCR3Score X y cluster g := by
+    ext a
+    exact (clusterCR3Score_apply X y cluster g a).symm
+  simp [hscore]
 
 /-- The CR3-style clustered covariance estimator is positive semidefinite. -/
 theorem olsClusteredCR3VarianceEstimator_posSemidef
