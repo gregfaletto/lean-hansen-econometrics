@@ -232,6 +232,21 @@ theorem olsHuberWhiteHC2VarianceEstimator_le_HC3_posSemidef
     (hc_leverage_weight_ordering (hlev_nonneg i) (hlev_lt_one i)).2
     (sq_nonneg (residual X y i))
 
+omit [Fintype k] [DecidableEq k] in
+/-- A finite sum of score outer products is positive semidefinite. -/
+theorem sum_vecMulVec_posSemidef
+    {κ G : Type*} [Finite κ] [Fintype G] (s : G → κ → ℝ) :
+    (∑ g, Matrix.vecMulVec (s g) (s g)).PosSemidef := by
+  classical
+  refine Finset.sum_induction
+    (fun g => Matrix.vecMulVec (s g) (s g))
+    (fun M : Matrix κ κ ℝ => M.PosSemidef)
+    (fun _ _ hA hB => Matrix.PosSemidef.add hA hB)
+    Matrix.PosSemidef.zero
+    ?_
+  intro g _
+  simpa using Matrix.posSemidef_vecMulVec_self_star (s g)
+
 /-- Clustered covariance: sandwich on cluster-summed scores. -/
 noncomputable def olsClusteredVarianceEstimator
     {G : Type*} [Fintype G] [DecidableEq G]
@@ -257,6 +272,48 @@ noncomputable def olsClusteredVarianceEstimatorAdjusted
     (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G)
     [DecidableEq n] [Invertible (Xᵀ * X)] : Matrix k k ℝ :=
   clusterFiniteSampleAdjustment n k G • olsClusteredVarianceEstimator X y cluster
+
+/-- The cluster-score middle matrix in the clustered sandwich is positive
+semidefinite. -/
+theorem olsClusteredScoreMiddle_posSemidef
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G)
+    [Invertible (Xᵀ * X)] :
+    (let s : G → k → ℝ := fun g a =>
+        ∑ i, (if cluster i = g then residual X y i * X i a else 0)
+      ∑ g, Matrix.vecMulVec (s g) (s g)).PosSemidef := by
+  let s : G → k → ℝ := fun g a =>
+    ∑ i, (if cluster i = g then residual X y i * X i a else 0)
+  simpa [s] using sum_vecMulVec_posSemidef (κ := k) s
+
+/-- The unadjusted clustered sandwich covariance estimator is positive
+semidefinite. -/
+theorem olsClusteredVarianceEstimator_posSemidef
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G)
+    [DecidableEq n] [Invertible (Xᵀ * X)] :
+    (olsClusteredVarianceEstimator X y cluster).PosSemidef := by
+  let s : G → k → ℝ := fun g a =>
+    ∑ i, (if cluster i = g then residual X y i * X i a else 0)
+  have hmiddle : (∑ g, Matrix.vecMulVec (s g) (s g)).PosSemidef :=
+    sum_vecMulVec_posSemidef (κ := k) s
+  have hpsd := Matrix.PosSemidef.conjTranspose_mul_mul_same
+    hmiddle (⅟ (Xᵀ * X))
+  have hinvT : ((Xᵀ * X)⁻¹)ᵀ = (Xᵀ * X)⁻¹ := by
+    rw [Matrix.transpose_nonsing_inv, gram_transpose]
+  simpa [olsClusteredVarianceEstimator, s, Matrix.conjTranspose_eq_transpose_of_trivial,
+    hinvT, inv_gram_transpose X, Matrix.mul_assoc] using hpsd
+
+/-- The finite-sample adjusted clustered covariance estimator is positive
+semidefinite whenever the adjustment factor is nonnegative. -/
+theorem olsClusteredVarianceEstimatorAdjusted_posSemidef
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    (hadj : 0 ≤ clusterFiniteSampleAdjustment n k G) :
+    (olsClusteredVarianceEstimatorAdjusted X y cluster).PosSemidef := by
+  simpa [olsClusteredVarianceEstimatorAdjusted] using
+    (olsClusteredVarianceEstimator_posSemidef X y cluster).smul hadj
 
 omit [DecidableEq k] in
 /-- When every observation is its own cluster, Hansen's finite-sample cluster

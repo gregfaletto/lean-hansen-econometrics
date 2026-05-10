@@ -184,8 +184,13 @@ residual squares:
 \end{itemize}
 
 The branch also adds singleton-cluster bridges showing that singleton clustered
-covariance estimators reduce to the heteroskedastic sandwich estimators, and
-tightens the finite-sample Gauss--Markov proof layer.
+covariance estimators reduce to the heteroskedastic sandwich estimators.  The
+cluster score middle matrix and the unadjusted clustered sandwich are proved
+positive semidefinite via \lean{sum_vecMulVec_posSemidef},
+\lean{olsClusteredScoreMiddle_posSemidef}, and
+\lean{olsClusteredVarianceEstimator_posSemidef}; the adjusted sandwich is PSD
+whenever its finite-sample scale factor is nonnegative.  This tightens the
+finite-sample Gauss--Markov and covariance-estimator proof layer.
 
 \section{Chapter 6: Asymptotic Infrastructure}
 
@@ -516,7 +521,7 @@ remaining gaps are:
 Area & Remaining work \\
 \midrule
 Chapter 4 & Clustered covariance asymptotics and multi-observation cluster
-partition infrastructure; HC4-style leverage-adjusted variants. \\
+partition infrastructure; CR3/leave-cluster-out variants. \\
 Chapter 5 & Kinal theorem 5.5, deferred unless a downstream theorem needs the
 exact moment-existence threshold. \\
 Chapter 6 & Scalar triangular-array Lindeberg/Lyapunov sufficient-condition
