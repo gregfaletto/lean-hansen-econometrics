@@ -396,6 +396,89 @@ theorem iidLinearUnbiasedEstimator_variance_ge_sampleMean
           mul_le_mul_of_nonneg_right hsum_sq_ge hvar_nonneg
     _ = Var[fun ω => ∑ i, w i * Z i ω; μ] := hweighted.symm
 
+/-- **Hansen Theorem 6.11, vector best-linear-unbiased face.**
+
+For scalar weights summing to one, the covariance matrix of the weighted linear
+estimator `∑ᵢ wᵢ Zᵢ` dominates the covariance matrix of the equal-weight sample
+mean. The proof applies the scalar best-linear-unbiased theorem to every fixed
+linear projection and then repackages the result as a positive-semidefinite
+matrix inequality. -/
+theorem iidLinearUnbiasedEstimator_covMat_sub_sampleMean_posSemidef
+    {k : Type*} [Fintype k]
+    [IsProbabilityMeasure μ] [Fintype ι] [Nonempty ι]
+    {Z : ι → Ω → k → ℝ} (j : ι) (w : ι → ℝ)
+    (hZ : ∀ i, MemLp (Z i) 2 μ)
+    (hindep : Pairwise (fun i l => Z i ⟂ᵢ[μ] Z l))
+    (hident : ∀ i, IdentDistrib (Z i) (Z j) μ μ)
+    (hw : ∑ i, w i = 1) :
+    (covMat μ (fun ω a => ∑ i, w i * Z i ω a) -
+      (Fintype.card ι : ℝ)⁻¹ • covMat μ (Z j)).PosSemidef := by
+  classical
+  let Zbar : Ω → k → ℝ := fun ω a => ∑ i, w i * Z i ω a
+  refine Matrix.PosSemidef.of_dotProduct_mulVec_nonneg ?_ ?_
+  · rw [Matrix.IsHermitian]
+    ext a b
+    simp [covMat, ProbabilityTheory.covariance_comm]
+  · intro a
+    have hproj_mem : ∀ i, MemLp (fun ω => Z i ω ⬝ᵥ a) 2 μ :=
+      fun i => dotProduct_memLp_two (μ := μ) (hZ i) a
+    have hproj_indep : Pairwise (fun i l =>
+        (fun ω => Z i ω ⬝ᵥ a) ⟂ᵢ[μ] (fun ω => Z l ω ⬝ᵥ a)) := by
+      intro i l hil
+      exact IndepFun.comp
+        (φ := fun v : k → ℝ => v ⬝ᵥ a)
+        (ψ := fun v : k → ℝ => v ⬝ᵥ a)
+        (hindep hil) (measurable_dotProduct_right a) (measurable_dotProduct_right a)
+    have hproj_ident : ∀ i,
+        IdentDistrib (fun ω => Z i ω ⬝ᵥ a) (fun ω => Z j ω ⬝ᵥ a) μ μ := by
+      intro i
+      simpa [Function.comp_def] using (hident i).comp (measurable_dotProduct_right a)
+    have hscalar := iidLinearUnbiasedEstimator_variance_ge_sampleMean
+      (μ := μ) (j := j) (w := w) hproj_mem hproj_indep hproj_ident hw
+    have hZbar_mem : ∀ b, MemLp (fun ω => Zbar ω b) 2 μ := by
+      intro b
+      convert (memLp_finset_sum' (s := Finset.univ)
+        (f := fun i ω => w i * Z i ω b)
+        (fun i _ => ((hZ i).eval b).const_mul (w i))) using 1
+      ext ω
+      simp [Zbar]
+    have hscalar_cov :
+        (Fintype.card ι : ℝ)⁻¹ * (a ⬝ᵥ (covMat μ (Z j) *ᵥ a)) ≤
+          a ⬝ᵥ (covMat μ Zbar *ᵥ a) := by
+      calc
+        (Fintype.card ι : ℝ)⁻¹ * (a ⬝ᵥ (covMat μ (Z j) *ᵥ a))
+            = (Fintype.card ι : ℝ)⁻¹ * Var[fun ω => Z j ω ⬝ᵥ a; μ] := by
+              rw [variance_dotProduct_eq_dotProduct_covMat_mulVec
+                (μ := μ) (X := Z j) a (fun b => (hZ j).eval b)]
+        _ ≤ Var[fun ω => ∑ i, w i * (Z i ω ⬝ᵥ a); μ] := hscalar
+        _ = Var[fun ω => Zbar ω ⬝ᵥ a; μ] := by
+              congr
+              ext ω
+              calc
+                ∑ i, w i * (Z i ω ⬝ᵥ a)
+                    = ∑ i, ∑ b, w i * (Z i ω b * a b) := by
+                      simp [dotProduct, Finset.mul_sum]
+                _ = ∑ b, ∑ i, w i * (Z i ω b * a b) := by
+                      rw [Finset.sum_comm]
+                _ = ∑ b, (∑ i, w i * Z i ω b) * a b := by
+                      refine Finset.sum_congr rfl ?_
+                      intro b _
+                      rw [Finset.sum_mul]
+                      simp [mul_assoc]
+                _ = Zbar ω ⬝ᵥ a := by
+                      simp [Zbar, dotProduct]
+        _ = a ⬝ᵥ (covMat μ Zbar *ᵥ a) := by
+              rw [variance_dotProduct_eq_dotProduct_covMat_mulVec
+                (μ := μ) (X := Zbar) a hZbar_mem]
+    have hdiff :
+        a ⬝ᵥ ((covMat μ Zbar - (Fintype.card ι : ℝ)⁻¹ • covMat μ (Z j)) *ᵥ a) =
+          a ⬝ᵥ (covMat μ Zbar *ᵥ a) -
+            (Fintype.card ι : ℝ)⁻¹ * (a ⬝ᵥ (covMat μ (Z j) *ᵥ a)) := by
+      rw [Matrix.sub_mulVec, dotProduct_sub, Matrix.smul_mulVec, dotProduct_smul, smul_eq_mul]
+    change 0 ≤ a ⬝ᵥ ((covMat μ Zbar - (Fintype.card ι : ℝ)⁻¹ • covMat μ (Z j)) *ᵥ a)
+    rw [hdiff]
+    linarith
+
 /-- **Hansen Theorem 6.11, covariance-matrix sample-mean sharpness face.**
 
 For finite-dimensional square-integrable observations whose coordinates are
