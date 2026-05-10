@@ -324,14 +324,19 @@ The branch adds exact scalar and vector sample-mean variance formulas:
   \item \lean{iidSampleMean_variance_eq_inv_card_mul}.
   \item \lean{iidLinearUnbiasedEstimator_variance_ge_sampleMean}.
   \item \lean{iidLinearUnbiasedEstimator_covMat_sub_sampleMean_posSemidef}.
+  \item \lean{variance_le_of_eq_add_uncorrelated}.
+  \item \lean{covMat_sub_posSemidef_of_eq_add_uncorrelated}.
   \item \lean{iidSampleMean_covMat_eq_inv_card_smul}.
   \item \lean{iidSampleMean_covMat_eq_inv_card_smul_of_identDistrib}.
 \end{itemize}
 
 These prove the sample mean attains the $n^{-1}$ variance/covariance scale for
 iid observations and that no scalar or finite-dimensional scalar-weighted linear
-unbiased estimator improves on the equal-weight sample mean.  They are not the full
-arbitrary-unbiased-estimator lower bound of Hansen Theorem 6.11.
+unbiased estimator improves on the equal-weight sample mean.  The orthogonal
+residual lemmas also isolate the Hilbert-space variance algebra needed for the
+arbitrary-estimator theorem.  They are not the full arbitrary-unbiased-estimator
+lower bound of Hansen Theorem 6.11 because the theorem-specific orthogonality
+discharge remains missing.
 
 \section{Chapter 7: Least-Squares Asymptotics}
 

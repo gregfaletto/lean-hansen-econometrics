@@ -479,6 +479,77 @@ theorem iidLinearUnbiasedEstimator_covMat_sub_sampleMean_posSemidef
     rw [hdiff]
     linarith
 
+/-- Variance lower bound from an orthogonal residual decomposition.
+
+This is the scalar Hilbert-space algebra behind best-unbiased-estimator
+arguments: if an estimator is the efficient part plus a square-integrable
+uncorrelated residual, then its variance dominates the efficient part's variance. -/
+theorem variance_le_of_eq_add_uncorrelated
+    [IsProbabilityMeasure μ]
+    {T M R : Ω → ℝ}
+    (hM : MemLp M 2 μ) (hR : MemLp R 2 μ)
+    (hT : ∀ ω, T ω = M ω + R ω)
+    (hcov : cov[M, R; μ] = 0) :
+    Var[M; μ] ≤ Var[T; μ] := by
+  have hvarT : Var[T; μ] = Var[M + R; μ] := by
+    congr
+    ext ω
+    exact hT ω
+  rw [hvarT, ProbabilityTheory.variance_add hM hR, hcov]
+  have hR_nonneg : 0 ≤ Var[R; μ] := ProbabilityTheory.variance_nonneg R μ
+  linarith
+
+/-- Vector covariance lower bound from an orthogonal residual decomposition.
+
+This repackages the scalar orthogonal-residual variance inequality along every
+fixed linear projection as a positive-semidefinite covariance matrix
+inequality. -/
+theorem covMat_sub_posSemidef_of_eq_add_uncorrelated
+    {k : Type*} [Fintype k]
+    [IsProbabilityMeasure μ]
+    {T M R : Ω → k → ℝ}
+    (hM : MemLp M 2 μ) (hR : MemLp R 2 μ)
+    (hT : ∀ ω, T ω = M ω + R ω)
+    (hcov : ∀ a : k → ℝ, cov[fun ω => M ω ⬝ᵥ a, fun ω => R ω ⬝ᵥ a; μ] = 0) :
+    (covMat μ T - covMat μ M).PosSemidef := by
+  classical
+  have hTmem : MemLp T 2 μ :=
+    (hM.add hR).ae_eq (ae_of_all μ fun ω => (hT ω).symm)
+  refine Matrix.PosSemidef.of_dotProduct_mulVec_nonneg ?_ ?_
+  · rw [Matrix.IsHermitian]
+    ext a b
+    simp [covMat, ProbabilityTheory.covariance_comm]
+  · intro a
+    have hscalar := variance_le_of_eq_add_uncorrelated
+      (μ := μ)
+      (T := fun ω => T ω ⬝ᵥ a)
+      (M := fun ω => M ω ⬝ᵥ a)
+      (R := fun ω => R ω ⬝ᵥ a)
+      (dotProduct_memLp_two (μ := μ) hM a)
+      (dotProduct_memLp_two (μ := μ) hR a)
+      (fun ω => by
+        change T ω ⬝ᵥ a = M ω ⬝ᵥ a + R ω ⬝ᵥ a
+        rw [hT ω, add_dotProduct])
+      (hcov a)
+    have hcov_le :
+        a ⬝ᵥ (covMat μ M *ᵥ a) ≤ a ⬝ᵥ (covMat μ T *ᵥ a) := by
+      calc
+        a ⬝ᵥ (covMat μ M *ᵥ a)
+            = Var[fun ω => M ω ⬝ᵥ a; μ] := by
+              rw [variance_dotProduct_eq_dotProduct_covMat_mulVec
+                (μ := μ) (X := M) a (fun b => hM.eval b)]
+        _ ≤ Var[fun ω => T ω ⬝ᵥ a; μ] := hscalar
+        _ = a ⬝ᵥ (covMat μ T *ᵥ a) := by
+              rw [variance_dotProduct_eq_dotProduct_covMat_mulVec
+                (μ := μ) (X := T) a (fun b => hTmem.eval b)]
+    have hdiff :
+        a ⬝ᵥ ((covMat μ T - covMat μ M) *ᵥ a) =
+          a ⬝ᵥ (covMat μ T *ᵥ a) - a ⬝ᵥ (covMat μ M *ᵥ a) := by
+      rw [Matrix.sub_mulVec, dotProduct_sub]
+    change 0 ≤ a ⬝ᵥ ((covMat μ T - covMat μ M) *ᵥ a)
+    rw [hdiff]
+    linarith
+
 /-- **Hansen Theorem 6.11, covariance-matrix sample-mean sharpness face.**
 
 For finite-dimensional square-integrable observations whose coordinates are
