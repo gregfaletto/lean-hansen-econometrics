@@ -265,6 +265,35 @@ noncomputable def clusterFiniteSampleAdjustment
   ((Fintype.card n : ℝ) - 1) / ((Fintype.card n : ℝ) - Fintype.card k) *
     ((Fintype.card G : ℝ) / ((Fintype.card G : ℝ) - 1))
 
+omit [DecidableEq k] in
+/-- The clustered finite-sample adjustment is nonnegative on the usual
+cardinality range `k < n` and `1 < G`. -/
+theorem clusterFiniteSampleAdjustment_nonneg
+    {G : Type*} [Fintype G]
+    (hnk : Fintype.card k < Fintype.card n)
+    (hG : 1 < Fintype.card G) :
+    0 ≤ clusterFiniteSampleAdjustment n k G := by
+  unfold clusterFiniteSampleAdjustment
+  have hnk_real : (Fintype.card k : ℝ) < Fintype.card n := by
+    exact_mod_cast hnk
+  have hn_pos : (0 : ℝ) < (Fintype.card n : ℝ) - Fintype.card k := by
+    linarith
+  have hn_ge_one : (1 : ℝ) ≤ Fintype.card n := by
+    have hn_nat : 1 ≤ Fintype.card n := by
+      exact Nat.succ_le_iff.mpr (lt_of_le_of_lt (Nat.zero_le _) hnk)
+    exact_mod_cast hn_nat
+  have hn_num_nonneg : 0 ≤ (Fintype.card n : ℝ) - 1 := by
+    linarith
+  have hG_real : (1 : ℝ) < Fintype.card G := by
+    exact_mod_cast hG
+  have hG_den_pos : (0 : ℝ) < (Fintype.card G : ℝ) - 1 := by
+    linarith
+  have hG_num_nonneg : 0 ≤ (Fintype.card G : ℝ) := by
+    exact_mod_cast Nat.zero_le (Fintype.card G)
+  exact mul_nonneg
+    (div_nonneg hn_num_nonneg hn_pos.le)
+    (div_nonneg hG_num_nonneg hG_den_pos.le)
+
 /-- Hansen equation (4.50): cluster-robust covariance estimator with the
 finite-sample adjustment from equation (4.51). -/
 noncomputable def olsClusteredVarianceEstimatorAdjusted
@@ -314,6 +343,18 @@ theorem olsClusteredVarianceEstimatorAdjusted_posSemidef
     (olsClusteredVarianceEstimatorAdjusted X y cluster).PosSemidef := by
   simpa [olsClusteredVarianceEstimatorAdjusted] using
     (olsClusteredVarianceEstimator_posSemidef X y cluster).smul hadj
+
+/-- The finite-sample adjusted clustered covariance estimator is positive
+semidefinite on the standard cardinality range `k < n` and `1 < G`. -/
+theorem olsClusteredVarianceEstimatorAdjusted_posSemidef_of_card
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    (hnk : Fintype.card k < Fintype.card n)
+    (hG : 1 < Fintype.card G) :
+    (olsClusteredVarianceEstimatorAdjusted X y cluster).PosSemidef :=
+  olsClusteredVarianceEstimatorAdjusted_posSemidef X y cluster
+    (clusterFiniteSampleAdjustment_nonneg (n := n) (k := k) hnk hG)
 
 omit [DecidableEq k] in
 /-- When every observation is its own cluster, Hansen's finite-sample cluster

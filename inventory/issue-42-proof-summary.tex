@@ -189,8 +189,10 @@ cluster score middle matrix and the unadjusted clustered sandwich are proved
 positive semidefinite via \lean{sum_vecMulVec_posSemidef},
 \lean{olsClusteredScoreMiddle_posSemidef}, and
 \lean{olsClusteredVarianceEstimator_posSemidef}; the adjusted sandwich is PSD
-whenever its finite-sample scale factor is nonnegative.  This tightens the
-finite-sample Gauss--Markov and covariance-estimator proof layer.
+whenever its finite-sample scale factor is nonnegative, and
+\lean{clusterFiniteSampleAdjustment_nonneg} discharges that condition from
+$k<n$ and $G>1$.  This tightens the finite-sample Gauss--Markov and
+covariance-estimator proof layer.
 
 \section{Chapter 6: Asymptotic Infrastructure}
 
