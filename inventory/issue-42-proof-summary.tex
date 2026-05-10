@@ -267,7 +267,11 @@ Lindeberg triangular-array CLTs:
 \lean{multivariateLindebergCLT_tendstoInDistribution},
 \lean{HeterogeneousArrayCLTConditions}, and
 \lean{heterogeneousArrayCLT_tendstoInDistribution}.  These are Cramer--Wold
-endpoints; the scalar triangular-array probability engine remains outside this
+endpoints.  The scalar Lyapunov-to-Lindeberg algebra now includes
+\lean{sq_le_even_moment_div_threshold} and
+\lean{sq_tail_indicator_le_even_moment_div_threshold}, which bound the scalar
+Lindeberg tail summand by an even higher moment over the threshold power; the
+remaining scalar triangular-array probability engine remains outside this
 branch.
 
 \subsection{Delta Method}
@@ -558,8 +562,9 @@ identities; CR3 middle-moment comparison needed for the full conditional
 conservativeness theorem. \\
 Chapter 5 & Exact random-design Kinal theorem 5.5 inverse-Gram moment threshold. \\
 Chapter 6 & Scalar triangular-array Lindeberg/Lyapunov sufficient-condition
-discharge for Theorems 6.4 and 6.5; arbitrary-unbiased-estimator lower bound
-for Theorem 6.11. \\
+probability-engine discharge for Theorems 6.4 and 6.5 beyond the deterministic
+even-moment tail inequality; arbitrary-unbiased-estimator lower bound for
+Theorem 6.11. \\
 Chapter 7 & Further tightening of the remaining public condition packages to the
 literal textbook iid/moment assumptions; concrete high-moment cumulant
 expansion for Theorem 7.15. \\

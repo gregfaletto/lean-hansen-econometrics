@@ -723,6 +723,44 @@ section ArrayCLT
 variable {Ω : Type*} {mΩ : MeasurableSpace Ω}
 variable {k : Type*} [Fintype k] [DecidableEq k]
 
+/-- Even-moment Lyapunov tail bound for scalar triangular arrays.
+
+On the tail event `c ≤ x^2`, the squared summand is bounded by the
+`(2 + 2m)`-moment scaled by `c^m`. This is the deterministic scalar inequality
+behind an even-moment Lyapunov discharge of Hansen's Lindeberg condition. -/
+theorem sq_le_even_moment_div_threshold
+    (x c : ℝ) (m : ℕ) (hc : 0 < c) (hcx : c ≤ x ^ 2) :
+    x ^ 2 ≤ |x| ^ (2 + 2 * m) / c ^ m := by
+  have hx2_nonneg : 0 ≤ |x| ^ 2 := sq_nonneg |x|
+  have hcx_abs : c ≤ |x| ^ 2 := by simpa [sq_abs] using hcx
+  have hpow : c ^ m ≤ (|x| ^ 2) ^ m := pow_le_pow_left₀ hc.le hcx_abs m
+  have hmul : |x| ^ 2 * c ^ m ≤ |x| ^ 2 * (|x| ^ 2) ^ m :=
+    mul_le_mul_of_nonneg_left hpow hx2_nonneg
+  have hc_pow_pos : 0 < c ^ m := pow_pos hc m
+  have hrewrite : |x| ^ 2 * (|x| ^ 2) ^ m = |x| ^ (2 + 2 * m) := by
+    rw [← pow_mul]
+    rw [← pow_add]
+  have hmul' : |x| ^ 2 * c ^ m ≤ |x| ^ (2 + 2 * m) := by
+    rw [← hrewrite]
+    exact hmul
+  have hdiv : |x| ^ 2 ≤ |x| ^ (2 + 2 * m) / c ^ m :=
+    (le_div_iff₀ (pow_pos hc m)).2 hmul'
+  simpa [sq_abs] using hdiv
+
+/-- Indicator form of `sq_le_even_moment_div_threshold`, matching the
+Lindeberg tail summand. -/
+theorem sq_tail_indicator_le_even_moment_div_threshold
+    (x c : ℝ) (m : ℕ) (hc : 0 < c) :
+    Set.indicator {y : ℝ | c ≤ y ^ 2} (fun y => y ^ 2) x ≤
+      |x| ^ (2 + 2 * m) / c ^ m := by
+  by_cases hx : c ≤ x ^ 2
+  · have hxmem : x ∈ {y : ℝ | c ≤ y ^ 2} := hx
+    rw [Set.indicator_of_mem hxmem]
+    exact sq_le_even_moment_div_threshold x c m hc hx
+  · have hxnot : x ∉ {y : ℝ | c ≤ y ^ 2} := hx
+    rw [Set.indicator_of_notMem hxnot]
+    exact div_nonneg (pow_nonneg (abs_nonneg x) _) (pow_nonneg hc.le m)
+
 /-- Projection-level sufficient condition package for Hansen's multivariate
 Lindeberg CLT.
 
