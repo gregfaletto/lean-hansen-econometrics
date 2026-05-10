@@ -242,9 +242,6 @@ structure IidRobustFeasibleHCMomentConditions (μ : Measure Ω) [IsProbabilityMe
   Q_nonsing : IsUnit (μ[fun ω => Matrix.vecMulVec (X 0 ω) (X 0 ω)]).det
   /-- Population orthogonality `E[e₀X₀] = 0`. -/
   orthogonality : μ[fun ω => e 0 ω • X 0 ω] = 0
-  /-- Square integrability of every scalar projection of the score vector. -/
-  memLp_cross_projection :
-    ∀ a : k → ℝ, MemLp (fun ω => (e 0 ω • X 0 ω) ⬝ᵥ a) 2 μ
   /-- Integrability of the true-error score outer product. -/
   int_score_outer :
     Integrable (fun ω => Matrix.vecMulVec (e 0 ω • X 0 ω) (e 0 ω • X 0 ω)) μ
@@ -386,6 +383,30 @@ private theorem hcQuadWeight_integrable_of_rowNorm_fourth
 
 namespace IidRobustFeasibleHCMomentConditions
 
+/-- Integrability of the score outer product supplies square-integrability of
+each fixed scalar score projection. -/
+theorem memLp_cross_projection
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) (a : k → ℝ) :
+    MemLp (fun ω => (e 0 ω • X 0 ω) ⬝ᵥ a) 2 μ := by
+  classical
+  have hcoord : ∀ j : k, MemLp (fun ω => (e 0 ω • X 0 ω) j) 2 μ := by
+    intro j
+    have hsq_entry :
+        Integrable
+          (fun ω => Matrix.vecMulVec (e 0 ω • X 0 ω) (e 0 ω • X 0 ω) j j) μ :=
+      Integrable.eval (Integrable.eval h.int_score_outer j) j
+    have hsq : Integrable (fun ω => ((e 0 ω • X 0 ω) j) ^ 2) μ := by
+      simpa [Matrix.vecMulVec_apply, pow_two] using hsq_entry
+    exact (memLp_two_iff_integrable_sq
+      (Integrable.eval h.int_cross j).aestronglyMeasurable).2 hsq
+  convert (memLp_finset_sum' (s := Finset.univ)
+    (f := fun j ω => (e 0 ω • X 0 ω) j * a j)
+    (fun j _ => (hcoord j).mul_const (a j))) using 1
+  ext ω
+  simp [dotProduct]
+
 /-- IID joint observations imply pairwise independence of the regressor outer
 products used by the least-squares consistency package. -/
 private theorem outer_pairwise_indep
@@ -519,7 +540,8 @@ theorem toErrorVarianceConsistencyConditions
   int_error_sq := h.int_error_sq
 
 /-- The iid joint-observation package discharges the score-CLT condition
-package once scalar score-projection square-integrability is supplied. -/
+package by deriving scalar score-projection square-integrability from the
+score-outer-product moment. -/
 theorem toScoreCLTConditions
     {μ : Measure Ω} [IsProbabilityMeasure μ]
     {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
@@ -527,7 +549,7 @@ theorem toScoreCLTConditions
     ScoreCLTConditions μ X e where
   toLeastSquaresConsistencyConditions := h.toLeastSquaresConsistencyConditions
   iIndep_cross := cross_iIndep h
-  memLp_cross_projection := h.memLp_cross_projection
+  memLp_cross_projection := IidRobustFeasibleHCMomentConditions.memLp_cross_projection h
 
 /-- The iid joint-observation package discharges the robust covariance
 condition package. -/
