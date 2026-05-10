@@ -1,3 +1,4 @@
+import Mathlib.Algebra.Order.BigOperators.Ring.Finset
 import Mathlib.Probability.CentralLimitTheorem
 import HansenEconometrics.AsymptoticUtils
 import HansenEconometrics.ProbabilityUtils
@@ -332,6 +333,68 @@ theorem iidSampleMean_variance_eq_inv_card_mul
             exact_mod_cast Fintype.card_ne_zero
           dsimp [c]
           field_simp [hcard]
+
+/-- **Hansen Theorem 6.11, scalar best-linear-unbiased face.**
+
+Among linear unbiased estimators `∑ᵢ wᵢ Zᵢ` with weights summing to one, the
+equal-weight sample mean has minimal variance under iid square-integrable scalar
+observations. This is a linear-estimator lower-bound face of Hansen's
+best-unbiased-estimation theorem; the arbitrary-estimator lower bound remains a
+separate efficiency statement. -/
+theorem iidLinearUnbiasedEstimator_variance_ge_sampleMean
+    [IsProbabilityMeasure μ] [Fintype ι] [Nonempty ι]
+    {Z : ι → Ω → ℝ} (j : ι) (w : ι → ℝ)
+    (hZ : ∀ i, MemLp (Z i) 2 μ)
+    (hindep : Pairwise (fun i l => Z i ⟂ᵢ[μ] Z l))
+    (hident : ∀ i, IdentDistrib (Z i) (Z j) μ μ)
+    (hw : ∑ i, w i = 1) :
+    (Fintype.card ι : ℝ)⁻¹ * Var[Z j; μ] ≤
+      Var[fun ω => ∑ i, w i * Z i ω; μ] := by
+  classical
+  let W : ι → Ω → ℝ := fun i ω => w i * Z i ω
+  have hWmem : ∀ i, MemLp (W i) 2 μ := fun i => (hZ i).const_mul (w i)
+  have hWpair : Set.Pairwise (↑(Finset.univ : Finset ι) : Set ι)
+      (fun i l => W i ⟂ᵢ[μ] W l) := by
+    intro i _ l _ hil
+    exact IndepFun.comp (hindep hil)
+      (measurable_const.mul measurable_id) (measurable_const.mul measurable_id)
+  have hvarsum := ProbabilityTheory.IndepFun.variance_sum
+    (μ := μ) (X := W) (s := Finset.univ) (fun i _ => hWmem i) hWpair
+  have hweighted :
+      Var[fun ω => ∑ i, w i * Z i ω; μ] =
+        (∑ i, w i ^ 2) * Var[Z j; μ] := by
+    calc
+      Var[fun ω => ∑ i, w i * Z i ω; μ] = Var[(∑ i, W i); μ] := by
+        congr
+        ext ω
+        simp [W]
+      _ = ∑ i, Var[W i; μ] := hvarsum
+      _ = ∑ i, w i ^ 2 * Var[Z i; μ] := by
+        refine Finset.sum_congr rfl ?_
+        intro i _
+        simp [W, ProbabilityTheory.variance_const_mul, pow_two]
+      _ = ∑ i, w i ^ 2 * Var[Z j; μ] := by
+        refine Finset.sum_congr rfl ?_
+        intro i _
+        rw [(hident i).variance_eq]
+      _ = (∑ i, w i ^ 2) * Var[Z j; μ] := by
+        rw [Finset.sum_mul]
+  have hcard_pos : 0 < (Fintype.card ι : ℝ) := by
+    exact_mod_cast Fintype.card_pos
+  have hcs := Finset.sum_mul_sq_le_sq_mul_sq (s := (Finset.univ : Finset ι))
+    (f := w) (g := fun _ : ι => (1 : ℝ))
+  have hsum_sq_ge : (Fintype.card ι : ℝ)⁻¹ ≤ ∑ i, w i ^ 2 := by
+    rw [inv_eq_one_div, div_le_iff₀ hcard_pos]
+    convert hcs using 1
+    · simp [hw]
+    · simp [pow_two, mul_comm]
+  have hvar_nonneg : 0 ≤ Var[Z j; μ] :=
+    ProbabilityTheory.variance_nonneg (Z j) μ
+  calc
+    (Fintype.card ι : ℝ)⁻¹ * Var[Z j; μ]
+        ≤ (∑ i, w i ^ 2) * Var[Z j; μ] :=
+          mul_le_mul_of_nonneg_right hsum_sq_ge hvar_nonneg
+    _ = Var[fun ω => ∑ i, w i * Z i ω; μ] := hweighted.symm
 
 /-- **Hansen Theorem 6.11, covariance-matrix sample-mean sharpness face.**
 

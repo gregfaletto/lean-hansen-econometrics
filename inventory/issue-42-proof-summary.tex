@@ -322,13 +322,15 @@ The main theorem names are
 The branch adds exact scalar and vector sample-mean variance formulas:
 \begin{itemize}
   \item \lean{iidSampleMean_variance_eq_inv_card_mul}.
+  \item \lean{iidLinearUnbiasedEstimator_variance_ge_sampleMean}.
   \item \lean{iidSampleMean_covMat_eq_inv_card_smul}.
   \item \lean{iidSampleMean_covMat_eq_inv_card_smul_of_identDistrib}.
 \end{itemize}
 
 These prove the sample mean attains the $n^{-1}$ variance/covariance scale for
-iid observations.  They are not the full arbitrary-unbiased-estimator lower
-bound of Hansen Theorem 6.11.
+iid observations and that no scalar linear unbiased weighted estimator improves
+on the equal-weight sample mean.  They are not the full
+arbitrary-unbiased-estimator lower bound of Hansen Theorem 6.11.
 
 \section{Chapter 7: Least-Squares Asymptotics}
 
