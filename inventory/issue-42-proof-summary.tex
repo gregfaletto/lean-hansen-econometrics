@@ -105,11 +105,18 @@ Main declarations:
   \item \lean{conditionalAverageTreatmentEffectOn_treatment_covariates_eq_of_CIA}:
   conditioning the treatment effect on $(D,X)$ gives the same CATE as
   conditioning on $X$ alone, almost everywhere.
+  \item \lean{conditionalAverageTreatmentEffectSurface},
+  \lean{observedRegressionSurface}, and
+  \lean{observedRegressionTreatmentContrastSurface}: thin pointwise notation
+  bridges for $ACE(x)$, $m(d,x)$, and $m(1,x)-m(0,x)$.
+  \item \lean{conditionalAverageTreatmentEffectOn_eq_surface} and
+  \lean{conditionalAverageTreatmentEffectOn_eq_observedRegressionTreatmentContrastSurface}:
+  supplied pointwise versions pull back to the existing variable-facing CATE.
 \end{itemize}
 
 The result is a usable a.e. version of the potential-outcomes and conditional
-average-treatment-effect story.  The branch does not add pointwise density
-notation $ACE(x)$.
+average-treatment-effect story with pointwise notation bridges layered on top
+of the a.e. conditional-expectation core.
 
 \section{Chapter 3: Finite-Sample Least-Squares Algebra}
 
@@ -483,9 +490,6 @@ remaining gaps are:
 \toprule
 Area & Remaining work \\
 \midrule
-Chapter 2 & Optional pointwise $ACE(x)$ notation and a literal
-$m(1,x)-m(0,x)$ surface beyond the current a.e. variable-facing CATE and
-observed-regression wrappers. \\
 Chapter 4 & Clustered covariance asymptotics and multi-observation cluster
 partition infrastructure; HC4-style leverage-adjusted variants. \\
 Chapter 5 & Kinal theorem 5.5, deferred unless a downstream theorem needs the
