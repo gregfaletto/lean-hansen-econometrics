@@ -234,8 +234,6 @@ structure IidRobustFeasibleHCMomentConditions (μ : Measure Ω) [IsProbabilityMe
       (fun ω => (X 0 ω, e 0 ω)) μ μ
   /-- Integrability of the one-row regressor outer product. -/
   int_outer : Integrable (fun ω => Matrix.vecMulVec (X 0 ω) (X 0 ω)) μ
-  /-- Integrability of the one-row score vector `e₀X₀`. -/
-  int_cross : Integrable (fun ω => e 0 ω • X 0 ω) μ
   /-- Integrability of the one-row squared structural error. -/
   int_error_sq : Integrable (fun ω => e 0 ω ^ 2) μ
   /-- Population Gram matrix `Q := E[X₀X₀ᵀ]` is nonsingular. -/
@@ -383,6 +381,42 @@ private theorem hcQuadWeight_integrable_of_rowNorm_fourth
 
 namespace IidRobustFeasibleHCMomentConditions
 
+/-- The baseline score vector is strongly measurable under the iid feasible-HC package. -/
+theorem score_aestronglyMeasurable
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    AEStronglyMeasurable (fun ω => e 0 ω • X 0 ω) μ :=
+  (h.e_aestronglyMeasurable 0).smul (h.x_aestronglyMeasurable 0)
+
+/-- Integrability of the score outer product supplies coordinatewise score
+square-integrability. -/
+theorem scoreCoordinate_memLp_two
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) (j : k) :
+    MemLp (fun ω => (e 0 ω • X 0 ω) j) 2 μ := by
+  have hsq_entry :
+      Integrable
+        (fun ω => Matrix.vecMulVec (e 0 ω • X 0 ω) (e 0 ω • X 0 ω) j j) μ :=
+    Integrable.eval (Integrable.eval h.int_score_outer j) j
+  have hsq : Integrable (fun ω => ((e 0 ω • X 0 ω) j) ^ 2) μ := by
+    simpa [Matrix.vecMulVec_apply, pow_two] using hsq_entry
+  exact (memLp_two_iff_integrable_sq
+    ((continuous_apply j).comp_aestronglyMeasurable
+      (IidRobustFeasibleHCMomentConditions.score_aestronglyMeasurable h))).2 hsq
+
+/-- Integrability of the score outer product supplies integrability of the score vector. -/
+theorem int_cross
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    Integrable (fun ω => e 0 ω • X 0 ω) μ := by
+  have hscore : MemLp (fun ω => e 0 ω • X 0 ω) 2 μ :=
+    MemLp.of_eval
+      (fun j => IidRobustFeasibleHCMomentConditions.scoreCoordinate_memLp_two h j)
+  exact memLp_one_iff_integrable.mp (hscore.mono_exponent one_le_two)
+
 /-- Integrability of the score outer product supplies square-integrability of
 each fixed scalar score projection. -/
 theorem memLp_cross_projection
@@ -391,19 +425,11 @@ theorem memLp_cross_projection
     (h : IidRobustFeasibleHCMomentConditions μ X e y β) (a : k → ℝ) :
     MemLp (fun ω => (e 0 ω • X 0 ω) ⬝ᵥ a) 2 μ := by
   classical
-  have hcoord : ∀ j : k, MemLp (fun ω => (e 0 ω • X 0 ω) j) 2 μ := by
-    intro j
-    have hsq_entry :
-        Integrable
-          (fun ω => Matrix.vecMulVec (e 0 ω • X 0 ω) (e 0 ω • X 0 ω) j j) μ :=
-      Integrable.eval (Integrable.eval h.int_score_outer j) j
-    have hsq : Integrable (fun ω => ((e 0 ω • X 0 ω) j) ^ 2) μ := by
-      simpa [Matrix.vecMulVec_apply, pow_two] using hsq_entry
-    exact (memLp_two_iff_integrable_sq
-      (Integrable.eval h.int_cross j).aestronglyMeasurable).2 hsq
   convert (memLp_finset_sum' (s := Finset.univ)
     (f := fun j ω => (e 0 ω • X 0 ω) j * a j)
-    (fun j _ => (hcoord j).mul_const (a j))) using 1
+    (fun j _ =>
+      (IidRobustFeasibleHCMomentConditions.scoreCoordinate_memLp_two h j).mul_const (a j)))
+    using 1
   ext ω
   simp [dotProduct]
 
@@ -520,7 +546,7 @@ theorem toLeastSquaresConsistencyConditions
     have hi := (h.joint_identDistrib i).comp measurable_jointCross
     simpa [Function.comp] using hi
   int_outer := h.int_outer
-  int_cross := h.int_cross
+  int_cross := IidRobustFeasibleHCMomentConditions.int_cross h
   Q_nonsing := h.Q_nonsing
   orthogonality := h.orthogonality
 
