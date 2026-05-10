@@ -40,6 +40,1635 @@ private lemma matrixBorelSpaceInst : BorelSpace (Matrix k k ℝ) :=
 
 attribute [local instance] matrixBorelSpaceInst
 
+/-- Condition package for the feasible HC0/HC1 residual-substitution layer.
+
+This collects the linear-model identity, component measurability, and bounded
+empirical third/fourth weight premises that appear repeatedly in the current
+HC0/HC1 covariance wrappers. It is a chapter-facing sufficient condition layer,
+not a claim that these hypotheses are minimal. -/
+structure FeasibleHCRemainderConditions (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (X : ℕ → Ω → (k → ℝ)) (e y : ℕ → Ω → ℝ) (β : k → ℝ) where
+  /-- Linear-model decomposition of the observed outcome. -/
+  model : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω
+  /-- Component measurability of the regressor sequence. -/
+  x_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (X i) μ
+  /-- Component measurability of the structural-error sequence. -/
+  e_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (e i) μ
+  /-- Bounded-in-probability third-weight controls for the HC0 cross remainder. -/
+  crossWeight_bounded : ∀ a b l : k, BoundedInProbability μ
+    (fun n ω =>
+      sampleScoreCovCrossWeight
+        (stackRegressors X n ω) (stackErrors e n ω) a b l)
+  /-- Bounded-in-probability fourth-weight controls for the HC0 quadratic remainder. -/
+  quadWeight_bounded : ∀ a b l m : k, BoundedInProbability μ
+    (fun n ω =>
+      sampleScoreCovQuadraticWeight
+        (stackRegressors X n ω) a b l m)
+
+/-- Condition package for the HC2/HC3 leverage-adjusted feasible covariance
+wrappers. It adds maximal leverage `oₚ(1)` to the feasible HC0 remainder
+package. -/
+structure FeasibleHCLeverageConditions (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (X : ℕ → Ω → (k → ℝ)) (e y : ℕ → Ω → ℝ) (β : k → ℝ)
+    extends FeasibleHCRemainderConditions μ X e y β where
+  /-- Maximal totalized leverage converges to zero in probability. -/
+  maxLeverage_tendsto :
+    TendstoInMeasure μ
+      (fun n ω => maxLeverageStar (stackRegressors X n ω))
+      atTop (fun _ => 0)
+
+/-- Primitive scalar-WLLN condition package for the feasible HC0/HC1
+bounded-weight layer.
+
+This packages the integrability, pairwise-independence, and identical-distribution
+hypotheses for the third- and fourth-moment scalar summands that appear in the
+HC0 residual-substitution expansion. It is a proof-facing sufficient condition
+that feeds `FeasibleHCRemainderConditions`. -/
+structure FeasibleHCWeightWLLNConditions (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (X : ℕ → Ω → (k → ℝ)) (e y : ℕ → Ω → ℝ) (β : k → ℝ) where
+  /-- Linear-model decomposition of the observed outcome. -/
+  model : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω
+  /-- Component measurability of the regressor sequence. -/
+  x_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (X i) μ
+  /-- Component measurability of the structural-error sequence. -/
+  e_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (e i) μ
+  /-- Integrability of each baseline third-moment scalar summand. -/
+  crossWeight_integrable : ∀ a b l : k, Integrable
+    (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ
+  /-- Pairwise independence of each third-moment scalar summand sequence. -/
+  crossWeight_pairwise_indep : ∀ a b l : k, Pairwise ((· ⟂ᵢ[μ] ·) on
+    (fun i ω => 2 * e i ω * X i ω l * X i ω a * X i ω b))
+  /-- Identical distribution of each third-moment scalar summand sequence. -/
+  crossWeight_identDistrib : ∀ a b l : k, ∀ i,
+    IdentDistrib
+      (fun ω => 2 * e i ω * X i ω l * X i ω a * X i ω b)
+      (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ μ
+  /-- Integrability of each baseline fourth-moment scalar summand. -/
+  quadWeight_integrable : ∀ a b l m : k, Integrable
+    (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ
+  /-- Pairwise independence of each fourth-moment scalar summand sequence. -/
+  quadWeight_pairwise_indep : ∀ a b l m : k, Pairwise ((· ⟂ᵢ[μ] ·) on
+    (fun i ω => X i ω l * X i ω m * X i ω a * X i ω b))
+  /-- Identical distribution of each fourth-moment scalar summand sequence. -/
+  quadWeight_identDistrib : ∀ a b l m : k, ∀ i,
+    IdentDistrib
+      (fun ω => X i ω l * X i ω m * X i ω a * X i ω b)
+      (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ μ
+
+/-- Joint-observation sufficient condition package for the scalar WLLN layer
+used in feasible HC covariance proofs.
+
+The independence and identical-distribution assumptions are stated once for the
+joint observations `(Xᵢ, eᵢ)`. The integrability fields are still scalar because
+they are the exact summands consumed by the existing WLLN constructors. -/
+structure FeasibleHCJointWLLNConditions (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (X : ℕ → Ω → (k → ℝ)) (e y : ℕ → Ω → ℝ) (β : k → ℝ) where
+  /-- Linear-model decomposition of the observed outcome. -/
+  model : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω
+  /-- Component measurability of the regressor sequence. -/
+  x_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (X i) μ
+  /-- Component measurability of the structural-error sequence. -/
+  e_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (e i) μ
+  /-- Pairwise independence of the joint observations `(Xᵢ, eᵢ)`. -/
+  joint_pairwise_indep : Pairwise ((· ⟂ᵢ[μ] ·) on
+    (fun i ω => (X i ω, e i ω)))
+  /-- Identical distribution of the joint observations against the baseline row. -/
+  joint_identDistrib : ∀ i,
+    IdentDistrib (fun ω => (X i ω, e i ω))
+      (fun ω => (X 0 ω, e 0 ω)) μ μ
+  /-- Integrability of each baseline third-moment scalar summand. -/
+  crossWeight_integrable : ∀ a b l : k, Integrable
+    (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ
+  /-- Integrability of each baseline fourth-moment scalar summand. -/
+  quadWeight_integrable : ∀ a b l m : k, Integrable
+    (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ
+
+/-- Compact moment sufficient condition package for the feasible HC WLLN layer.
+
+The two moment fields dominate every coordinatewise third/fourth scalar summand
+used by the residual-substitution expansion. This keeps the public assumption
+surface closer to textbook row-norm moment conditions while still feeding the
+existing scalar WLLN constructors. -/
+structure FeasibleHCMomentWLLNConditions (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (X : ℕ → Ω → (k → ℝ)) (e y : ℕ → Ω → ℝ) (β : k → ℝ) where
+  /-- Linear-model decomposition of the observed outcome. -/
+  model : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω
+  /-- Component measurability of the regressor sequence. -/
+  x_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (X i) μ
+  /-- Component measurability of the structural-error sequence. -/
+  e_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (e i) μ
+  /-- Pairwise independence of the joint observations `(Xᵢ, eᵢ)`. -/
+  joint_pairwise_indep : Pairwise ((· ⟂ᵢ[μ] ·) on
+    (fun i ω => (X i ω, e i ω)))
+  /-- Identical distribution of the joint observations against the baseline row. -/
+  joint_identDistrib : ∀ i,
+    IdentDistrib (fun ω => (X i ω, e i ω))
+      (fun ω => (X 0 ω, e 0 ω)) μ μ
+  /-- Compact third-moment domination for feasible-HC cross weights. -/
+  absError_rowNorm_cubed_integrable :
+    Integrable (fun ω => |e 0 ω| * ‖X 0 ω‖ ^ 3) μ
+  /-- Compact fourth-row-moment domination for feasible-HC quadratic weights. -/
+  rowNorm_fourth_integrable : Integrable (fun ω => ‖X 0 ω‖ ^ 4) μ
+
+namespace FeasibleHCMomentWLLNConditions
+
+omit [DecidableEq k] in
+/-- Fourth-row-moment integrability implies the finite first moment for squared row norms used by
+max-leverage and residual-uniformity discharges. -/
+theorem rowNorm_sq_memLp
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : FeasibleHCMomentWLLNConditions μ X e y β) :
+    MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ := by
+  exact memLp_one_iff_integrable.mpr
+    (integrable_norm_pow_of_le (f := X 0) (μ := μ) (h.x_aestronglyMeasurable 0)
+      (show (2 : ℕ) ≤ 4 by norm_num) h.rowNorm_fourth_integrable)
+
+end FeasibleHCMomentWLLNConditions
+
+/-- Single public sufficient-condition package for robust feasible HC0--HC3 inference.
+
+This combines the robust covariance WLLN/CLT package with the compact feasible-HC
+moment package. The squared-row `L¹` moment used to discharge maximal leverage is
+derived from the fourth-row-moment field, and the feasible-HC third absolute row
+moment is derived from the score outer-product moment plus the fourth-row moment
+rather than carried as a separate assumption. It is still a sufficient condition
+layer, not a literal minimal encoding of Hansen's Assumption 7.2. -/
+structure RobustFeasibleHCMomentConditions (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (X : ℕ → Ω → (k → ℝ)) (e y : ℕ → Ω → ℝ) (β : k → ℝ)
+    extends RobustCovarianceConsistencyConditions μ X e where
+  /-- Linear-model decomposition of the observed outcome. -/
+  model : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω
+  /-- Component measurability of the regressor sequence. -/
+  x_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (X i) μ
+  /-- Component measurability of the structural-error sequence. -/
+  e_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (e i) μ
+  /-- Pairwise independence of the joint observations `(Xᵢ, eᵢ)`. -/
+  joint_pairwise_indep : Pairwise ((· ⟂ᵢ[μ] ·) on
+    (fun i ω => (X i ω, e i ω)))
+  /-- Identical distribution of the joint observations against the baseline row. -/
+  joint_identDistrib : ∀ i,
+    IdentDistrib (fun ω => (X i ω, e i ω))
+      (fun ω => (X 0 ω, e 0 ω)) μ μ
+  /-- Compact fourth-row-moment domination for feasible-HC quadratic weights. -/
+  rowNorm_fourth_integrable : Integrable (fun ω => ‖X 0 ω‖ ^ 4) μ
+
+namespace RobustFeasibleHCMomentConditions
+
+/-- Fourth-row-moment integrability supplies the squared-row `L¹` moment needed by the
+Chapter 6 maximum theorem. -/
+theorem rowNorm_sq_memLp
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : RobustFeasibleHCMomentConditions μ X e y β) :
+    MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ := by
+  exact memLp_one_iff_integrable.mpr
+    (integrable_norm_pow_of_le (f := X 0) (μ := μ) (h.x_aestronglyMeasurable 0)
+      (show (2 : ℕ) ≤ 4 by norm_num) h.rowNorm_fourth_integrable)
+
+/-- Fourth-row-moment integrability supplies the squared-row `L²` moment used with
+the score `L²` moment in the feasible-HC third-weight discharge. -/
+theorem rowNorm_sq_memLp_two
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : RobustFeasibleHCMomentConditions μ X e y β) :
+    MemLp (fun ω => ‖X 0 ω‖ ^ 2) 2 μ := by
+  have hmeas : AEStronglyMeasurable (fun ω => ‖X 0 ω‖ ^ 2) μ :=
+    ((h.x_aestronglyMeasurable 0).norm.aemeasurable.pow_const 2).aestronglyMeasurable
+  refine (memLp_two_iff_integrable_sq hmeas).2 ?_
+  convert h.rowNorm_fourth_integrable using 1
+  ext ω
+  ring
+
+/-- The baseline score vector is strongly measurable under the compact robust
+feasible-HC package. -/
+theorem score_aestronglyMeasurable
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : RobustFeasibleHCMomentConditions μ X e y β) :
+    AEStronglyMeasurable (fun ω => e 0 ω • X 0 ω) μ :=
+  (h.e_aestronglyMeasurable 0).smul (h.x_aestronglyMeasurable 0)
+
+/-- Integrability of the score outer product supplies coordinatewise score
+square-integrability under the compact robust feasible-HC package. -/
+theorem scoreCoordinate_memLp_two
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : RobustFeasibleHCMomentConditions μ X e y β) (j : k) :
+    MemLp (fun ω => (e 0 ω • X 0 ω) j) 2 μ := by
+  have hsq_entry :
+      Integrable
+        (fun ω => Matrix.vecMulVec (e 0 ω • X 0 ω) (e 0 ω • X 0 ω) j j) μ :=
+    Integrable.eval (Integrable.eval h.int_score_outer j) j
+  have hsq : Integrable (fun ω => ((e 0 ω • X 0 ω) j) ^ 2) μ := by
+    simpa [Matrix.vecMulVec_apply, pow_two] using hsq_entry
+  exact (memLp_two_iff_integrable_sq
+    ((continuous_apply j).comp_aestronglyMeasurable
+      (RobustFeasibleHCMomentConditions.score_aestronglyMeasurable h))).2 hsq
+
+/-- Integrability of the score outer product supplies vector-valued score
+square-integrability under the compact robust feasible-HC package. -/
+theorem score_memLp_two
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : RobustFeasibleHCMomentConditions μ X e y β) :
+    MemLp (fun ω => e 0 ω • X 0 ω) 2 μ :=
+  MemLp.of_eval
+    (fun j => RobustFeasibleHCMomentConditions.scoreCoordinate_memLp_two h j)
+
+/-- The robust score second moment and fourth row moment imply the compact third-moment
+domination used by the feasible-HC cross weights. -/
+theorem absError_rowNorm_cubed_integrable
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : RobustFeasibleHCMomentConditions μ X e y β) :
+    Integrable (fun ω => |e 0 ω| * ‖X 0 ω‖ ^ 3) μ := by
+  have hscore : MemLp (fun ω => ‖e 0 ω • X 0 ω‖) 2 μ :=
+    (RobustFeasibleHCMomentConditions.score_memLp_two h).norm
+  have hrow : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 2 μ :=
+    RobustFeasibleHCMomentConditions.rowNorm_sq_memLp_two h
+  have hprod : Integrable
+      ((fun ω => ‖e 0 ω • X 0 ω‖) * (fun ω => ‖X 0 ω‖ ^ 2)) μ :=
+    hscore.integrable_mul hrow
+  convert hprod using 1
+  ext ω
+  simp [Pi.mul_apply, norm_smul, Real.norm_eq_abs]
+  ring
+
+/-- The compact robust feasible-HC package discharges the compact feasible-HC
+moment WLLN package. -/
+theorem toFeasibleHCMomentWLLNConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : RobustFeasibleHCMomentConditions μ X e y β) :
+    FeasibleHCMomentWLLNConditions μ X e y β where
+  model := h.model
+  x_aestronglyMeasurable := h.x_aestronglyMeasurable
+  e_aestronglyMeasurable := h.e_aestronglyMeasurable
+  joint_pairwise_indep := h.joint_pairwise_indep
+  joint_identDistrib := h.joint_identDistrib
+  absError_rowNorm_cubed_integrable :=
+    RobustFeasibleHCMomentConditions.absError_rowNorm_cubed_integrable h
+  rowNorm_fourth_integrable := h.rowNorm_fourth_integrable
+
+end RobustFeasibleHCMomentConditions
+
+/-- IID joint-observation sufficient-condition package for robust feasible HC0--HC3 inference.
+
+This package records primitive independence and identical-distribution assumptions
+for the observations `(Xᵢ, eᵢ)` and derives the transformed condition bundles used
+by the existing Chapter 7 covariance and inference theorems. It is intentionally
+a sufficient iid layer: moment, nonsingularity, orthogonality, and high-moment
+fields remain explicit rather than hidden behind a minimal textbook assumption. -/
+structure IidRobustFeasibleHCMomentConditions (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (X : ℕ → Ω → (k → ℝ)) (e y : ℕ → Ω → ℝ) (β : k → ℝ) where
+  /-- Linear-model decomposition of the observed outcome. -/
+  model : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω
+  /-- Component measurability of the regressor sequence. -/
+  x_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (X i) μ
+  /-- Component measurability of the structural-error sequence. -/
+  e_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (e i) μ
+  /-- Full independence of the joint observations `(Xᵢ, eᵢ)`. -/
+  joint_iIndep : iIndepFun (fun i ω => (X i ω, e i ω)) μ
+  /-- Identical distribution of the joint observations against the baseline row. -/
+  joint_identDistrib : ∀ i,
+    IdentDistrib (fun ω => (X i ω, e i ω))
+      (fun ω => (X 0 ω, e 0 ω)) μ μ
+  /-- Integrability of the one-row squared structural error. -/
+  int_error_sq : Integrable (fun ω => e 0 ω ^ 2) μ
+  /-- Population Gram matrix `Q := E[X₀X₀ᵀ]` is nonsingular. -/
+  Q_nonsing : IsUnit (μ[fun ω => Matrix.vecMulVec (X 0 ω) (X 0 ω)]).det
+  /-- Population orthogonality `E[e₀X₀] = 0`. -/
+  orthogonality : μ[fun ω => e 0 ω • X 0 ω] = 0
+  /-- Integrability of the true-error score outer product. -/
+  int_score_outer :
+    Integrable (fun ω => Matrix.vecMulVec (e 0 ω • X 0 ω) (e 0 ω • X 0 ω)) μ
+  /-- Compact fourth-row-moment domination for feasible-HC quadratic weights. -/
+  rowNorm_fourth_integrable : Integrable (fun ω => ‖X 0 ω‖ ^ 4) μ
+
+namespace IidRobustFeasibleHCMomentConditions
+
+/-- Fourth-row-moment integrability supplies the squared-row `L¹` moment needed by the
+Chapter 6 maximum theorem. -/
+theorem rowNorm_sq_memLp
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ := by
+  exact memLp_one_iff_integrable.mpr
+    (integrable_norm_pow_of_le (f := X 0) (μ := μ) (h.x_aestronglyMeasurable 0)
+      (show (2 : ℕ) ≤ 4 by norm_num) h.rowNorm_fourth_integrable)
+
+/-- Fourth-row-moment integrability supplies the squared-row `L²` moment used with
+the score `L²` moment in the feasible-HC third-weight discharge. -/
+theorem rowNorm_sq_memLp_two
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    MemLp (fun ω => ‖X 0 ω‖ ^ 2) 2 μ := by
+  have hmeas : AEStronglyMeasurable (fun ω => ‖X 0 ω‖ ^ 2) μ :=
+    ((h.x_aestronglyMeasurable 0).norm.aemeasurable.pow_const 2).aestronglyMeasurable
+  refine (memLp_two_iff_integrable_sq hmeas).2 ?_
+  convert h.rowNorm_fourth_integrable using 1
+  ext ω
+  ring
+
+end IidRobustFeasibleHCMomentConditions
+
+/-- IID fourth-moment sufficient-condition package for Hansen Assumption 7.2.
+
+This is closer to the textbook assumption surface than
+`IidRobustFeasibleHCMomentConditions`: it asks for iid joint observations, a
+fourth moment for the structural error, and a fourth row-norm moment for the
+regressor.  The conversion theorem below derives the score outer-product moment
+used by the existing robust feasible-HC API.  The remaining difference from a
+literal textbook `E[Y^4]` assumption is the projection step turning a response
+fourth moment into a structural-error fourth moment. -/
+structure IidAssumption72FourthMomentConditions (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (X : ℕ → Ω → (k → ℝ)) (e y : ℕ → Ω → ℝ) (β : k → ℝ) where
+  /-- Linear-model decomposition of the observed outcome. -/
+  model : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω
+  /-- Component measurability of the regressor sequence. -/
+  x_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (X i) μ
+  /-- Component measurability of the structural-error sequence. -/
+  e_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (e i) μ
+  /-- Full independence of the joint observations `(Xᵢ, eᵢ)`. -/
+  joint_iIndep : iIndepFun (fun i ω => (X i ω, e i ω)) μ
+  /-- Identical distribution of the joint observations against the baseline row. -/
+  joint_identDistrib : ∀ i,
+    IdentDistrib (fun ω => (X i ω, e i ω))
+      (fun ω => (X 0 ω, e 0 ω)) μ μ
+  /-- Integrability of the one-row fourth structural-error moment. -/
+  int_error_fourth : Integrable (fun ω => e 0 ω ^ 4) μ
+  /-- Population Gram matrix `Q := E[X₀X₀ᵀ]` is nonsingular. -/
+  Q_nonsing : IsUnit (μ[fun ω => Matrix.vecMulVec (X 0 ω) (X 0 ω)]).det
+  /-- Population orthogonality `E[e₀X₀] = 0`. -/
+  orthogonality : μ[fun ω => e 0 ω • X 0 ω] = 0
+  /-- Fourth-row-moment domination for feasible-HC quadratic weights. -/
+  rowNorm_fourth_integrable : Integrable (fun ω => ‖X 0 ω‖ ^ 4) μ
+
+namespace IidAssumption72FourthMomentConditions
+
+/-- The fourth structural-error moment supplies the squared-error `L²` moment. -/
+theorem error_sq_memLp_two
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidAssumption72FourthMomentConditions μ X e y β) :
+    MemLp (fun ω => e 0 ω ^ 2) 2 μ := by
+  have hmeas : AEStronglyMeasurable (fun ω => e 0 ω ^ 2) μ :=
+    ((h.e_aestronglyMeasurable 0).aemeasurable.pow_const 2).aestronglyMeasurable
+  refine (memLp_two_iff_integrable_sq hmeas).2 ?_
+  convert h.int_error_fourth using 1
+  ext ω
+  ring
+
+/-- The fourth structural-error moment supplies the squared-error first moment. -/
+theorem int_error_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidAssumption72FourthMomentConditions μ X e y β) :
+    Integrable (fun ω => e 0 ω ^ 2) μ :=
+  memLp_one_iff_integrable.mp
+    ((IidAssumption72FourthMomentConditions.error_sq_memLp_two h).mono_exponent one_le_two)
+
+/-- Fourth-row-moment integrability supplies the squared-row `L²` moment. -/
+theorem rowNorm_sq_memLp_two
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidAssumption72FourthMomentConditions μ X e y β) :
+    MemLp (fun ω => ‖X 0 ω‖ ^ 2) 2 μ := by
+  have hmeas : AEStronglyMeasurable (fun ω => ‖X 0 ω‖ ^ 2) μ :=
+    ((h.x_aestronglyMeasurable 0).norm.aemeasurable.pow_const 2).aestronglyMeasurable
+  refine (memLp_two_iff_integrable_sq hmeas).2 ?_
+  convert h.rowNorm_fourth_integrable using 1
+  ext ω
+  ring
+
+/-- Fourth moments of the structural error and regressor row imply integrability
+of the true-error score outer product. -/
+theorem int_score_outer
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidAssumption72FourthMomentConditions μ X e y β) :
+    Integrable (fun ω => Matrix.vecMulVec (e 0 ω • X 0 ω) (e 0 ω • X 0 ω)) μ := by
+  classical
+  have he2 : MemLp (fun ω => e 0 ω ^ 2) 2 μ :=
+    IidAssumption72FourthMomentConditions.error_sq_memLp_two h
+  have hrow2 : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 2 μ :=
+    IidAssumption72FourthMomentConditions.rowNorm_sq_memLp_two h
+  have hprod : Integrable
+      ((fun ω => e 0 ω ^ 2) * (fun ω => ‖X 0 ω‖ ^ 2)) μ :=
+    he2.integrable_mul hrow2
+  refine Integrable.of_eval ?_
+  intro a
+  refine Integrable.of_eval ?_
+  intro b
+  have hXa : AEStronglyMeasurable (fun ω => X 0 ω a) μ :=
+    (continuous_apply a).comp_aestronglyMeasurable (h.x_aestronglyMeasurable 0)
+  have hXb : AEStronglyMeasurable (fun ω => X 0 ω b) μ :=
+    (continuous_apply b).comp_aestronglyMeasurable (h.x_aestronglyMeasurable 0)
+  have he0 : AEStronglyMeasurable (fun ω => e 0 ω) μ :=
+    h.e_aestronglyMeasurable 0
+  have hf : AEStronglyMeasurable
+      (fun ω => Matrix.vecMulVec (e 0 ω • X 0 ω) (e 0 ω • X 0 ω) a b) μ := by
+    simpa [Matrix.vecMulVec_apply, Pi.smul_apply] using
+      ((he0.mul hXa).mul (he0.mul hXb))
+  refine hprod.mono' hf (ae_of_all μ fun ω => ?_)
+  have hxa : |X 0 ω a| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) a
+  have hxb : |X 0 ω b| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) b
+  calc
+    ‖Matrix.vecMulVec (e 0 ω • X 0 ω) (e 0 ω • X 0 ω) a b‖
+        = |e 0 ω| ^ 2 * |X 0 ω a| * |X 0 ω b| := by
+          simp [Matrix.vecMulVec_apply, Pi.smul_apply, Real.norm_eq_abs,
+            pow_two, mul_left_comm, mul_comm]
+    _ ≤ |e 0 ω| ^ 2 * ‖X 0 ω‖ * ‖X 0 ω‖ := by
+          gcongr
+    _ = e 0 ω ^ 2 * ‖X 0 ω‖ ^ 2 := by
+          rw [sq_abs]
+          ring
+
+/-- The fourth-moment iid package discharges the existing robust feasible-HC
+joint-observation package. -/
+theorem toIidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidAssumption72FourthMomentConditions μ X e y β) :
+    IidRobustFeasibleHCMomentConditions μ X e y β where
+  model := h.model
+  x_aestronglyMeasurable := h.x_aestronglyMeasurable
+  e_aestronglyMeasurable := h.e_aestronglyMeasurable
+  joint_iIndep := h.joint_iIndep
+  joint_identDistrib := h.joint_identDistrib
+  int_error_sq := IidAssumption72FourthMomentConditions.int_error_sq h
+  Q_nonsing := h.Q_nonsing
+  orthogonality := h.orthogonality
+  int_score_outer := IidAssumption72FourthMomentConditions.int_score_outer h
+  rowNorm_fourth_integrable := h.rowNorm_fourth_integrable
+
+end IidAssumption72FourthMomentConditions
+
+/-- IID response/regressor fourth-moment package for Hansen Assumption 7.2.
+
+This packages the textbook-style response moment `E[Y^4] < ∞` together with
+the linear-model decomposition.  The conversion theorem derives the structural
+error fourth moment and then reuses `IidAssumption72FourthMomentConditions`. -/
+structure IidAssumption72ResponseMomentConditions (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (X : ℕ → Ω → (k → ℝ)) (e y : ℕ → Ω → ℝ) (β : k → ℝ) where
+  /-- Linear-model decomposition of the observed outcome. -/
+  model : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω
+  /-- Component measurability of the regressor sequence. -/
+  x_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (X i) μ
+  /-- Component measurability of the structural-error sequence. -/
+  e_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (e i) μ
+  /-- Component measurability of the response sequence. -/
+  y_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (y i) μ
+  /-- Full independence of the joint observations `(Xᵢ, eᵢ)`. -/
+  joint_iIndep : iIndepFun (fun i ω => (X i ω, e i ω)) μ
+  /-- Identical distribution of the joint observations against the baseline row. -/
+  joint_identDistrib : ∀ i,
+    IdentDistrib (fun ω => (X i ω, e i ω))
+      (fun ω => (X 0 ω, e 0 ω)) μ μ
+  /-- Integrability of the one-row fourth response moment. -/
+  int_response_fourth : Integrable (fun ω => y 0 ω ^ 4) μ
+  /-- Population Gram matrix `Q := E[X₀X₀ᵀ]` is nonsingular. -/
+  Q_nonsing : IsUnit (μ[fun ω => Matrix.vecMulVec (X 0 ω) (X 0 ω)]).det
+  /-- Population orthogonality `E[e₀X₀] = 0`. -/
+  orthogonality : μ[fun ω => e 0 ω • X 0 ω] = 0
+  /-- Fourth-row-moment domination for feasible-HC quadratic weights. -/
+  rowNorm_fourth_integrable : Integrable (fun ω => ‖X 0 ω‖ ^ 4) μ
+
+namespace IidAssumption72ResponseMomentConditions
+
+omit [Fintype k] [DecidableEq k] in
+private theorem memLp_four_of_integrable_fourth
+    {μ : Measure Ω} [IsProbabilityMeasure μ] {f : Ω → ℝ}
+    (hf_meas : AEStronglyMeasurable f μ)
+    (hf_four : Integrable (fun ω => f ω ^ 4) μ) :
+    MemLp f 4 μ := by
+  rw [← integrable_norm_rpow_iff (μ := μ) hf_meas (by norm_num) (by norm_num)]
+  convert hf_four using 1
+  ext ω
+  simpa [Real.norm_eq_abs] using (show Even (4 : ℕ) by decide).pow_abs (f ω)
+
+/-- A fourth row-norm moment supplies fourth moments for every regressor
+coordinate. -/
+theorem regressorCoordinate_memLp_four
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidAssumption72ResponseMomentConditions μ X e y β) (j : k) :
+    MemLp (fun ω => X 0 ω j) 4 μ := by
+  have hXj : AEStronglyMeasurable (fun ω => X 0 ω j) μ :=
+    (continuous_apply j).comp_aestronglyMeasurable (h.x_aestronglyMeasurable 0)
+  refine memLp_four_of_integrable_fourth hXj ?_
+  refine h.rowNorm_fourth_integrable.mono' (hXj.aemeasurable.pow_const 4).aestronglyMeasurable
+    (ae_of_all μ fun ω => ?_)
+  have hxj : |X 0 ω j| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) j
+  calc
+    ‖X 0 ω j ^ 4‖ = |X 0 ω j| ^ 4 := by
+      simp [Real.norm_eq_abs]
+    _ ≤ ‖X 0 ω‖ ^ 4 := by
+      gcongr
+
+/-- The fitted linear index has a finite fourth moment under the regressor
+fourth-row moment. -/
+theorem fittedIndex_memLp_four
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidAssumption72ResponseMomentConditions μ X e y β) :
+    MemLp (fun ω => (X 0 ω) ⬝ᵥ β) 4 μ := by
+  classical
+  convert (memLp_finset_sum' (s := Finset.univ)
+    (f := fun j ω => X 0 ω j * β j)
+    (fun j _ =>
+      (IidAssumption72ResponseMomentConditions.regressorCoordinate_memLp_four h j).mul_const
+        (β j))) using 1
+  ext ω
+  simp [dotProduct]
+
+/-- The response fourth moment and regressor fourth-row moment imply the
+structural-error fourth moment through the linear-model decomposition. -/
+theorem int_error_fourth
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidAssumption72ResponseMomentConditions μ X e y β) :
+    Integrable (fun ω => e 0 ω ^ 4) μ := by
+  have hy_mem : MemLp (fun ω => y 0 ω) 4 μ :=
+    memLp_four_of_integrable_fourth (h.y_aestronglyMeasurable 0) h.int_response_fourth
+  have hfit_mem : MemLp (fun ω => (X 0 ω) ⬝ᵥ β) 4 μ :=
+    IidAssumption72ResponseMomentConditions.fittedIndex_memLp_four h
+  have hdiff_mem : MemLp (fun ω => y 0 ω - (X 0 ω) ⬝ᵥ β) 4 μ :=
+    hy_mem.sub hfit_mem
+  have hnorm_int : Integrable (fun ω => ‖y 0 ω - (X 0 ω) ⬝ᵥ β‖ ^ 4) μ :=
+    hdiff_mem.integrable_norm_pow' (p := 4)
+  convert hnorm_int using 1
+  ext ω
+  have heq : y 0 ω - (X 0 ω) ⬝ᵥ β = e 0 ω := by
+    rw [h.model 0 ω]
+    ring
+  rw [heq]
+  exact ((show Even (4 : ℕ) by decide).pow_abs (e 0 ω)).symm
+
+/-- The response-fourth-moment package discharges the structural-error
+fourth-moment iid package. -/
+theorem toIidAssumption72FourthMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidAssumption72ResponseMomentConditions μ X e y β) :
+    IidAssumption72FourthMomentConditions μ X e y β where
+  model := h.model
+  x_aestronglyMeasurable := h.x_aestronglyMeasurable
+  e_aestronglyMeasurable := h.e_aestronglyMeasurable
+  joint_iIndep := h.joint_iIndep
+  joint_identDistrib := h.joint_identDistrib
+  int_error_fourth := IidAssumption72ResponseMomentConditions.int_error_fourth h
+  Q_nonsing := h.Q_nonsing
+  orthogonality := h.orthogonality
+  rowNorm_fourth_integrable := h.rowNorm_fourth_integrable
+
+/-- The response-fourth-moment package discharges the existing robust feasible-HC
+joint-observation package. -/
+theorem toIidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidAssumption72ResponseMomentConditions μ X e y β) :
+    IidRobustFeasibleHCMomentConditions μ X e y β :=
+  IidAssumption72FourthMomentConditions.toIidRobustFeasibleHCMomentConditions
+    h.toIidAssumption72FourthMomentConditions
+
+end IidAssumption72ResponseMomentConditions
+
+omit [Fintype k] [DecidableEq k] in
+private lemma measurable_hcCrossWeightScalar (a b l : k) :
+    Measurable (fun z : (k → ℝ) × ℝ =>
+      2 * z.2 * z.1 l * z.1 a * z.1 b) := by
+  exact (((measurable_const.mul measurable_snd).mul
+    ((measurable_pi_apply l).comp measurable_fst)).mul
+    ((measurable_pi_apply a).comp measurable_fst)).mul
+    ((measurable_pi_apply b).comp measurable_fst)
+
+omit [Fintype k] [DecidableEq k] in
+private lemma measurable_hcQuadWeightScalar (a b l m : k) :
+    Measurable (fun z : (k → ℝ) × ℝ =>
+      z.1 l * z.1 m * z.1 a * z.1 b) := by
+  exact ((((measurable_pi_apply l).comp measurable_fst).mul
+    ((measurable_pi_apply m).comp measurable_fst)).mul
+    ((measurable_pi_apply a).comp measurable_fst)).mul
+    ((measurable_pi_apply b).comp measurable_fst)
+
+omit [DecidableEq k] in
+private lemma measurable_rowNormSq_fst :
+    Measurable (fun z : (k → ℝ) × ℝ => ‖z.1‖ ^ 2) := by
+  exact ((continuous_norm.comp continuous_fst).measurable).pow_const 2
+
+omit [DecidableEq k] in
+private lemma measurable_jointOuter :
+    Measurable (fun z : (k → ℝ) × ℝ => Matrix.vecMulVec z.1 z.1) := by
+  exact (Continuous.matrix_vecMulVec continuous_fst continuous_fst).measurable
+
+omit [Fintype k] [DecidableEq k] in
+private lemma measurable_jointCross :
+    Measurable (fun z : (k → ℝ) × ℝ => z.2 • z.1) := by
+  rw [measurable_pi_iff]
+  intro i
+  simpa using measurable_snd.mul ((measurable_pi_apply i).comp measurable_fst)
+
+omit [Fintype k] [DecidableEq k] in
+private lemma measurable_jointErrorSq :
+    Measurable (fun z : (k → ℝ) × ℝ => z.2 ^ 2) := by
+  exact measurable_snd.pow_const 2
+
+omit [DecidableEq k] in
+private lemma measurable_jointScoreOuter :
+    Measurable (fun z : (k → ℝ) × ℝ =>
+      Matrix.vecMulVec (z.2 • z.1) (z.2 • z.1)) := by
+  have hscore : Continuous (fun z : (k → ℝ) × ℝ => z.2 • z.1) :=
+    continuous_snd.smul continuous_fst
+  exact (Continuous.matrix_vecMulVec hscore hscore).measurable
+
+omit [DecidableEq k] in
+private theorem hcCrossWeight_integrable_of_absError_rowNorm_cubed
+    {μ : Measure Ω} {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ}
+    (hX0 : AEStronglyMeasurable (X 0) μ)
+    (he0 : AEStronglyMeasurable (e 0) μ)
+    (hAbs : Integrable (fun ω => |e 0 ω| * ‖X 0 ω‖ ^ 3) μ)
+    (a b l : k) :
+    Integrable (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ := by
+  have hXl : AEStronglyMeasurable (fun ω => X 0 ω l) μ :=
+    (continuous_apply l).comp_aestronglyMeasurable hX0
+  have hXa : AEStronglyMeasurable (fun ω => X 0 ω a) μ :=
+    (continuous_apply a).comp_aestronglyMeasurable hX0
+  have hXb : AEStronglyMeasurable (fun ω => X 0 ω b) μ :=
+    (continuous_apply b).comp_aestronglyMeasurable hX0
+  have hf : AEStronglyMeasurable
+      (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ :=
+    (((he0.const_mul 2).mul hXl).mul hXa).mul hXb
+  refine (hAbs.const_mul 2).mono' hf (ae_of_all μ fun ω => ?_)
+  have hxl : |X 0 ω l| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) l
+  have hxa : |X 0 ω a| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) a
+  have hxb : |X 0 ω b| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) b
+  calc
+    ‖2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b‖
+        = 2 * |e 0 ω| * |X 0 ω l| * |X 0 ω a| * |X 0 ω b| := by
+          simp [Real.norm_eq_abs, mul_assoc]
+    _ ≤ 2 * |e 0 ω| * ‖X 0 ω‖ * ‖X 0 ω‖ * ‖X 0 ω‖ := by
+      gcongr
+    _ = 2 * (|e 0 ω| * ‖X 0 ω‖ ^ 3) := by ring
+
+omit [DecidableEq k] in
+private theorem hcQuadWeight_integrable_of_rowNorm_fourth
+    {μ : Measure Ω} {X : ℕ → Ω → (k → ℝ)}
+    (hX0 : AEStronglyMeasurable (X 0) μ)
+    (hFourth : Integrable (fun ω => ‖X 0 ω‖ ^ 4) μ)
+    (a b l m : k) :
+    Integrable (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ := by
+  have hXl : AEStronglyMeasurable (fun ω => X 0 ω l) μ :=
+    (continuous_apply l).comp_aestronglyMeasurable hX0
+  have hXm : AEStronglyMeasurable (fun ω => X 0 ω m) μ :=
+    (continuous_apply m).comp_aestronglyMeasurable hX0
+  have hXa : AEStronglyMeasurable (fun ω => X 0 ω a) μ :=
+    (continuous_apply a).comp_aestronglyMeasurable hX0
+  have hXb : AEStronglyMeasurable (fun ω => X 0 ω b) μ :=
+    (continuous_apply b).comp_aestronglyMeasurable hX0
+  have hf : AEStronglyMeasurable
+      (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ :=
+    ((hXl.mul hXm).mul hXa).mul hXb
+  refine hFourth.mono' hf (ae_of_all μ fun ω => ?_)
+  have hxl : |X 0 ω l| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) l
+  have hxm : |X 0 ω m| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) m
+  have hxa : |X 0 ω a| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) a
+  have hxb : |X 0 ω b| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) b
+  calc
+    ‖X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b‖
+        = |X 0 ω l| * |X 0 ω m| * |X 0 ω a| * |X 0 ω b| := by
+          simp [Real.norm_eq_abs, mul_assoc]
+    _ ≤ ‖X 0 ω‖ * ‖X 0 ω‖ * ‖X 0 ω‖ * ‖X 0 ω‖ := by
+      gcongr
+    _ = ‖X 0 ω‖ ^ 4 := by ring
+
+namespace IidRobustFeasibleHCMomentConditions
+
+/-- Fourth-row-moment integrability supplies integrability of the one-row
+regressor outer product. -/
+theorem int_outer
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    Integrable (fun ω => Matrix.vecMulVec (X 0 ω) (X 0 ω)) μ := by
+  classical
+  have hsq : Integrable (fun ω => ‖X 0 ω‖ ^ 2) μ :=
+    memLp_one_iff_integrable.mp
+      (IidRobustFeasibleHCMomentConditions.rowNorm_sq_memLp h)
+  refine Integrable.of_eval ?_
+  intro a
+  refine Integrable.of_eval ?_
+  intro b
+  have hXa : AEStronglyMeasurable (fun ω => X 0 ω a) μ :=
+    (continuous_apply a).comp_aestronglyMeasurable (h.x_aestronglyMeasurable 0)
+  have hXb : AEStronglyMeasurable (fun ω => X 0 ω b) μ :=
+    (continuous_apply b).comp_aestronglyMeasurable (h.x_aestronglyMeasurable 0)
+  refine hsq.mono' (hXa.mul hXb) (ae_of_all μ fun ω => ?_)
+  have hxa : |X 0 ω a| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) a
+  have hxb : |X 0 ω b| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) b
+  calc
+    ‖Matrix.vecMulVec (X 0 ω) (X 0 ω) a b‖
+        = |X 0 ω a| * |X 0 ω b| := by
+          simp [Matrix.vecMulVec_apply, Real.norm_eq_abs]
+    _ ≤ ‖X 0 ω‖ * ‖X 0 ω‖ := by gcongr
+    _ = ‖X 0 ω‖ ^ 2 := by ring
+
+/-- The baseline score vector is strongly measurable under the iid feasible-HC package. -/
+theorem score_aestronglyMeasurable
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    AEStronglyMeasurable (fun ω => e 0 ω • X 0 ω) μ :=
+  (h.e_aestronglyMeasurable 0).smul (h.x_aestronglyMeasurable 0)
+
+/-- Integrability of the score outer product supplies coordinatewise score
+square-integrability. -/
+theorem scoreCoordinate_memLp_two
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) (j : k) :
+    MemLp (fun ω => (e 0 ω • X 0 ω) j) 2 μ := by
+  have hsq_entry :
+      Integrable
+        (fun ω => Matrix.vecMulVec (e 0 ω • X 0 ω) (e 0 ω • X 0 ω) j j) μ :=
+    Integrable.eval (Integrable.eval h.int_score_outer j) j
+  have hsq : Integrable (fun ω => ((e 0 ω • X 0 ω) j) ^ 2) μ := by
+    simpa [Matrix.vecMulVec_apply, pow_two] using hsq_entry
+  exact (memLp_two_iff_integrable_sq
+    ((continuous_apply j).comp_aestronglyMeasurable
+      (IidRobustFeasibleHCMomentConditions.score_aestronglyMeasurable h))).2 hsq
+
+/-- Integrability of the score outer product supplies vector-valued score
+square-integrability. -/
+theorem score_memLp_two
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    MemLp (fun ω => e 0 ω • X 0 ω) 2 μ :=
+  MemLp.of_eval
+    (fun j => IidRobustFeasibleHCMomentConditions.scoreCoordinate_memLp_two h j)
+
+/-- Integrability of the score outer product supplies integrability of the score vector. -/
+theorem int_cross
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    Integrable (fun ω => e 0 ω • X 0 ω) μ := by
+  have hscore : MemLp (fun ω => e 0 ω • X 0 ω) 2 μ :=
+    IidRobustFeasibleHCMomentConditions.score_memLp_two h
+  exact memLp_one_iff_integrable.mp (hscore.mono_exponent one_le_two)
+
+/-- Integrability of the score outer product supplies square-integrability of
+each fixed scalar score projection. -/
+theorem memLp_cross_projection
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) (a : k → ℝ) :
+    MemLp (fun ω => (e 0 ω • X 0 ω) ⬝ᵥ a) 2 μ := by
+  classical
+  convert (memLp_finset_sum' (s := Finset.univ)
+    (f := fun j ω => (e 0 ω • X 0 ω) j * a j)
+    (fun j _ =>
+      (IidRobustFeasibleHCMomentConditions.scoreCoordinate_memLp_two h j).mul_const (a j)))
+    using 1
+  ext ω
+  simp [dotProduct]
+
+/-- The iid score second moment and fourth row moment imply the compact third-moment
+domination used by the feasible-HC cross weights. -/
+theorem absError_rowNorm_cubed_integrable
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    Integrable (fun ω => |e 0 ω| * ‖X 0 ω‖ ^ 3) μ := by
+  have hscore : MemLp (fun ω => ‖e 0 ω • X 0 ω‖) 2 μ :=
+    (IidRobustFeasibleHCMomentConditions.score_memLp_two h).norm
+  have hrow : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 2 μ :=
+    IidRobustFeasibleHCMomentConditions.rowNorm_sq_memLp_two h
+  have hprod : Integrable
+      ((fun ω => ‖e 0 ω • X 0 ω‖) * (fun ω => ‖X 0 ω‖ ^ 2)) μ :=
+    hscore.integrable_mul hrow
+  convert hprod using 1
+  ext ω
+  simp [Pi.mul_apply, norm_smul, Real.norm_eq_abs]
+  ring
+
+/-- IID joint observations imply pairwise independence of the regressor outer
+products used by the least-squares consistency package. -/
+private theorem outer_pairwise_indep
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    Pairwise ((· ⟂ᵢ[μ] ·) on
+      (fun i ω => Matrix.vecMulVec (X i ω) (X i ω))) := by
+  have hindep : iIndepFun
+      (fun i ω => Matrix.vecMulVec (X i ω) (X i ω)) μ := by
+    simpa [Function.comp] using
+      h.joint_iIndep.comp (fun _ z => Matrix.vecMulVec z.1 z.1)
+        (fun _ => measurable_jointOuter)
+  intro i j hij
+  exact hindep.indepFun hij
+
+/-- IID joint observations imply pairwise independence of the score vectors
+used by the least-squares consistency package. -/
+private theorem cross_pairwise_indep
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    Pairwise ((· ⟂ᵢ[μ] ·) on (fun i ω => e i ω • X i ω)) := by
+  have hindep : iIndepFun (fun i ω => e i ω • X i ω) μ := by
+    simpa [Function.comp] using
+      h.joint_iIndep.comp (fun _ z => z.2 • z.1)
+        (fun _ => measurable_jointCross)
+  intro i j hij
+  exact hindep.indepFun hij
+
+/-- IID joint observations imply pairwise independence of squared errors
+used by the residual-variance consistency package. -/
+private theorem error_sq_pairwise_indep
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    Pairwise ((· ⟂ᵢ[μ] ·) on (fun i ω => e i ω ^ 2)) := by
+  have hindep : iIndepFun (fun i ω => e i ω ^ 2) μ := by
+    simpa [Function.comp] using
+      h.joint_iIndep.comp (fun _ z => z.2 ^ 2)
+        (fun _ => measurable_jointErrorSq)
+  intro i j hij
+  exact hindep.indepFun hij
+
+/-- IID joint observations imply full independence of the score-vector
+sequence used by the score CLT package. -/
+private theorem cross_iIndep
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    iIndepFun (fun i ω => e i ω • X i ω) μ := by
+  simpa [Function.comp] using
+    h.joint_iIndep.comp (fun _ z => z.2 • z.1)
+      (fun _ => measurable_jointCross)
+
+/-- IID joint observations imply pairwise independence of true-error score
+outer products used by the robust covariance package. -/
+private theorem score_outer_pairwise_indep
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    Pairwise ((· ⟂ᵢ[μ] ·) on
+      (fun i ω => Matrix.vecMulVec (e i ω • X i ω) (e i ω • X i ω))) := by
+  have hindep : iIndepFun
+      (fun i ω => Matrix.vecMulVec (e i ω • X i ω) (e i ω • X i ω)) μ := by
+    simpa [Function.comp] using
+      h.joint_iIndep.comp
+        (fun _ z => Matrix.vecMulVec (z.2 • z.1) (z.2 • z.1))
+        (fun _ => measurable_jointScoreOuter)
+  intro i j hij
+  exact hindep.indepFun hij
+
+/-- IID joint observations imply pairwise independence of the joint
+observations, as required by the feasible-HC WLLN package. -/
+private theorem joint_pairwise_indep
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    Pairwise ((· ⟂ᵢ[μ] ·) on (fun i ω => (X i ω, e i ω))) := by
+  intro i j hij
+  exact h.joint_iIndep.indepFun hij
+
+/-- IID joint observations imply identical distribution of squared row norms,
+the primitive input used by the Chapter 6 maximum theorem in the 7.16/7.17
+rate wrappers. -/
+theorem rowNorm_sq_identDistrib
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    ∀ i, IdentDistrib (fun ω => ‖X i ω‖ ^ 2)
+      (fun ω => ‖X 0 ω‖ ^ 2) μ μ := by
+  intro i
+  have hi := (h.joint_identDistrib i).comp measurable_rowNormSq_fst
+  simpa [Function.comp] using hi
+
+/-- The iid joint-observation package discharges the least-squares consistency
+condition package by mapping iid observations through the relevant row moments. -/
+theorem toLeastSquaresConsistencyConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    LeastSquaresConsistencyConditions μ X e where
+  indep_outer := outer_pairwise_indep h
+  indep_cross := cross_pairwise_indep h
+  ident_outer := by
+    intro i
+    have hi := (h.joint_identDistrib i).comp measurable_jointOuter
+    simpa [Function.comp] using hi
+  ident_cross := by
+    intro i
+    have hi := (h.joint_identDistrib i).comp measurable_jointCross
+    simpa [Function.comp] using hi
+  int_outer := IidRobustFeasibleHCMomentConditions.int_outer h
+  int_cross := IidRobustFeasibleHCMomentConditions.int_cross h
+  Q_nonsing := h.Q_nonsing
+  orthogonality := h.orthogonality
+
+/-- The iid joint-observation package discharges the residual-variance
+condition package by mapping iid observations through squared errors. -/
+theorem toErrorVarianceConsistencyConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    ErrorVarianceConsistencyConditions μ X e where
+  toLeastSquaresConsistencyConditions := h.toLeastSquaresConsistencyConditions
+  indep_error_sq := error_sq_pairwise_indep h
+  ident_error_sq := by
+    intro i
+    have hi := (h.joint_identDistrib i).comp measurable_jointErrorSq
+    simpa [Function.comp] using hi
+  int_error_sq := h.int_error_sq
+
+/-- The iid joint-observation package discharges the score-CLT condition
+package by deriving scalar score-projection square-integrability from the
+score-outer-product moment. -/
+theorem toScoreCLTConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    ScoreCLTConditions μ X e where
+  toLeastSquaresConsistencyConditions := h.toLeastSquaresConsistencyConditions
+  iIndep_cross := cross_iIndep h
+  memLp_cross_projection := IidRobustFeasibleHCMomentConditions.memLp_cross_projection h
+
+/-- The iid joint-observation package discharges the robust covariance
+condition package. -/
+theorem toRobustCovarianceConsistencyConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    RobustCovarianceConsistencyConditions μ X e where
+  toScoreCLTConditions := h.toScoreCLTConditions
+  indep_score_outer := score_outer_pairwise_indep h
+  ident_score_outer := by
+    intro i
+    have hi := (h.joint_identDistrib i).comp measurable_jointScoreOuter
+    simpa [Function.comp] using hi
+  int_score_outer := h.int_score_outer
+
+/-- The iid joint-observation package discharges the compact feasible-HC moment
+WLLN package. -/
+theorem toFeasibleHCMomentWLLNConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    FeasibleHCMomentWLLNConditions μ X e y β where
+  model := h.model
+  x_aestronglyMeasurable := h.x_aestronglyMeasurable
+  e_aestronglyMeasurable := h.e_aestronglyMeasurable
+  joint_pairwise_indep := joint_pairwise_indep h
+  joint_identDistrib := h.joint_identDistrib
+  absError_rowNorm_cubed_integrable :=
+    IidRobustFeasibleHCMomentConditions.absError_rowNorm_cubed_integrable h
+  rowNorm_fourth_integrable := h.rowNorm_fourth_integrable
+
+/-- The iid joint-observation package discharges the combined robust feasible-HC
+moment package used by the compact HC0--HC3 covariance and inference endpoints. -/
+theorem toRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    RobustFeasibleHCMomentConditions μ X e y β where
+  toRobustCovarianceConsistencyConditions :=
+    IidRobustFeasibleHCMomentConditions.toRobustCovarianceConsistencyConditions h
+  model := h.model
+  x_aestronglyMeasurable := h.x_aestronglyMeasurable
+  e_aestronglyMeasurable := h.e_aestronglyMeasurable
+  joint_pairwise_indep := joint_pairwise_indep h
+  joint_identDistrib := h.joint_identDistrib
+  rowNorm_fourth_integrable := h.rowNorm_fourth_integrable
+
+/-- **Hansen Theorem 7.17, iid feasible-HC package endpoint.**
+
+The unified iid robust feasible-HC package directly discharges the max-leverage
+rate through its fourth-row-moment field and the row-norm identical-distribution
+bridge above. -/
+theorem maxLeverageStar_tendstoInMeasure_zero_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω => maxLeverageStar (stackRegressors X n ω))
+      atTop (fun _ => 0) :=
+  maxLeverageStar_tendstoInMeasure_zero_of_identDistrib_memLp_rowNorm_sq
+    (μ := μ) (X := X) (e := e)
+    h.toLeastSquaresConsistencyConditions
+    (IidRobustFeasibleHCMomentConditions.rowNorm_sq_memLp h) h.rowNorm_sq_identDistrib
+
+end IidRobustFeasibleHCMomentConditions
+
+namespace FeasibleHCJointWLLNConditions
+
+omit [DecidableEq k] in
+/-- Joint-observation independence and identical distribution imply the
+scalar-WLLN condition package for feasible HC third/fourth weights. -/
+theorem toFeasibleHCWeightWLLNConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hj : FeasibleHCJointWLLNConditions μ X e y β) :
+    FeasibleHCWeightWLLNConditions μ X e y β where
+  model := hj.model
+  x_aestronglyMeasurable := hj.x_aestronglyMeasurable
+  e_aestronglyMeasurable := hj.e_aestronglyMeasurable
+  crossWeight_integrable := hj.crossWeight_integrable
+  crossWeight_pairwise_indep := by
+    intro a b l i j hij
+    exact IndepFun.comp (hj.joint_pairwise_indep hij)
+      (measurable_hcCrossWeightScalar a b l)
+      (measurable_hcCrossWeightScalar a b l)
+  crossWeight_identDistrib := by
+    intro a b l i
+    have h := (hj.joint_identDistrib i).comp
+      (measurable_hcCrossWeightScalar a b l)
+    simpa [Function.comp] using h
+  quadWeight_integrable := hj.quadWeight_integrable
+  quadWeight_pairwise_indep := by
+    intro a b l m i j hij
+    exact IndepFun.comp (hj.joint_pairwise_indep hij)
+      (measurable_hcQuadWeightScalar a b l m)
+      (measurable_hcQuadWeightScalar a b l m)
+  quadWeight_identDistrib := by
+    intro a b l m i
+    have h := (hj.joint_identDistrib i).comp
+      (measurable_hcQuadWeightScalar a b l m)
+    simpa [Function.comp] using h
+
+end FeasibleHCJointWLLNConditions
+
+namespace FeasibleHCMomentWLLNConditions
+
+omit [DecidableEq k] in
+/-- Compact row-norm/error moments discharge the scalar integrability fields in
+the joint-observation feasible-HC WLLN package. -/
+theorem toFeasibleHCJointWLLNConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : FeasibleHCMomentWLLNConditions μ X e y β) :
+    FeasibleHCJointWLLNConditions μ X e y β where
+  model := hm.model
+  x_aestronglyMeasurable := hm.x_aestronglyMeasurable
+  e_aestronglyMeasurable := hm.e_aestronglyMeasurable
+  joint_pairwise_indep := hm.joint_pairwise_indep
+  joint_identDistrib := hm.joint_identDistrib
+  crossWeight_integrable := fun a b l =>
+    hcCrossWeight_integrable_of_absError_rowNorm_cubed
+      (μ := μ) (X := X) (e := e)
+      (hm.x_aestronglyMeasurable 0) (hm.e_aestronglyMeasurable 0)
+      hm.absError_rowNorm_cubed_integrable a b l
+  quadWeight_integrable := fun a b l m =>
+    hcQuadWeight_integrable_of_rowNorm_fourth
+      (μ := μ) (X := X)
+      (hm.x_aestronglyMeasurable 0) hm.rowNorm_fourth_integrable a b l m
+
+omit [DecidableEq k] in
+/-- Compact row-norm/error moments derive the scalar-WLLN condition package for
+feasible HC third/fourth weights. -/
+theorem toFeasibleHCWeightWLLNConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : FeasibleHCMomentWLLNConditions μ X e y β) :
+    FeasibleHCWeightWLLNConditions μ X e y β :=
+  hm.toFeasibleHCJointWLLNConditions.toFeasibleHCWeightWLLNConditions
+
+end FeasibleHCMomentWLLNConditions
+
+namespace FeasibleHCRemainderConditions
+
+omit [Fintype k] [DecidableEq k] in
+/-- Empirical third-moment HC0 cross weights are bounded in probability when
+the scalar summands satisfy the WLLN primitive hypotheses. -/
+theorem crossWeight_bounded_of_wlln
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} (a b l : k)
+    (hint : Integrable
+      (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ)
+    (hindep : Pairwise ((· ⟂ᵢ[μ] ·) on
+      (fun i ω => 2 * e i ω * X i ω l * X i ω a * X i ω b)))
+    (hident : ∀ i,
+      IdentDistrib
+        (fun ω => 2 * e i ω * X i ω l * X i ω a * X i ω b)
+        (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ μ) :
+    BoundedInProbability μ
+      (fun n ω =>
+        sampleScoreCovCrossWeight
+          (stackRegressors X n ω) (stackErrors e n ω) a b l) := by
+  let W : ℕ → Ω → ℝ := fun i ω =>
+    2 * e i ω * X i ω l * X i ω a * X i ω b
+  have hWLLN : TendstoInMeasure μ
+      (fun (n : ℕ) ω => (n : ℝ)⁻¹ • ∑ i ∈ Finset.range n, W i ω)
+      atTop (fun _ => μ[W 0]) :=
+    tendstoInMeasure_wlln W hint hindep hident
+  have hWeight : TendstoInMeasure μ
+      (fun n ω =>
+        sampleScoreCovCrossWeight
+          (stackRegressors X n ω) (stackErrors e n ω) a b l)
+      atTop (fun _ => μ[W 0]) := by
+    refine hWLLN.congr_left (fun n => ae_of_all μ (fun ω => ?_))
+    have hsum :
+        (∑ i : Fin n,
+          2 * e i.val ω * X i.val ω l * X i.val ω a * X i.val ω b) =
+          ∑ i ∈ Finset.range n, 2 * e i ω * X i ω l * X i ω a * X i ω b :=
+      Fin.sum_univ_eq_sum_range
+        (fun i => 2 * e i ω * X i ω l * X i ω a * X i ω b) n
+    simp [sampleScoreCovCrossWeight, stackRegressors, stackErrors, W,
+      Fintype.card_fin, hsum]
+  exact BoundedInProbability.of_tendstoInMeasure_const hWeight
+
+omit [Fintype k] [DecidableEq k] in
+/-- Empirical fourth-moment HC0 quadratic weights are bounded in probability
+when the scalar summands satisfy the WLLN primitive hypotheses. -/
+theorem quadWeight_bounded_of_wlln
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} (a b l m : k)
+    (hint : Integrable
+      (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ)
+    (hindep : Pairwise ((· ⟂ᵢ[μ] ·) on
+      (fun i ω => X i ω l * X i ω m * X i ω a * X i ω b)))
+    (hident : ∀ i,
+      IdentDistrib
+        (fun ω => X i ω l * X i ω m * X i ω a * X i ω b)
+        (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ μ) :
+    BoundedInProbability μ
+      (fun n ω =>
+        sampleScoreCovQuadraticWeight
+          (stackRegressors X n ω) a b l m) := by
+  let W : ℕ → Ω → ℝ := fun i ω =>
+    X i ω l * X i ω m * X i ω a * X i ω b
+  have hWLLN : TendstoInMeasure μ
+      (fun (n : ℕ) ω => (n : ℝ)⁻¹ • ∑ i ∈ Finset.range n, W i ω)
+      atTop (fun _ => μ[W 0]) :=
+    tendstoInMeasure_wlln W hint hindep hident
+  have hWeight : TendstoInMeasure μ
+      (fun n ω =>
+        sampleScoreCovQuadraticWeight
+          (stackRegressors X n ω) a b l m)
+      atTop (fun _ => μ[W 0]) := by
+    refine hWLLN.congr_left (fun n => ae_of_all μ (fun ω => ?_))
+    have hsum :
+        (∑ i : Fin n,
+          X i.val ω l * X i.val ω m * X i.val ω a * X i.val ω b) =
+          ∑ i ∈ Finset.range n, X i ω l * X i ω m * X i ω a * X i ω b :=
+      Fin.sum_univ_eq_sum_range
+        (fun i => X i ω l * X i ω m * X i ω a * X i ω b) n
+    simp [sampleScoreCovQuadraticWeight, stackRegressors, W,
+      Fintype.card_fin, hsum]
+  exact BoundedInProbability.of_tendstoInMeasure_const hWeight
+
+omit [DecidableEq k] in
+/-- Build the feasible HC0/HC1 remainder package from scalar WLLN primitive
+hypotheses for the empirical third- and fourth-moment weights. -/
+theorem of_weight_wlln
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    (hX_meas : ∀ i, AEStronglyMeasurable (X i) μ)
+    (he_meas : ∀ i, AEStronglyMeasurable (e i) μ)
+    (hCrossInt : ∀ a b l : k, Integrable
+      (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ)
+    (hCrossIndep : ∀ a b l : k, Pairwise ((· ⟂ᵢ[μ] ·) on
+      (fun i ω => 2 * e i ω * X i ω l * X i ω a * X i ω b)))
+    (hCrossIdent : ∀ a b l : k, ∀ i,
+      IdentDistrib
+        (fun ω => 2 * e i ω * X i ω l * X i ω a * X i ω b)
+        (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ μ)
+    (hQuadInt : ∀ a b l m : k, Integrable
+      (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ)
+    (hQuadIndep : ∀ a b l m : k, Pairwise ((· ⟂ᵢ[μ] ·) on
+      (fun i ω => X i ω l * X i ω m * X i ω a * X i ω b)))
+    (hQuadIdent : ∀ a b l m : k, ∀ i,
+      IdentDistrib
+        (fun ω => X i ω l * X i ω m * X i ω a * X i ω b)
+        (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ μ) :
+    FeasibleHCRemainderConditions μ X e y β where
+  model := hmodel
+  x_aestronglyMeasurable := hX_meas
+  e_aestronglyMeasurable := he_meas
+  crossWeight_bounded := fun a b l =>
+    crossWeight_bounded_of_wlln (μ := μ) (X := X) (e := e) a b l
+      (hCrossInt a b l) (hCrossIndep a b l) (hCrossIdent a b l)
+  quadWeight_bounded := fun a b l m =>
+    quadWeight_bounded_of_wlln (μ := μ) (X := X) a b l m
+      (hQuadInt a b l m) (hQuadIndep a b l m) (hQuadIdent a b l m)
+
+end FeasibleHCRemainderConditions
+
+namespace FeasibleHCWeightWLLNConditions
+
+omit [DecidableEq k] in
+/-- The scalar-WLLN condition package discharges the bounded empirical
+third/fourth weight hypotheses in `FeasibleHCRemainderConditions`. -/
+theorem toFeasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hw : FeasibleHCWeightWLLNConditions μ X e y β) :
+    FeasibleHCRemainderConditions μ X e y β :=
+  FeasibleHCRemainderConditions.of_weight_wlln
+    (μ := μ) (X := X) (e := e) (y := y) (β := β)
+    hw.model hw.x_aestronglyMeasurable hw.e_aestronglyMeasurable
+    hw.crossWeight_integrable hw.crossWeight_pairwise_indep hw.crossWeight_identDistrib
+    hw.quadWeight_integrable hw.quadWeight_pairwise_indep hw.quadWeight_identDistrib
+
+end FeasibleHCWeightWLLNConditions
+
+namespace FeasibleHCJointWLLNConditions
+
+omit [DecidableEq k] in
+/-- Joint-observation conditions directly discharge the feasible HC0/HC1
+bounded-weight remainder package. -/
+theorem toFeasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hj : FeasibleHCJointWLLNConditions μ X e y β) :
+    FeasibleHCRemainderConditions μ X e y β :=
+  hj.toFeasibleHCWeightWLLNConditions.toFeasibleHCRemainderConditions
+
+end FeasibleHCJointWLLNConditions
+
+namespace FeasibleHCMomentWLLNConditions
+
+omit [DecidableEq k] in
+/-- Compact row-norm/error moments directly discharge the feasible HC0/HC1
+bounded-weight remainder package. -/
+theorem toFeasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : FeasibleHCMomentWLLNConditions μ X e y β) :
+    FeasibleHCRemainderConditions μ X e y β :=
+  hm.toFeasibleHCWeightWLLNConditions.toFeasibleHCRemainderConditions
+
+end FeasibleHCMomentWLLNConditions
+
+namespace RobustFeasibleHCMomentConditions
+
+/-- Joint-observation identical distribution implies identical distribution of
+squared row norms. -/
+theorem rowNorm_sq_identDistrib
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) (i : ℕ) :
+    IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ := by
+  have h := (hm.toFeasibleHCMomentWLLNConditions.joint_identDistrib i).comp
+    measurable_rowNormSq_fst
+  simpa [Function.comp] using h
+
+/-- The compact robust feasible-HC package discharges the HC0/HC1 feasible
+residual-substitution remainder package. -/
+theorem toFeasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    FeasibleHCRemainderConditions μ X e y β :=
+  hm.toFeasibleHCMomentWLLNConditions.toFeasibleHCRemainderConditions
+
+/-- Identically distributed squared row norms with a finite first moment are
+uniformly integrable in `L¹`. -/
+theorem rowNorm_sq_uniformIntegrable
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ :=
+  uniformIntegrable_one_of_identDistrib_memLp
+    (RobustFeasibleHCMomentConditions.rowNorm_sq_memLp hm) hm.rowNorm_sq_identDistrib
+
+end RobustFeasibleHCMomentConditions
+
+namespace FeasibleHCLeverageConditions
+
+/-- Build the HC2/HC3 feasible-condition package from the HC0/HC1 remainder
+package plus the primitive squared-row uniform-integrability max-leverage
+discharge. -/
+theorem ofRemainder_uniformIntegrable_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : SampleMomentAssumption71 μ X e)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    FeasibleHCLeverageConditions μ X e y β where
+  toFeasibleHCRemainderConditions := hc
+  maxLeverage_tendsto :=
+    maxLeverageStar_tendstoInMeasure_zero_of_uniformIntegrable_rowNorm_sq
+      (μ := μ) (X := X) (e := e) h hUI
+
+/-- Build the HC2/HC3 feasible-condition package from the HC0/HC1 remainder
+package plus the iid finite-squared-row-moment max-leverage discharge. -/
+theorem ofRemainder_identDistrib_memLp_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : SampleMomentAssumption71 μ X e)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hRowMem : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ)
+    (hRowIdent : ∀ i,
+      IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ) :
+    FeasibleHCLeverageConditions μ X e y β where
+  toFeasibleHCRemainderConditions := hc
+  maxLeverage_tendsto :=
+    maxLeverageStar_tendstoInMeasure_zero_of_identDistrib_memLp_rowNorm_sq
+      (μ := μ) (X := X) (e := e) h hRowMem hRowIdent
+
+/-- Build the HC2/HC3 feasible-condition package from the HC0/HC1 remainder
+package plus the robust-covariance condition package and squared-row
+uniform-integrability max-leverage discharge. -/
+theorem ofRobustRemainder_uniformIntegrable_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  ofRemainder_uniformIntegrable_rowNorm_sq h.toSampleMomentAssumption71 hc hUI
+
+/-- Build the HC2/HC3 feasible-condition package from the HC0/HC1 remainder
+package plus the robust-covariance condition package and iid
+finite-squared-row-moment max-leverage discharge. -/
+theorem ofRobustRemainder_identDistrib_memLp_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hRowMem : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ)
+    (hRowIdent : ∀ i,
+      IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  ofRemainder_identDistrib_memLp_rowNorm_sq h.toSampleMomentAssumption71 hc hRowMem hRowIdent
+
+/-- Build the HC2/HC3 feasible-condition package directly from scalar WLLN
+primitive hypotheses for the HC0/HC1 bounded weights plus the squared-row
+uniform-integrability max-leverage discharge. -/
+theorem of_weight_wlln_uniformIntegrable_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : SampleMomentAssumption71 μ X e)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    (hX_meas : ∀ i, AEStronglyMeasurable (X i) μ)
+    (he_meas : ∀ i, AEStronglyMeasurable (e i) μ)
+    (hCrossInt : ∀ a b l : k, Integrable
+      (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ)
+    (hCrossIndep : ∀ a b l : k, Pairwise ((· ⟂ᵢ[μ] ·) on
+      (fun i ω => 2 * e i ω * X i ω l * X i ω a * X i ω b)))
+    (hCrossIdent : ∀ a b l : k, ∀ i,
+      IdentDistrib
+        (fun ω => 2 * e i ω * X i ω l * X i ω a * X i ω b)
+        (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ μ)
+    (hQuadInt : ∀ a b l m : k, Integrable
+      (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ)
+    (hQuadIndep : ∀ a b l m : k, Pairwise ((· ⟂ᵢ[μ] ·) on
+      (fun i ω => X i ω l * X i ω m * X i ω a * X i ω b)))
+    (hQuadIdent : ∀ a b l m : k, ∀ i,
+      IdentDistrib
+        (fun ω => X i ω l * X i ω m * X i ω a * X i ω b)
+        (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ μ)
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  ofRemainder_uniformIntegrable_rowNorm_sq h
+    (FeasibleHCRemainderConditions.of_weight_wlln
+      (μ := μ) (X := X) (e := e) (y := y) (β := β)
+      hmodel hX_meas he_meas hCrossInt hCrossIndep hCrossIdent
+      hQuadInt hQuadIndep hQuadIdent)
+    hUI
+
+/-- Build the HC2/HC3 feasible-condition package directly from scalar WLLN
+primitive hypotheses for the HC0/HC1 bounded weights plus the iid
+finite-squared-row-moment max-leverage discharge. -/
+theorem of_weight_wlln_identDistrib_memLp_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : SampleMomentAssumption71 μ X e)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    (hX_meas : ∀ i, AEStronglyMeasurable (X i) μ)
+    (he_meas : ∀ i, AEStronglyMeasurable (e i) μ)
+    (hCrossInt : ∀ a b l : k, Integrable
+      (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ)
+    (hCrossIndep : ∀ a b l : k, Pairwise ((· ⟂ᵢ[μ] ·) on
+      (fun i ω => 2 * e i ω * X i ω l * X i ω a * X i ω b)))
+    (hCrossIdent : ∀ a b l : k, ∀ i,
+      IdentDistrib
+        (fun ω => 2 * e i ω * X i ω l * X i ω a * X i ω b)
+        (fun ω => 2 * e 0 ω * X 0 ω l * X 0 ω a * X 0 ω b) μ μ)
+    (hQuadInt : ∀ a b l m : k, Integrable
+      (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ)
+    (hQuadIndep : ∀ a b l m : k, Pairwise ((· ⟂ᵢ[μ] ·) on
+      (fun i ω => X i ω l * X i ω m * X i ω a * X i ω b)))
+    (hQuadIdent : ∀ a b l m : k, ∀ i,
+      IdentDistrib
+        (fun ω => X i ω l * X i ω m * X i ω a * X i ω b)
+        (fun ω => X 0 ω l * X 0 ω m * X 0 ω a * X 0 ω b) μ μ)
+    (hRowMem : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ)
+    (hRowIdent : ∀ i,
+      IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  ofRemainder_identDistrib_memLp_rowNorm_sq h
+    (FeasibleHCRemainderConditions.of_weight_wlln
+      (μ := μ) (X := X) (e := e) (y := y) (β := β)
+      hmodel hX_meas he_meas hCrossInt hCrossIndep hCrossIdent
+      hQuadInt hQuadIndep hQuadIdent)
+    hRowMem hRowIdent
+
+end FeasibleHCLeverageConditions
+
+namespace FeasibleHCWeightWLLNConditions
+
+/-- Build the HC2/HC3 feasible-condition package from scalar WLLN weight
+conditions plus the squared-row uniform-integrability max-leverage discharge. -/
+theorem toFeasibleHCLeverageConditions_uniformIntegrable_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hw : FeasibleHCWeightWLLNConditions μ X e y β)
+    (h : SampleMomentAssumption71 μ X e)
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  FeasibleHCLeverageConditions.ofRemainder_uniformIntegrable_rowNorm_sq
+    h hw.toFeasibleHCRemainderConditions hUI
+
+/-- Build the HC2/HC3 feasible-condition package from scalar WLLN weight
+conditions plus the iid finite-squared-row-moment max-leverage discharge. -/
+theorem toFeasibleHCLeverageConditions_identDistrib_memLp_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hw : FeasibleHCWeightWLLNConditions μ X e y β)
+    (h : SampleMomentAssumption71 μ X e)
+    (hRowMem : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ)
+    (hRowIdent : ∀ i,
+      IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  FeasibleHCLeverageConditions.ofRemainder_identDistrib_memLp_rowNorm_sq
+    h hw.toFeasibleHCRemainderConditions hRowMem hRowIdent
+
+/-- Robust-covariance-package version of
+`toFeasibleHCLeverageConditions_uniformIntegrable_rowNorm_sq`. -/
+theorem toFeasibleHCLeverageConditions_robust_uniformIntegrable_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hw : FeasibleHCWeightWLLNConditions μ X e y β)
+    (h : RobustCovarianceConsistencyConditions μ X e)
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  FeasibleHCLeverageConditions.ofRobustRemainder_uniformIntegrable_rowNorm_sq
+    h hw.toFeasibleHCRemainderConditions hUI
+
+/-- Robust-covariance-package version of
+`toFeasibleHCLeverageConditions_identDistrib_memLp_rowNorm_sq`. -/
+theorem toFeasibleHCLeverageConditions_robust_identDistrib_memLp_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hw : FeasibleHCWeightWLLNConditions μ X e y β)
+    (h : RobustCovarianceConsistencyConditions μ X e)
+    (hRowMem : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ)
+    (hRowIdent : ∀ i,
+      IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  FeasibleHCLeverageConditions.ofRobustRemainder_identDistrib_memLp_rowNorm_sq
+    h hw.toFeasibleHCRemainderConditions hRowMem hRowIdent
+
+end FeasibleHCWeightWLLNConditions
+
+namespace FeasibleHCJointWLLNConditions
+
+/-- Build the HC2/HC3 feasible-condition package from joint-observation WLLN
+conditions plus the squared-row uniform-integrability max-leverage discharge. -/
+theorem toFeasibleHCLeverageConditions_uniformIntegrable_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hj : FeasibleHCJointWLLNConditions μ X e y β)
+    (h : SampleMomentAssumption71 μ X e)
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  hj.toFeasibleHCWeightWLLNConditions
+    |>.toFeasibleHCLeverageConditions_uniformIntegrable_rowNorm_sq h hUI
+
+/-- Build the HC2/HC3 feasible-condition package from joint-observation WLLN
+conditions plus the iid finite-squared-row-moment max-leverage discharge. -/
+theorem toFeasibleHCLeverageConditions_identDistrib_memLp_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hj : FeasibleHCJointWLLNConditions μ X e y β)
+    (h : SampleMomentAssumption71 μ X e)
+    (hRowMem : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ)
+    (hRowIdent : ∀ i,
+      IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  hj.toFeasibleHCWeightWLLNConditions
+    |>.toFeasibleHCLeverageConditions_identDistrib_memLp_rowNorm_sq h hRowMem hRowIdent
+
+/-- Robust-covariance-package version of
+`toFeasibleHCLeverageConditions_uniformIntegrable_rowNorm_sq`. -/
+theorem toFeasibleHCLeverageConditions_robust_uniformIntegrable_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hj : FeasibleHCJointWLLNConditions μ X e y β)
+    (h : RobustCovarianceConsistencyConditions μ X e)
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  hj.toFeasibleHCWeightWLLNConditions
+    |>.toFeasibleHCLeverageConditions_robust_uniformIntegrable_rowNorm_sq h hUI
+
+/-- Robust-covariance-package version of
+`toFeasibleHCLeverageConditions_identDistrib_memLp_rowNorm_sq`. -/
+theorem toFeasibleHCLeverageConditions_robust_identDistrib_memLp_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hj : FeasibleHCJointWLLNConditions μ X e y β)
+    (h : RobustCovarianceConsistencyConditions μ X e)
+    (hRowMem : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ)
+    (hRowIdent : ∀ i,
+      IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  hj.toFeasibleHCWeightWLLNConditions
+    |>.toFeasibleHCLeverageConditions_robust_identDistrib_memLp_rowNorm_sq h hRowMem hRowIdent
+
+end FeasibleHCJointWLLNConditions
+
+namespace FeasibleHCMomentWLLNConditions
+
+/-- Build the HC2/HC3 feasible-condition package from compact row-norm/error
+moments plus the squared-row uniform-integrability max-leverage discharge. -/
+theorem toFeasibleHCLeverageConditions_uniformIntegrable_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : FeasibleHCMomentWLLNConditions μ X e y β)
+    (h : SampleMomentAssumption71 μ X e)
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  hm.toFeasibleHCJointWLLNConditions
+    |>.toFeasibleHCLeverageConditions_uniformIntegrable_rowNorm_sq h hUI
+
+/-- Build the HC2/HC3 feasible-condition package from compact row-norm/error
+moments plus the iid finite-squared-row-moment max-leverage discharge. -/
+theorem toFeasibleHCLeverageConditions_identDistrib_memLp_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : FeasibleHCMomentWLLNConditions μ X e y β)
+    (h : SampleMomentAssumption71 μ X e)
+    (hRowMem : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ)
+    (hRowIdent : ∀ i,
+      IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  hm.toFeasibleHCJointWLLNConditions
+    |>.toFeasibleHCLeverageConditions_identDistrib_memLp_rowNorm_sq h hRowMem hRowIdent
+
+/-- Robust-covariance-package version of
+`toFeasibleHCLeverageConditions_uniformIntegrable_rowNorm_sq`. -/
+theorem toFeasibleHCLeverageConditions_robust_uniformIntegrable_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : FeasibleHCMomentWLLNConditions μ X e y β)
+    (h : RobustCovarianceConsistencyConditions μ X e)
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  hm.toFeasibleHCJointWLLNConditions
+    |>.toFeasibleHCLeverageConditions_robust_uniformIntegrable_rowNorm_sq h hUI
+
+/-- Robust-covariance-package version of
+`toFeasibleHCLeverageConditions_identDistrib_memLp_rowNorm_sq`. -/
+theorem toFeasibleHCLeverageConditions_robust_identDistrib_memLp_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : FeasibleHCMomentWLLNConditions μ X e y β)
+    (h : RobustCovarianceConsistencyConditions μ X e)
+    (hRowMem : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ)
+    (hRowIdent : ∀ i,
+      IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  hm.toFeasibleHCJointWLLNConditions
+    |>.toFeasibleHCLeverageConditions_robust_identDistrib_memLp_rowNorm_sq h hRowMem hRowIdent
+
+end FeasibleHCMomentWLLNConditions
+
+namespace RobustFeasibleHCMomentConditions
+
+/-- The compact robust feasible-HC package discharges the HC2/HC3 feasible
+leverage package via the iid finite-squared-row-moment max-leverage route. -/
+theorem toFeasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    FeasibleHCLeverageConditions μ X e y β :=
+  hm.toFeasibleHCMomentWLLNConditions
+    |>.toFeasibleHCLeverageConditions_robust_identDistrib_memLp_rowNorm_sq
+      hm.toRobustCovarianceConsistencyConditions
+      (RobustFeasibleHCMomentConditions.rowNorm_sq_memLp hm) hm.rowNorm_sq_identDistrib
+
+end RobustFeasibleHCMomentConditions
 
 omit [Fintype k] [DecidableEq k] in
 /-- The ideal HC0 score covariance average of stacked samples is the range-indexed
@@ -836,6 +2465,82 @@ theorem randomLinearMapCovariance_tendstoInMeasure
     hLeft_meas hRt_meas hLeft hRt
   simpa [Matrix.mul_assoc] using hFull
 
+/-- **Hansen Theorem 7.10, nonlinear plug-in derivative covariance.**
+
+If the derivative map `R(β)` is continuous at the true parameter and a
+covariance estimator `V̂ₙ` is consistent for `V`, then the plug-in nonlinear
+covariance `R(β̂*ₙ) V̂ₙ R(β̂*ₙ)ᵀ` converges to `R(β) V R(β)ᵀ`. This packages
+the covariance continuous-mapping step for nonlinear functions of OLS. -/
+theorem nonlinearDerivativeCovariance_olsBetaStar_tendstoInMeasure
+    {μ : Measure Ω} [IsFiniteMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ} (β : k → ℝ)
+    (h : LeastSquaresConsistencyConditions μ X e)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    {q : Type*} [Fintype q]
+    (Rfun : (k → ℝ) → Matrix q k ℝ) (hRfun : ContinuousAt Rfun β)
+    (hR_meas : ∀ n, AEStronglyMeasurable
+      (fun ω => Rfun
+        (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω))) μ)
+    {Vhat : ℕ → Ω → Matrix k k ℝ} {V : Matrix k k ℝ}
+    (hV_meas : ∀ n, AEStronglyMeasurable (Vhat n) μ)
+    (hV : TendstoInMeasure μ Vhat atTop (fun _ => V)) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Rfun (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω)) *
+          Vhat n ω *
+          (Rfun (olsBetaStar
+            (stackRegressors X n ω) (stackOutcomes y n ω)))ᵀ)
+      atTop (fun _ => Rfun β * V * (Rfun β)ᵀ) := by
+  have hR : TendstoInMeasure μ
+      (fun n ω =>
+        Rfun (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω)))
+      atTop (fun _ => Rfun β) :=
+    continuousAt_function_olsBetaStar_tendstoInMeasure
+      (μ := μ) (X := X) (e := e) (y := y) β h hmodel Rfun hRfun hR_meas
+  exact randomLinearMapCovariance_tendstoInMeasure
+    (μ := μ)
+    (Rhat := fun n ω =>
+      Rfun (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω)))
+    (R := Rfun β) (Vhat := Vhat) (V := V)
+    hR_meas hV_meas hR hV
+
+/-- **Hansen Theorem 7.10, ordinary-wrapper nonlinear derivative covariance.**
+
+This is the ordinary-on-nonsingular counterpart of
+`nonlinearDerivativeCovariance_olsBetaStar_tendstoInMeasure`. -/
+theorem nonlinearDerivativeCovariance_olsBetaOrZero_tendstoInMeasure
+    {μ : Measure Ω} [IsFiniteMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ} (β : k → ℝ)
+    (h : LeastSquaresConsistencyConditions μ X e)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    {q : Type*} [Fintype q]
+    (Rfun : (k → ℝ) → Matrix q k ℝ) (hRfun : ContinuousAt Rfun β)
+    (hR_meas : ∀ n, AEStronglyMeasurable
+      (fun ω => Rfun
+        (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω))) μ)
+    {Vhat : ℕ → Ω → Matrix k k ℝ} {V : Matrix k k ℝ}
+    (hV_meas : ∀ n, AEStronglyMeasurable (Vhat n) μ)
+    (hV : TendstoInMeasure μ Vhat atTop (fun _ => V)) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Rfun (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω)) *
+          Vhat n ω *
+          (Rfun (olsBetaOrZero
+            (stackRegressors X n ω) (stackOutcomes y n ω)))ᵀ)
+      atTop (fun _ => Rfun β * V * (Rfun β)ᵀ) := by
+  have hR : TendstoInMeasure μ
+      (fun n ω =>
+        Rfun (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω)))
+      atTop (fun _ => Rfun β) :=
+    continuousAt_function_olsBetaOrZero_tendstoInMeasure
+      (μ := μ) (X := X) (e := e) (y := y) β h hmodel Rfun hRfun hR_meas
+  exact randomLinearMapCovariance_tendstoInMeasure
+    (μ := μ)
+    (Rhat := fun n ω =>
+      Rfun (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω)))
+    (R := Rfun β) (Vhat := Vhat) (V := V)
+    hR_meas hV_meas hR hV
+
 omit [DecidableEq k] in
 /-- AEMeasurability of a fixed linear covariance transform `R V Rᵀ`. -/
 theorem linMapCov_aestronglyMeasurable
@@ -1553,6 +3258,45 @@ theorem olsHetCovStar_tendstoInMeasure_of_bddWts_components
     (μ := μ) (X := X) (e := e) (y := y)
     h β hmodel hScore_meas hCrossWeight hQuadWeight
 
+/-- **Hansen Theorem 7.6, feasible HC0 sandwich under packaged remainder conditions.**
+
+This is the chapter-facing packaged version of
+`olsHetCovStar_tendstoInMeasure_of_bddWts_components`: the linear model,
+component measurability, and bounded-weight residual-remainder controls are
+carried by `FeasibleHCRemainderConditions`. -/
+theorem olsHetCovStar_tendstoInMeasure_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : SampleHC0Assumption76 μ X e) (β : k → ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHetCovStar
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => heteroAsymCov μ X e) :=
+  olsHetCovStar_tendstoInMeasure_of_bddWts_components
+    (μ := μ) (X := X) (e := e) (y := y) h β
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded
+
+/-- **Hansen Theorem 7.6, feasible HC0 sandwich under compact robust moments.**
+
+This endpoint uses the combined robust feasible-HC moment package, discharging
+both the robust covariance assumptions and the feasible HC0 remainder package. -/
+theorem olsHetCovStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHetCovStar
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => heteroAsymCov μ X e) :=
+  olsHetCovStar_tendstoInMeasure_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions.toSampleHC0Assumption76 β
+    hm.toFeasibleHCRemainderConditions
+
 /-- AEMeasurability of the totalized feasible HC0 sandwich estimator from
 component measurability. -/
 theorem olsHetCovStar_stack_aestronglyMeasurable_components
@@ -1692,6 +3436,79 @@ theorem olsHC0LinSEStar_tendstoInMeasure_of_bddWts_components
     (V := heteroAsymCov μ X e)
     hV_meas hV
 
+/-- **Hansen Theorem 7.10, packaged HC0 covariance for fixed linear functions.** -/
+theorem linMap_olsHC0CovStar_tendstoInMeasure_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q]
+    (h : SampleHC0Assumption76 μ X e) (β : k → ℝ)
+    (R : Matrix q k ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        R * olsHetCovStar
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)
+      atTop (fun _ => R * heteroAsymCov μ X e * Rᵀ) :=
+  linMap_olsHC0CovStar_tendstoInMeasure_of_bddWts_components
+    (μ := μ) (X := X) (e := e) (y := y) h β R
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded
+
+/-- **Hansen Theorem 7.10, HC0 covariance for fixed linear functions under compact robust
+moments.** -/
+theorem linMap_olsHC0CovStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q]
+    (β : k → ℝ) (R : Matrix q k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        R * olsHetCovStar
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)
+      atTop (fun _ => R * heteroAsymCov μ X e * Rᵀ) :=
+  linMap_olsHC0CovStar_tendstoInMeasure_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions.toSampleHC0Assumption76 β R
+    hm.toFeasibleHCRemainderConditions
+
+/-- **Hansen §7.11, packaged HC0 standard errors for fixed linear functions.** -/
+theorem olsHC0LinSEStar_tendstoInMeasure_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Finite q]
+    (h : SampleHC0Assumption76 μ X e) (β : k → ℝ)
+    (R : Matrix q k ℝ) (j : q)
+    (hc : FeasibleHCRemainderConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Real.sqrt ((R * olsHetCovStar
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) j j))
+      atTop (fun _ =>
+        Real.sqrt ((R * heteroAsymCov μ X e * Rᵀ) j j)) :=
+  olsHC0LinSEStar_tendstoInMeasure_of_bddWts_components
+    (μ := μ) (X := X) (e := e) (y := y) h β R j
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded
+
+/-- **Hansen §7.11, HC0 standard errors under compact robust moments.** -/
+theorem olsHC0LinSEStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Finite q]
+    (β : k → ℝ) (R : Matrix q k ℝ) (j : q)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Real.sqrt ((R * olsHetCovStar
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) j j))
+      atTop (fun _ =>
+        Real.sqrt ((R * heteroAsymCov μ X e * Rᵀ) j j)) :=
+  olsHC0LinSEStar_tendstoInMeasure_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions.toSampleHC0Assumption76 β R j
+    hm.toFeasibleHCRemainderConditions
+
 /-- The HC1 finite-sample degrees-of-freedom multiplier `n / (n - k)` tends to `1`. -/
 theorem hc1FiniteSampleScale_tendsto_one (k : Type*) [Fintype k] :
     Tendsto
@@ -1807,6 +3624,40 @@ theorem olsHetCovHC1Star_tendstoInMeasure_of_bddWts_components
     (μ := μ) (X := X) (e := e) (y := y)
     h β hmodel hScore_meas hCrossWeight hQuadWeight
 
+/-- **Hansen Theorem 7.7, HC1 sandwich under packaged remainder conditions.**
+
+HC1 has the same probability limit as HC0 under the packaged feasible
+remainder conditions. -/
+theorem olsHetCovHC1Star_tendstoInMeasure_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : SampleHC0Assumption76 μ X e) (β : k → ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHetCovHC1Star
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => heteroAsymCov μ X e) :=
+  olsHetCovHC1Star_tendstoInMeasure_of_bddWts_components
+    (μ := μ) (X := X) (e := e) (y := y) h β
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded
+
+/-- **Hansen Theorem 7.7, HC1 sandwich under compact robust moments.** -/
+theorem olsHetCovHC1Star_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHetCovHC1Star
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => heteroAsymCov μ X e) :=
+  olsHetCovHC1Star_tendstoInMeasure_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions.toSampleHC0Assumption76 β
+    hm.toFeasibleHCRemainderConditions
+
 /-- AEMeasurability of the totalized HC1 sandwich estimator from component
 measurability. -/
 theorem olsHC1CovarianceStar_stack_aestronglyMeasurable_components
@@ -1914,6 +3765,79 @@ theorem olsHC1LinSEStar_tendstoInMeasure_of_bddWts_components
         (stackRegressors X n ω) (stackOutcomes y n ω))
     (V := heteroAsymCov μ X e)
     hV_meas hV
+
+/-- **Hansen Theorem 7.10, packaged HC1 covariance for fixed linear functions.** -/
+theorem linMap_olsHC1CovStar_tendstoInMeasure_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q]
+    (h : SampleHC0Assumption76 μ X e) (β : k → ℝ)
+    (R : Matrix q k ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        R * olsHetCovHC1Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)
+      atTop (fun _ => R * heteroAsymCov μ X e * Rᵀ) :=
+  linMap_olsHC1CovStar_tendstoInMeasure_of_bddWts_components
+    (μ := μ) (X := X) (e := e) (y := y) h β R
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded
+
+/-- **Hansen Theorem 7.10, HC1 covariance for fixed linear functions under compact robust
+moments.** -/
+theorem linMap_olsHC1CovStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q]
+    (β : k → ℝ) (R : Matrix q k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        R * olsHetCovHC1Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)
+      atTop (fun _ => R * heteroAsymCov μ X e * Rᵀ) :=
+  linMap_olsHC1CovStar_tendstoInMeasure_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions.toSampleHC0Assumption76 β R
+    hm.toFeasibleHCRemainderConditions
+
+/-- **Hansen §7.11, packaged HC1 standard errors for fixed linear functions.** -/
+theorem olsHC1LinSEStar_tendstoInMeasure_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Finite q]
+    (h : SampleHC0Assumption76 μ X e) (β : k → ℝ)
+    (R : Matrix q k ℝ) (j : q)
+    (hc : FeasibleHCRemainderConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Real.sqrt ((R * olsHetCovHC1Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) j j))
+      atTop (fun _ =>
+        Real.sqrt ((R * heteroAsymCov μ X e * Rᵀ) j j)) :=
+  olsHC1LinSEStar_tendstoInMeasure_of_bddWts_components
+    (μ := μ) (X := X) (e := e) (y := y) h β R j
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded
+
+/-- **Hansen §7.11, HC1 standard errors under compact robust moments.** -/
+theorem olsHC1LinSEStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Finite q]
+    (β : k → ℝ) (R : Matrix q k ℝ) (j : q)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Real.sqrt ((R * olsHetCovHC1Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) j j))
+      atTop (fun _ =>
+        Real.sqrt ((R * heteroAsymCov μ X e * Rᵀ) j j)) :=
+  olsHC1LinSEStar_tendstoInMeasure_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions.toSampleHC0Assumption76 β R j
+    hm.toFeasibleHCRemainderConditions
 
 /-- **Generic leverage-adjusted sandwich assembly.**
 
@@ -2293,6 +4217,72 @@ theorem olsHetCovHC3Star_tendstoInMeasure_of_bddWts_components_maxLev
       (weight := fun h => ((1 - h)⁻¹) ^ 2) measurable_hc3Weight
       h.toSampleHC0Assumption76 β hmodel hX_meas he_meas hCrossWeight hQuadWeight hAdj
 
+/-- **Hansen Theorem 7.7, HC2 sandwich under packaged leverage conditions.**
+
+This is the packaged HC2 wrapper: the feasible HC0 remainder controls are
+bundled together with maximal leverage `oₚ(1)`. -/
+theorem olsHetCovHC2Star_tendstoInMeasure_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHetCovHC2Star
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => heteroAsymCov μ X e) :=
+  olsHetCovHC2Star_tendstoInMeasure_of_bddWts_components_maxLev
+    (μ := μ) (X := X) (e := e) (y := y) h β
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hc.maxLeverage_tendsto
+
+/-- **Hansen Theorem 7.7, HC2 sandwich under compact robust moments.** -/
+theorem olsHetCovHC2Star_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHetCovHC2Star
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => heteroAsymCov μ X e) :=
+  olsHetCovHC2Star_tendstoInMeasure_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β hm.toFeasibleHCLeverageConditions
+
+/-- **Hansen Theorem 7.7, HC3 sandwich under packaged leverage conditions.**
+
+This is the packaged HC3 wrapper: the feasible HC0 remainder controls are
+bundled together with maximal leverage `oₚ(1)`. -/
+theorem olsHetCovHC3Star_tendstoInMeasure_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHetCovHC3Star
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => heteroAsymCov μ X e) :=
+  olsHetCovHC3Star_tendstoInMeasure_of_bddWts_components_maxLev
+    (μ := μ) (X := X) (e := e) (y := y) h β
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hc.maxLeverage_tendsto
+
+/-- **Hansen Theorem 7.7, HC3 sandwich under compact robust moments.** -/
+theorem olsHetCovHC3Star_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHetCovHC3Star
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => heteroAsymCov μ X e) :=
+  olsHetCovHC3Star_tendstoInMeasure_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β hm.toFeasibleHCLeverageConditions
+
 /-- HC2 covariance for fixed linear functions from maximal leverage. -/
 theorem linMap_olsHC2CovStar_tendstoInMeasure_of_bddWts_components_maxLev
     {μ : Measure Ω} [IsProbabilityMeasure μ]
@@ -2364,6 +4354,400 @@ theorem linMap_olsHC3CovStar_tendstoInMeasure_of_bddWts_components_maxLev
       (μ := μ) (X := X) (e := e) (y := y)
       (weight := fun h => ((1 - h)⁻¹) ^ 2) measurable_hc3Weight
       h β R hmodel hX_meas he_meas hCrossWeight hQuadWeight hAdj
+
+/-- **Hansen Theorem 7.10, packaged HC2 covariance for fixed linear functions.** -/
+theorem linMap_olsHC2CovStar_tendstoInMeasure_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix q k ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        R * olsHetCovHC2Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)
+      atTop (fun _ => R * heteroAsymCov μ X e * Rᵀ) :=
+  linMap_olsHC2CovStar_tendstoInMeasure_of_bddWts_components_maxLev
+    (μ := μ) (X := X) (e := e) (y := y) h.toSampleHC0Assumption76 β R
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hc.maxLeverage_tendsto
+
+/-- **Hansen Theorem 7.10, HC2 covariance for fixed linear functions under compact robust
+moments.** -/
+theorem linMap_olsHC2CovStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q]
+    (β : k → ℝ) (R : Matrix q k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        R * olsHetCovHC2Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)
+      atTop (fun _ => R * heteroAsymCov μ X e * Rᵀ) :=
+  linMap_olsHC2CovStar_tendstoInMeasure_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R hm.toFeasibleHCLeverageConditions
+
+/-- **Hansen Theorem 7.10, packaged HC3 covariance for fixed linear functions.** -/
+theorem linMap_olsHC3CovStar_tendstoInMeasure_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix q k ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        R * olsHetCovHC3Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)
+      atTop (fun _ => R * heteroAsymCov μ X e * Rᵀ) :=
+  linMap_olsHC3CovStar_tendstoInMeasure_of_bddWts_components_maxLev
+    (μ := μ) (X := X) (e := e) (y := y) h.toSampleHC0Assumption76 β R
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hc.maxLeverage_tendsto
+
+/-- **Hansen Theorem 7.10, HC3 covariance for fixed linear functions under compact robust
+moments.** -/
+theorem linMap_olsHC3CovStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q]
+    (β : k → ℝ) (R : Matrix q k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        R * olsHetCovHC3Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)
+      atTop (fun _ => R * heteroAsymCov μ X e * Rᵀ) :=
+  linMap_olsHC3CovStar_tendstoInMeasure_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R hm.toFeasibleHCLeverageConditions
+
+/-- **Hansen §7.11, packaged HC2 standard errors for fixed linear functions.** -/
+theorem olsHC2LinSEStar_tendstoInMeasure_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Finite q]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix q k ℝ) (j : q)
+    (hc : FeasibleHCLeverageConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Real.sqrt ((R * olsHetCovHC2Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) j j))
+      atTop (fun _ =>
+        Real.sqrt ((R * heteroAsymCov μ X e * Rᵀ) j j)) := by
+  have hV_meas :=
+    olsHC2CovarianceStar_stack_aestronglyMeasurable_components
+      (μ := μ) (X := X) (e := e) (y := y)
+      h.toSampleMomentAssumption71 β hc.model
+      hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+  have hV :=
+    olsHetCovHC2Star_tendstoInMeasure_of_feasibleHCLeverageConditions
+      (μ := μ) (X := X) (e := e) (y := y) h β hc
+  exact linMapCovStdError_tendstoInMeasure
+    (μ := μ) (R := R) (j := j)
+    (Vhat := fun n ω =>
+      olsHetCovHC2Star
+        (stackRegressors X n ω) (stackOutcomes y n ω))
+    (V := heteroAsymCov μ X e)
+    hV_meas hV
+
+/-- **Hansen §7.11, HC2 standard errors under compact robust moments.** -/
+theorem olsHC2LinSEStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Finite q]
+    (β : k → ℝ) (R : Matrix q k ℝ) (j : q)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Real.sqrt ((R * olsHetCovHC2Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) j j))
+      atTop (fun _ =>
+        Real.sqrt ((R * heteroAsymCov μ X e * Rᵀ) j j)) :=
+  olsHC2LinSEStar_tendstoInMeasure_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R j hm.toFeasibleHCLeverageConditions
+
+/-- **Hansen §7.11, packaged HC3 standard errors for fixed linear functions.** -/
+theorem olsHC3LinSEStar_tendstoInMeasure_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Finite q]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix q k ℝ) (j : q)
+    (hc : FeasibleHCLeverageConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Real.sqrt ((R * olsHetCovHC3Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) j j))
+      atTop (fun _ =>
+        Real.sqrt ((R * heteroAsymCov μ X e * Rᵀ) j j)) := by
+  have hV_meas :=
+    olsHC3CovarianceStar_stack_aestronglyMeasurable_components
+      (μ := μ) (X := X) (e := e) (y := y)
+      h.toSampleMomentAssumption71 β hc.model
+      hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+  have hV :=
+    olsHetCovHC3Star_tendstoInMeasure_of_feasibleHCLeverageConditions
+      (μ := μ) (X := X) (e := e) (y := y) h β hc
+  exact linMapCovStdError_tendstoInMeasure
+    (μ := μ) (R := R) (j := j)
+    (Vhat := fun n ω =>
+      olsHetCovHC3Star
+        (stackRegressors X n ω) (stackOutcomes y n ω))
+    (V := heteroAsymCov μ X e)
+    hV_meas hV
+
+/-- **Hansen §7.11, HC3 standard errors under compact robust moments.** -/
+theorem olsHC3LinSEStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Finite q]
+    (β : k → ℝ) (R : Matrix q k ℝ) (j : q)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Real.sqrt ((R * olsHetCovHC3Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) j j))
+      atTop (fun _ =>
+        Real.sqrt ((R * heteroAsymCov μ X e * Rᵀ) j j)) :=
+  olsHC3LinSEStar_tendstoInMeasure_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R j hm.toFeasibleHCLeverageConditions
+
+/-- IID joint-observation residual-variance consistency for `σ̂²`. -/
+theorem olsSigmaSqHatStar_tendstoInMeasure_errorVariance_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (hm : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsSigmaSqHatStar
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => errorVariance μ e) :=
+  olsSigmaSqHatStar_tendstoInMeasure_errorVariance
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toErrorVarianceConsistencyConditions β hm.model
+
+/-- IID joint-observation residual-variance consistency for `s²`. -/
+theorem olsS2Star_tendstoInMeasure_errorVariance_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (hm : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsS2Star
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => errorVariance μ e) :=
+  olsS2Star_tendstoInMeasure_errorVariance
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toErrorVarianceConsistencyConditions β hm.model
+
+/-- IID joint-observation homoskedastic covariance consistency. -/
+theorem olsHomoCovStar_tendstoInMeasure_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (hm : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHomoCovStar
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => homoAsymCov μ X e) :=
+  olsHomoCovStar_tendstoInMeasure
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toErrorVarianceConsistencyConditions β hm.model
+
+/-- IID joint-observation HC0 sandwich consistency. -/
+theorem olsHetCovStar_tendstoInMeasure_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (hm : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHetCovStar
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => heteroAsymCov μ X e) :=
+  olsHetCovStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β
+    hm.toRobustFeasibleHCMomentConditions
+
+/-- IID joint-observation HC0 covariance for fixed linear functions. -/
+theorem linMap_olsHC0CovStar_tendstoInMeasure_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q]
+    (β : k → ℝ) (R : Matrix q k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        R * olsHetCovStar
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)
+      atTop (fun _ => R * heteroAsymCov μ X e * Rᵀ) :=
+  linMap_olsHC0CovStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β R
+    hm.toRobustFeasibleHCMomentConditions
+
+/-- IID joint-observation HC0 standard errors for fixed linear functions. -/
+theorem olsHC0LinSEStar_tendstoInMeasure_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Finite q]
+    (β : k → ℝ) (R : Matrix q k ℝ) (j : q)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Real.sqrt ((R * olsHetCovStar
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) j j))
+      atTop (fun _ =>
+        Real.sqrt ((R * heteroAsymCov μ X e * Rᵀ) j j)) :=
+  olsHC0LinSEStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β R j
+    hm.toRobustFeasibleHCMomentConditions
+
+/-- IID joint-observation HC1 sandwich consistency. -/
+theorem olsHetCovHC1Star_tendstoInMeasure_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (hm : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHetCovHC1Star
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => heteroAsymCov μ X e) :=
+  olsHetCovHC1Star_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β
+    hm.toRobustFeasibleHCMomentConditions
+
+/-- IID joint-observation HC1 covariance for fixed linear functions. -/
+theorem linMap_olsHC1CovStar_tendstoInMeasure_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q]
+    (β : k → ℝ) (R : Matrix q k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        R * olsHetCovHC1Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)
+      atTop (fun _ => R * heteroAsymCov μ X e * Rᵀ) :=
+  linMap_olsHC1CovStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β R
+    hm.toRobustFeasibleHCMomentConditions
+
+/-- IID joint-observation HC1 standard errors for fixed linear functions. -/
+theorem olsHC1LinSEStar_tendstoInMeasure_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Finite q]
+    (β : k → ℝ) (R : Matrix q k ℝ) (j : q)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Real.sqrt ((R * olsHetCovHC1Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) j j))
+      atTop (fun _ =>
+        Real.sqrt ((R * heteroAsymCov μ X e * Rᵀ) j j)) :=
+  olsHC1LinSEStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β R j
+    hm.toRobustFeasibleHCMomentConditions
+
+/-- IID joint-observation HC2 sandwich consistency. -/
+theorem olsHetCovHC2Star_tendstoInMeasure_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (hm : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHetCovHC2Star
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => heteroAsymCov μ X e) :=
+  olsHetCovHC2Star_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β
+    hm.toRobustFeasibleHCMomentConditions
+
+/-- IID joint-observation HC3 sandwich consistency. -/
+theorem olsHetCovHC3Star_tendstoInMeasure_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (hm : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        olsHetCovHC3Star
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => heteroAsymCov μ X e) :=
+  olsHetCovHC3Star_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β
+    hm.toRobustFeasibleHCMomentConditions
+
+/-- IID joint-observation HC2 covariance for fixed linear functions. -/
+theorem linMap_olsHC2CovStar_tendstoInMeasure_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q]
+    (β : k → ℝ) (R : Matrix q k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        R * olsHetCovHC2Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)
+      atTop (fun _ => R * heteroAsymCov μ X e * Rᵀ) :=
+  linMap_olsHC2CovStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β R
+    hm.toRobustFeasibleHCMomentConditions
+
+/-- IID joint-observation HC3 covariance for fixed linear functions. -/
+theorem linMap_olsHC3CovStar_tendstoInMeasure_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q]
+    (β : k → ℝ) (R : Matrix q k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        R * olsHetCovHC3Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)
+      atTop (fun _ => R * heteroAsymCov μ X e * Rᵀ) :=
+  linMap_olsHC3CovStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β R
+    hm.toRobustFeasibleHCMomentConditions
+
+/-- IID joint-observation HC2 standard errors for fixed linear functions. -/
+theorem olsHC2LinSEStar_tendstoInMeasure_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Finite q]
+    (β : k → ℝ) (R : Matrix q k ℝ) (j : q)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Real.sqrt ((R * olsHetCovHC2Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) j j))
+      atTop (fun _ =>
+        Real.sqrt ((R * heteroAsymCov μ X e * Rᵀ) j j)) :=
+  olsHC2LinSEStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β R j
+    hm.toRobustFeasibleHCMomentConditions
+
+/-- IID joint-observation HC3 standard errors for fixed linear functions. -/
+theorem olsHC3LinSEStar_tendstoInMeasure_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Finite q]
+    (β : k → ℝ) (R : Matrix q k ℝ) (j : q)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        Real.sqrt ((R * olsHetCovHC3Star
+          (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) j j))
+      atTop (fun _ =>
+        Real.sqrt ((R * heteroAsymCov μ X e * Rᵀ) j j)) :=
+  olsHC3LinSEStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β R j
+    hm.toRobustFeasibleHCMomentConditions
 
 end Assumption72
 

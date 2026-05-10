@@ -105,6 +105,346 @@ noncomputable def linearRestrictionStdError
     (R : Matrix Unit k ℝ) (Vhat : Matrix k k ℝ) : ℝ :=
   Real.sqrt ((R * Vhat * Rᵀ) () ())
 
+/-- Scalar t-statistic for a generic nonlinear scalar parameter transform. -/
+@[reducible]
+noncomputable def scalarFunctionTStat
+    (θhat θ se root : ℝ) : ℝ :=
+  root * (θhat - θ) / se
+
+/-- Symmetric confidence-interval membership for a generic nonlinear scalar parameter transform. -/
+@[reducible]
+noncomputable def scalarFunctionCIEvent
+    (θhat θ se root crit : ℝ) : Prop :=
+  θ ∈ Set.Icc
+    (θhat - crit * se / root)
+    (θhat + crit * se / root)
+
+omit [Fintype k] [DecidableEq k] in
+/-- Real-valued CDF of a scalar statistic at a fixed sample size and cutoff. -/
+noncomputable def statisticCDFReal
+    (μ : Measure Ω) (T : ℕ → Ω → ℝ) (n : ℕ) (x : ℝ) : ℝ :=
+  μ.real {ω | T n ω ≤ x}
+
+omit [Fintype k] [DecidableEq k] in
+/-- First-order Edgeworth expansion interface for scalar statistics.
+
+The field records the theorem-facing content of Hansen's Edgeworth statement:
+after multiplying the CDF error by `√n`, the error converges to a fixed
+correction function. The concrete polynomial/cumulant calculation that proves
+this hypothesis is intentionally left outside this generic wrapper. -/
+structure FirstOrderEdgeworthExpansion
+    (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (T : ℕ → Ω → ℝ) (baseCDF correction : ℝ → ℝ) where
+  /-- Scaled CDF error converges pointwise to the first Edgeworth correction. -/
+  scaled_cdf_error_tendsto :
+    ∀ x, Tendsto
+      (fun n : ℕ => Real.sqrt (n : ℝ) * (statisticCDFReal μ T n x - baseCDF x))
+      atTop (𝓝 (correction x))
+
+namespace FirstOrderEdgeworthExpansion
+
+omit [Fintype k] [DecidableEq k] in
+/-- First-order Edgeworth expansion, written as a vanishing scaled remainder. -/
+theorem scaled_remainder_tendsto_zero
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {T : ℕ → Ω → ℝ} {baseCDF correction : ℝ → ℝ}
+    (h : FirstOrderEdgeworthExpansion μ T baseCDF correction) (x : ℝ) :
+    Tendsto
+      (fun n : ℕ => Real.sqrt (n : ℝ) *
+        (statisticCDFReal μ T n x - baseCDF x -
+          (Real.sqrt (n : ℝ))⁻¹ * correction x))
+      atTop (𝓝 0) := by
+  have hscaled : Tendsto
+      (fun n : ℕ =>
+        Real.sqrt (n : ℝ) * (statisticCDFReal μ T n x - baseCDF x) -
+          correction x)
+      atTop (𝓝 0) := by
+    simpa using
+      (h.scaled_cdf_error_tendsto x).sub
+        (tendsto_const_nhds (x := correction x))
+  have heq :
+      (fun n : ℕ => Real.sqrt (n : ℝ) *
+        (statisticCDFReal μ T n x - baseCDF x -
+          (Real.sqrt (n : ℝ))⁻¹ * correction x)) =ᶠ[atTop]
+      (fun n : ℕ => Real.sqrt (n : ℝ) *
+        (statisticCDFReal μ T n x - baseCDF x) - correction x) := by
+    filter_upwards [eventually_ge_atTop 1] with n hn
+    have hnpos : (0 : ℝ) < n := by exact_mod_cast hn
+    have hsqrt_ne : Real.sqrt (n : ℝ) ≠ 0 :=
+      Real.sqrt_ne_zero'.mpr hnpos
+    field_simp [hsqrt_ne]
+  rw [tendsto_congr' heq]
+  simpa using hscaled
+
+omit [Fintype k] [DecidableEq k] in
+/-- A first-order Edgeworth expansion implies ordinary CDF convergence to the base CDF. -/
+theorem cdf_tendsto_base
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {T : ℕ → Ω → ℝ} {baseCDF correction : ℝ → ℝ}
+    (h : FirstOrderEdgeworthExpansion μ T baseCDF correction) (x : ℝ) :
+    Tendsto (fun n : ℕ => statisticCDFReal μ T n x) atTop (𝓝 (baseCDF x)) := by
+  have hinv_sqrt : Tendsto (fun n : ℕ => (Real.sqrt (n : ℝ))⁻¹)
+      atTop (𝓝 (0 : ℝ)) := by
+    exact tendsto_inv_atTop_zero.comp
+      (Real.tendsto_sqrt_atTop.comp tendsto_natCast_atTop_atTop)
+  have hprod := hinv_sqrt.mul (h.scaled_cdf_error_tendsto x)
+  have herror : Tendsto (fun n : ℕ => statisticCDFReal μ T n x - baseCDF x)
+      atTop (𝓝 0) := by
+    have heq :
+        (fun n : ℕ => (Real.sqrt (n : ℝ))⁻¹ *
+          (Real.sqrt (n : ℝ) *
+            (statisticCDFReal μ T n x - baseCDF x))) =ᶠ[atTop]
+        (fun n : ℕ => statisticCDFReal μ T n x - baseCDF x) := by
+      filter_upwards [eventually_ge_atTop 1] with n hn
+      have hnpos : (0 : ℝ) < n := by exact_mod_cast hn
+      have hsqrt_ne : Real.sqrt (n : ℝ) ≠ 0 :=
+        Real.sqrt_ne_zero'.mpr hnpos
+      field_simp [hsqrt_ne]
+    rw [← tendsto_congr' heq]
+    simpa using hprod
+  have hsum : Tendsto
+      (fun n : ℕ => (statisticCDFReal μ T n x - baseCDF x) + baseCDF x)
+      atTop (𝓝 (0 + baseCDF x)) :=
+    herror.add (tendsto_const_nhds (x := baseCDF x))
+  simpa [sub_eq_add_neg, add_assoc, add_comm, add_left_comm] using hsum
+
+end FirstOrderEdgeworthExpansion
+
+omit [Fintype k] [DecidableEq k] in
+/-- Second-order uniform Edgeworth expansion interface for scalar statistics.
+
+This is the theorem-facing shape of Hansen Theorem 7.15: the CDF of a scalar
+statistic is approximated uniformly in the cutoff `x` by a base CDF plus
+`n^{-1/2}` and `n^{-1}` correction terms. For the textbook t-ratio application,
+`baseCDF` is the standard-normal CDF, `density` is the standard-normal density,
+and `p1`, `p2` are the Edgeworth polynomials. The structure records the
+expansion statement; the concrete cumulant/polynomial calculation remains a
+separate proof obligation. -/
+structure SecondOrderEdgeworthExpansion
+    (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (T : ℕ → Ω → ℝ) (baseCDF density p1 p2 : ℝ → ℝ) where
+  /-- The second-order Edgeworth remainder is `o(n^{-1})` uniformly in `x`. -/
+  uniform_scaled_remainder_tendsto_zero :
+    TendstoUniformly
+      (fun (n : ℕ) x =>
+        (n : ℝ) *
+          (statisticCDFReal μ T n x - baseCDF x -
+            (Real.sqrt (n : ℝ))⁻¹ * (p1 x * density x) -
+            (n : ℝ)⁻¹ * (p2 x * density x)))
+      (fun _ : ℝ => 0) atTop
+
+omit [Fintype k] [DecidableEq k] in
+/-- The even quadratic polynomial shape appearing as `p₁` in Hansen's
+Theorem 7.15 Edgeworth expansion.  The concrete coefficients are cumulant
+functions of the regression moments; this definition records the textbook
+polynomial order and parity. -/
+@[reducible]
+def edgeworthP1Polynomial (a0 a2 x : ℝ) : ℝ :=
+  a0 + a2 * x ^ 2
+
+omit [Fintype k] [DecidableEq k] in
+/-- The odd degree-five polynomial shape appearing as `p₂` in Hansen's
+Theorem 7.15 Edgeworth expansion. -/
+@[reducible]
+def edgeworthP2Polynomial (b1 b3 b5 x : ℝ) : ℝ :=
+  b1 * x + b3 * x ^ 3 + b5 * x ^ 5
+
+omit [Fintype k] [DecidableEq k] in
+@[simp]
+theorem edgeworthP1Polynomial_neg (a0 a2 x : ℝ) :
+    edgeworthP1Polynomial a0 a2 (-x) = edgeworthP1Polynomial a0 a2 x := by
+  simp [edgeworthP1Polynomial]
+
+omit [Fintype k] [DecidableEq k] in
+@[simp]
+theorem edgeworthP2Polynomial_neg (b1 b3 b5 x : ℝ) :
+    edgeworthP2Polynomial b1 b3 b5 (-x) = -edgeworthP2Polynomial b1 b3 b5 x := by
+  ring
+
+namespace SecondOrderEdgeworthExpansion
+
+omit [Fintype k] [DecidableEq k] in
+/-- A uniform second-order Edgeworth expansion gives the corresponding
+pointwise scaled-remainder convergence at every cutoff. -/
+theorem pointwise_scaled_remainder_tendsto_zero
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {T : ℕ → Ω → ℝ} {baseCDF density p1 p2 : ℝ → ℝ}
+    (h : SecondOrderEdgeworthExpansion μ T baseCDF density p1 p2) (x : ℝ) :
+    Tendsto
+      (fun n : ℕ =>
+        (n : ℝ) *
+          (statisticCDFReal μ T n x - baseCDF x -
+            (Real.sqrt (n : ℝ))⁻¹ * (p1 x * density x) -
+            (n : ℝ)⁻¹ * (p2 x * density x)))
+      atTop (𝓝 0) := by
+  simpa using h.uniform_scaled_remainder_tendsto_zero.tendsto_at x
+
+omit [Fintype k] [DecidableEq k] in
+/-- The unscaled second-order Edgeworth approximation error vanishes at each cutoff. -/
+theorem pointwise_remainder_tendsto_zero
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {T : ℕ → Ω → ℝ} {baseCDF density p1 p2 : ℝ → ℝ}
+    (h : SecondOrderEdgeworthExpansion μ T baseCDF density p1 p2) (x : ℝ) :
+    Tendsto
+      (fun n : ℕ =>
+        statisticCDFReal μ T n x - baseCDF x -
+          (Real.sqrt (n : ℝ))⁻¹ * (p1 x * density x) -
+          (n : ℝ)⁻¹ * (p2 x * density x))
+      atTop (𝓝 0) := by
+  let R : ℕ → ℝ := fun n =>
+    statisticCDFReal μ T n x - baseCDF x -
+      (Real.sqrt (n : ℝ))⁻¹ * (p1 x * density x) -
+      (n : ℝ)⁻¹ * (p2 x * density x)
+  have hscaled : Tendsto (fun n : ℕ => (n : ℝ) * R n) atTop (𝓝 0) := by
+    simpa [R] using h.pointwise_scaled_remainder_tendsto_zero x
+  have hinv : Tendsto (fun n : ℕ => (n : ℝ)⁻¹) atTop (𝓝 (0 : ℝ)) :=
+    tendsto_inv_atTop_zero.comp tendsto_natCast_atTop_atTop
+  have hprod : Tendsto (fun n : ℕ => (n : ℝ)⁻¹ * ((n : ℝ) * R n))
+      atTop (𝓝 0) := by
+    simpa using hinv.mul hscaled
+  have heq :
+      (fun n : ℕ => (n : ℝ)⁻¹ * ((n : ℝ) * R n)) =ᶠ[atTop] R := by
+    filter_upwards [eventually_ge_atTop 1] with n hn
+    have hnne : (n : ℝ) ≠ 0 := by
+      exact_mod_cast (ne_of_gt hn)
+    field_simp [hnne]
+  rw [tendsto_congr' heq] at hprod
+  simpa [R] using hprod
+
+omit [Fintype k] [DecidableEq k] in
+/-- A second-order Edgeworth expansion implies the first-order Edgeworth
+interface, with correction `p1(x) * density(x)`. -/
+theorem toFirstOrderEdgeworthExpansion
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {T : ℕ → Ω → ℝ} {baseCDF density p1 p2 : ℝ → ℝ}
+    (h : SecondOrderEdgeworthExpansion μ T baseCDF density p1 p2) :
+    FirstOrderEdgeworthExpansion μ T baseCDF (fun x => p1 x * density x) where
+  scaled_cdf_error_tendsto := by
+    intro x
+    let A : ℝ := p1 x * density x
+    let B : ℝ := p2 x * density x
+    let R : ℕ → ℝ := fun n =>
+      (n : ℝ) *
+        (statisticCDFReal μ T n x - baseCDF x -
+          (Real.sqrt (n : ℝ))⁻¹ * A -
+          (n : ℝ)⁻¹ * B)
+    have hR : Tendsto R atTop (𝓝 0) := by
+      simpa [R, A, B] using h.pointwise_scaled_remainder_tendsto_zero x
+    have hinv_sqrt : Tendsto (fun n : ℕ => (Real.sqrt (n : ℝ))⁻¹)
+        atTop (𝓝 (0 : ℝ)) := by
+      exact tendsto_inv_atTop_zero.comp
+        (Real.tendsto_sqrt_atTop.comp tendsto_natCast_atTop_atTop)
+    have hB : Tendsto (fun n : ℕ => (Real.sqrt (n : ℝ))⁻¹ * B)
+        atTop (𝓝 0) :=
+      by simpa using hinv_sqrt.mul (tendsto_const_nhds (x := B))
+    have hRem : Tendsto (fun n : ℕ => (Real.sqrt (n : ℝ))⁻¹ * R n)
+        atTop (𝓝 0) :=
+      by simpa using hinv_sqrt.mul hR
+    have hsum : Tendsto
+        (fun n : ℕ => A + (Real.sqrt (n : ℝ))⁻¹ * B +
+          (Real.sqrt (n : ℝ))⁻¹ * R n)
+        atTop (𝓝 A) := by
+      simpa using
+        ((tendsto_const_nhds (x := A)).add hB).add hRem
+    have heq :
+        (fun n : ℕ =>
+          Real.sqrt (n : ℝ) * (statisticCDFReal μ T n x - baseCDF x)) =ᶠ[atTop]
+        (fun n : ℕ => A + (Real.sqrt (n : ℝ))⁻¹ * B +
+          (Real.sqrt (n : ℝ))⁻¹ * R n) := by
+      filter_upwards [eventually_ge_atTop 1] with n hn
+      have hnpos : (0 : ℝ) < n := by exact_mod_cast hn
+      have hsqrt_ne : Real.sqrt (n : ℝ) ≠ 0 :=
+        Real.sqrt_ne_zero'.mpr hnpos
+      have hsqrt_sq : Real.sqrt (n : ℝ) ^ 2 = (n : ℝ) :=
+        Real.sq_sqrt hnpos.le
+      dsimp [R, A, B]
+      rw [← hsqrt_sq]
+      field_simp [hsqrt_ne]
+      rw [Real.sqrt_sq_eq_abs, abs_of_nonneg (Real.sqrt_nonneg _)]
+      ring
+    rw [tendsto_congr' heq]
+    simpa [A] using hsum
+
+omit [Fintype k] [DecidableEq k] in
+/-- A second-order Edgeworth expansion implies ordinary CDF convergence to the base CDF. -/
+theorem cdf_tendsto_base
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {T : ℕ → Ω → ℝ} {baseCDF density p1 p2 : ℝ → ℝ}
+    (h : SecondOrderEdgeworthExpansion μ T baseCDF density p1 p2) (x : ℝ) :
+    Tendsto (fun n : ℕ => statisticCDFReal μ T n x) atTop (𝓝 (baseCDF x)) :=
+  h.toFirstOrderEdgeworthExpansion.cdf_tendsto_base x
+
+omit [Fintype k] [DecidableEq k] in
+/-- Symmetric two-sided Edgeworth expansion consequence.
+
+For a symmetric interval, the `n^{-1/2}` correction cancels when `p₁` is even
+and the density is even, while the odd `p₂` term contributes twice its positive
+cutoff value. This is the formal version of Hansen's explanation after
+Theorem 7.15 that two-sided intervals remove the first-order Edgeworth
+coverage error. -/
+theorem symmetric_interval_scaled_remainder_tendsto_zero
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {T : ℕ → Ω → ℝ} {baseCDF density p1 p2 : ℝ → ℝ}
+    (h : SecondOrderEdgeworthExpansion μ T baseCDF density p1 p2) (c : ℝ)
+    (hp1 : p1 (-c) = p1 c) (hp2 : p2 (-c) = -p2 c)
+    (hdensity : density (-c) = density c) :
+    Tendsto
+      (fun n : ℕ =>
+        (n : ℝ) *
+          ((statisticCDFReal μ T n c - statisticCDFReal μ T n (-c)) -
+            (baseCDF c - baseCDF (-c)) -
+            (n : ℝ)⁻¹ * (2 * (p2 c * density c))))
+      atTop (𝓝 0) := by
+  have hc := h.pointwise_scaled_remainder_tendsto_zero c
+  have hneg := h.pointwise_scaled_remainder_tendsto_zero (-c)
+  have hdiff := hc.sub hneg
+  have heq :
+      (fun n : ℕ =>
+        (n : ℝ) *
+            (statisticCDFReal μ T n c - baseCDF c -
+              (Real.sqrt (n : ℝ))⁻¹ * (p1 c * density c) -
+              (n : ℝ)⁻¹ * (p2 c * density c)) -
+          (n : ℝ) *
+            (statisticCDFReal μ T n (-c) - baseCDF (-c) -
+              (Real.sqrt (n : ℝ))⁻¹ * (p1 (-c) * density (-c)) -
+              (n : ℝ)⁻¹ * (p2 (-c) * density (-c)))) =ᶠ[atTop]
+      (fun n : ℕ =>
+        (n : ℝ) *
+          ((statisticCDFReal μ T n c - statisticCDFReal μ T n (-c)) -
+            (baseCDF c - baseCDF (-c)) -
+            (n : ℝ)⁻¹ * (2 * (p2 c * density c)))) := by
+    filter_upwards with n
+    rw [hp1, hp2, hdensity]
+    ring
+  rw [tendsto_congr' heq] at hdiff
+  simpa using hdiff
+
+omit [Fintype k] [DecidableEq k] in
+/-- Coefficient-specialized version of the symmetric two-sided Edgeworth
+cancellation theorem for Hansen's even-quadratic `p₁` and odd degree-five `p₂`
+polynomial shapes. -/
+theorem symmetric_interval_scaled_remainder_tendsto_zero_polynomial
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {T : ℕ → Ω → ℝ} {baseCDF density : ℝ → ℝ}
+    {a0 a2 b1 b3 b5 c : ℝ}
+    (h : SecondOrderEdgeworthExpansion μ T baseCDF density
+      (edgeworthP1Polynomial a0 a2) (edgeworthP2Polynomial b1 b3 b5))
+    (hdensity : density (-c) = density c) :
+    Tendsto
+      (fun n : ℕ =>
+        (n : ℝ) *
+          ((statisticCDFReal μ T n c - statisticCDFReal μ T n (-c)) -
+            (baseCDF c - baseCDF (-c)) -
+            (n : ℝ)⁻¹ *
+              (2 * (edgeworthP2Polynomial b1 b3 b5 c * density c))))
+      atTop (𝓝 0) :=
+  h.symmetric_interval_scaled_remainder_tendsto_zero c
+    (edgeworthP1Polynomial_neg a0 a2 c)
+    (edgeworthP2Polynomial_neg b1 b3 b5 c)
+    hdensity
+
+end SecondOrderEdgeworthExpansion
+
 omit [DecidableEq k] in
 /-- Numerator of the scalar t-statistic for totalized OLS. -/
 @[reducible]
@@ -422,6 +762,63 @@ theorem studentizedLimit_tendstoInDistribution
   exact tendstoInDistribution_div_of_tendstoInMeasure_const_pos
     (μ := μ) (ν := ν) (X := num) (Y := se) (Z := Z) (c := c)
     hc hnum hse hse_meas hratio_meas
+
+/-- **Hansen Theorem 7.11, generic nonlinear scalar t-statistic.**
+
+If the scaled scalar plug-in error has a distributional limit and the nonlinear
+standard error converges in probability to a positive constant, then the
+studentized nonlinear scalar statistic converges to the corresponding ratio
+limit. -/
+theorem nonlinearScalarTStat_tendstoInDistribution
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    {θ : ℝ} {θhat se : ℕ → Ω → ℝ} {root : ℕ → ℝ}
+    {Z : Ω' → ℝ} {c : ℝ}
+    (hc : 0 < c)
+    (hnum : TendstoInDistribution
+      (fun n ω => root n * (θhat n ω - θ))
+      atTop Z (fun _ => μ) ν)
+    (hse : TendstoInMeasure μ se atTop (fun _ => c))
+    (hse_meas : ∀ n, AEMeasurable (se n) μ) :
+    TendstoInDistribution
+      (fun n ω => scalarFunctionTStat (θhat n ω) θ (se n ω) (root n))
+      atTop (fun ω => Z ω / c) (fun _ => μ) ν := by
+  simpa [scalarFunctionTStat] using
+    studentizedLimit_tendstoInDistribution
+      (μ := μ) (ν := ν)
+      (num := fun n ω => root n * (θhat n ω - θ))
+      (se := se) (Z := Z) (c := c)
+      hc hnum hse hse_meas
+
+/-- **Hansen Theorem 7.12, nonlinear scalar CI coverage from a signed t limit.**
+
+If a nonlinear scalar t-statistic has the standard-normal limit and its standard
+error converges to a positive constant, then the usual symmetric confidence
+interval has standard-normal asymptotic coverage. -/
+theorem nonlinearScalarCI_coverage_of_tstat_standardNormal_se_tendsto_pos
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {θ crit c : ℝ}
+    {θhat se : ℕ → Ω → ℝ} {root : ℕ → ℝ}
+    (hroot : ∀ᶠ n in atTop, 0 < root n)
+    (hc : 0 < c)
+    (hse : TendstoInMeasure μ se atTop (fun _ => c))
+    (hT : TendstoInDistribution
+      (fun n ω => scalarFunctionTStat (θhat n ω) θ (se n ω) (root n))
+      atTop (fun x : ℝ => x) (fun _ => μ) (gaussianReal 0 1)) :
+    Tendsto
+      (fun n => μ {ω |
+        scalarFunctionCIEvent (θhat n ω) θ (se n ω) (root n) crit})
+      atTop
+      (𝓝 (((gaussianReal 0 1).map (fun x : ℝ => |x|)) (Set.Iic crit))) := by
+  have hAbs : TendstoInDistribution
+      (fun n ω => |scalarFunctionTStat (θhat n ω) θ (se n ω) (root n)|)
+      atTop (fun x : ℝ => |x|) (fun _ => μ) (gaussianReal 0 1) := by
+    simpa [Function.comp_def] using hT.continuous_comp continuous_abs
+  simpa [scalarFunctionCIEvent, scalarFunctionTStat] using
+    symmetricCI_coverage_of_abs_tstat_standardNormal_se_tendsto_pos
+      (μ := μ) (θ := θ) (crit := crit) (c := c)
+      (θhat := θhat) (se := se) (root := root)
+      hroot hc hse hAbs
 
 /-- **Hansen §7.17, homoskedastic t-statistic for a scalar linear function.**
 
@@ -906,6 +1303,30 @@ theorem olsHomoLinWaldStatOrZero_tendstoInDistribution_chiSquared_one_homo
       (olsHomoLinTStatOrZero_tendstoInDistribution_standardNormal_homo
         (μ := μ) (X := X) (e := e) (y := y)
         hclt hvar β R hmodel hX_meas he_meas hX0 hhomo hse_pos)
+
+/-- IID joint-observation scalar homoskedastic Wald statistic from homoskedasticity. -/
+theorem olsHomoLinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_iidRobustFeasibleHC
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hX0 : Measurable (X 0))
+    [SigmaFinite (μ.trim (conditioningSpace_le hX0))]
+    (hhomo : HomoskedasticErrorVariance μ X e)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (homoAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearWaldStatOrZero R
+          (olsHomoCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared 1) :=
+  olsHomoLinWaldStatOrZero_tendstoInDistribution_chiSquared_one_homo
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toScoreCLTConditions hm.toErrorVarianceConsistencyConditions β R hm.model
+    hm.x_aestronglyMeasurable hm.e_aestronglyMeasurable hX0 hhomo hse_pos
 
 /-- **Hansen Theorem 7.11, HC0 t-statistic for a scalar linear function.**
 
@@ -1609,6 +2030,1172 @@ theorem olsHC1LinCIOrZero_cov_tendsto_standardNormal
       (θhat := θhat) (se := se) (root := root) (c := c)
       hroot (by simpa [c] using hse_pos) hse hGeneric
 
+/-- Packaged ordinary HC0 scalar t-statistic with standard-normal limit. -/
+theorem olsHC0LinTStatOrZero_tendstoInDistribution_standardNormal_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix Unit k ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearTStatOrZero R
+          (olsHetCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (gaussianReal 0 1) :=
+  olsHC0LinTStatOrZero_tendstoInDistribution_standardNormal
+    (μ := μ) (X := X) (e := e) (y := y) h β R
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hse_pos
+
+set_option linter.style.longLine false in
+/-- Packaged absolute-value CMT for the ordinary HC0 scalar t-statistic. -/
+theorem olsHC0LinTStatOrZero_abs_tendstoInDistribution_standardNormalAbs_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix Unit k ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        |olsLinearTStatOrZero R
+          (olsHetCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ))|)
+      atTop (fun x : ℝ => |x|) (fun _ => μ) (gaussianReal 0 1) :=
+  olsHC0LinTStatOrZero_abs_tendstoInDistribution_standardNormalAbs
+    (μ := μ) (X := X) (e := e) (y := y) h β R
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hse_pos
+
+/-- Packaged ordinary HC0 confidence-interval coverage. -/
+theorem olsHC0LinCIOrZero_cov_tendsto_standardNormal_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix Unit k ℝ) (crit : ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    Tendsto
+      (fun n => μ {ω |
+        olsLinearCIEventOrZero R
+          (olsHetCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)) crit})
+      atTop
+      (𝓝 (((gaussianReal 0 1).map (fun x : ℝ => |x|)) (Set.Iic crit))) :=
+  olsHC0LinCIOrZero_cov_tendsto_standardNormal
+    (μ := μ) (X := X) (e := e) (y := y) h β R crit
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hse_pos
+
+set_option linter.style.longLine false in
+/-- Packaged ordinary HC0 one-degree Wald statistic. -/
+theorem olsHC0LinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix Unit k ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearWaldStatOrZero R
+          (olsHetCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared 1) :=
+  olsHC0LinWaldStatOrZero_tendstoInDistribution_chiSquared_one
+    (μ := μ) (X := X) (e := e) (y := y) h β R
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hse_pos
+
+/-- Packaged ordinary HC1 scalar t-statistic with standard-normal limit. -/
+theorem olsHC1LinTStatOrZero_tendstoInDistribution_standardNormal_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix Unit k ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearTStatOrZero R
+          (olsHetCovHC1Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (gaussianReal 0 1) :=
+  olsHC1LinTStatOrZero_tendstoInDistribution_standardNormal
+    (μ := μ) (X := X) (e := e) (y := y) h β R
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hse_pos
+
+set_option linter.style.longLine false in
+/-- Packaged absolute-value CMT for the ordinary HC1 scalar t-statistic. -/
+theorem olsHC1LinTStatOrZero_abs_tendstoInDistribution_standardNormalAbs_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix Unit k ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        |olsLinearTStatOrZero R
+          (olsHetCovHC1Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ))|)
+      atTop (fun x : ℝ => |x|) (fun _ => μ) (gaussianReal 0 1) :=
+  olsHC1LinTStatOrZero_abs_tendstoInDistribution_standardNormalAbs
+    (μ := μ) (X := X) (e := e) (y := y) h β R
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hse_pos
+
+/-- Packaged ordinary HC1 confidence-interval coverage. -/
+theorem olsHC1LinCIOrZero_cov_tendsto_standardNormal_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix Unit k ℝ) (crit : ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    Tendsto
+      (fun n => μ {ω |
+        olsLinearCIEventOrZero R
+          (olsHetCovHC1Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)) crit})
+      atTop
+      (𝓝 (((gaussianReal 0 1).map (fun x : ℝ => |x|)) (Set.Iic crit))) :=
+  olsHC1LinCIOrZero_cov_tendsto_standardNormal
+    (μ := μ) (X := X) (e := e) (y := y) h β R crit
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hse_pos
+
+set_option linter.style.longLine false in
+/-- Packaged ordinary HC1 one-degree Wald statistic. -/
+theorem olsHC1LinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix Unit k ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearWaldStatOrZero R
+          (olsHetCovHC1Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared 1) :=
+  olsHC1LinWaldStatOrZero_tendstoInDistribution_chiSquared_one
+    (μ := μ) (X := X) (e := e) (y := y) h β R
+    hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hse_pos
+
+set_option linter.style.longLine false in
+/-- Packaged ordinary HC2 scalar t-statistic with standard-normal limit. -/
+theorem olsHC2LinTStatOrZero_tendstoInDistribution_standardNormal_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix Unit k ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearTStatOrZero R
+          (olsHetCovHC2Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (gaussianReal 0 1) := by
+  let c : ℝ := linearRestrictionStdError R (heteroAsymCov μ X e)
+  let se : ℕ → Ω → ℝ := fun n ω =>
+    Real.sqrt ((R * olsHetCovHC2Star
+      (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) () ())
+  let num : ℕ → Ω → ℝ := fun n ω =>
+    ((Real.sqrt (n : ℝ) •
+      (R *ᵥ (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+        (fun _ : Unit => 1))
+  have hentry_pos : 0 < (R * heteroAsymCov μ X e * Rᵀ) () () := by
+    exact Real.sqrt_pos.mp hse_pos
+  have hentry_eq :
+      (R * heteroAsymCov μ X e * Rᵀ) () () =
+        olsProjectionAsymVar μ X e (Rᵀ *ᵥ (fun _ : Unit => 1)) :=
+    linMapCov_unit_apply_eq_olsProjectionAsymVar
+      (μ := μ) (X := X) (e := e) h.toSampleMomentAssumption71.int_outer R
+  have hσ :
+      olsProjectionAsymVar μ X e (Rᵀ *ᵥ (fun _ : Unit => 1)) = c ^ 2 := by
+    calc
+      olsProjectionAsymVar μ X e (Rᵀ *ᵥ (fun _ : Unit => 1))
+          = (R * heteroAsymCov μ X e * Rᵀ) () () :=
+            hentry_eq.symm
+      _ = c ^ 2 := by
+            simpa [c] using (Real.sq_sqrt hentry_pos.le).symm
+  have hZ : HasLaw (fun x : ℝ => c * x)
+      (gaussianReal 0
+        (olsProjectionAsymVar μ X e (Rᵀ *ᵥ (fun _ : Unit => 1))).toNNReal)
+      (gaussianReal 0 1) :=
+    hasLaw_const_mul_id_gaussianReal_of_variance_eq hσ
+  have hnum : TendstoInDistribution num atTop (fun x : ℝ => c * x)
+      (fun _ => μ) (gaussianReal 0 1) := by
+    simpa [num] using
+      scoreProj_linMap_olsBetaStar_tendstoInDistribution_gaussian_cov
+        (μ := μ) (ν := gaussianReal 0 1) (X := X) (e := e) (y := y)
+        h.toSampleCLTAssumption72 β R (fun _ : Unit => 1) hc.model hZ
+  have hse : TendstoInMeasure μ se atTop (fun _ => c) := by
+    simpa [se, c] using
+      olsHC2LinSEStar_tendstoInMeasure_of_feasibleHCLeverageConditions
+        (μ := μ) (X := X) (e := e) (y := y) h β R () hc
+  have hV_meas :=
+    olsHC2CovarianceStar_stack_aestronglyMeasurable_components
+      (μ := μ) (X := X) (e := e) (y := y)
+      h.toSampleMomentAssumption71 β hc.model
+      hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+  have hse_meas : ∀ n, AEMeasurable (se n) μ := by
+    intro n
+    exact linearCovarianceStdError_aemeasurable
+      (μ := μ) (R := R)
+      (Vhat := fun ω =>
+        olsHetCovHC2Star
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      (hV_meas n)
+  have hratio := studentizedLimit_tendstoInDistribution
+    (μ := μ) (ν := gaussianReal 0 1) (num := num) (se := se)
+    (Z := fun x : ℝ => c * x) (c := c)
+    (by simpa [c] using hse_pos) hnum hse hse_meas
+  have hstat : TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearTStatOrZero R
+          (olsHetCovHC2Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => c * x / c) (fun _ => μ) (gaussianReal 0 1) := by
+    simpa [num, se, c, olsLinearTStatOrZero, olsLinearTNumeratorOrZero,
+      linearRestrictionStdError] using hratio
+  convert hstat using 2
+  · rename_i x
+    dsimp [c]
+    exact (mul_div_cancel_left₀ x hse_pos.ne').symm
+
+set_option linter.style.longLine false in
+/-- Packaged absolute-value CMT for the ordinary HC2 scalar t-statistic. -/
+theorem olsHC2LinTStatOrZero_abs_tendstoInDistribution_standardNormalAbs_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix Unit k ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        |olsLinearTStatOrZero R
+          (olsHetCovHC2Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ))|)
+      atTop (fun x : ℝ => |x|) (fun _ => μ) (gaussianReal 0 1) :=
+  tendstoInDistribution_abs_real
+    (olsHC2LinTStatOrZero_tendstoInDistribution_standardNormal_of_feasibleHCLeverageConditions
+      (μ := μ) (X := X) (e := e) (y := y) h β R hc hse_pos)
+
+/-- Packaged ordinary HC2 confidence-interval coverage. -/
+theorem olsHC2LinCIOrZero_cov_tendsto_standardNormal_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix Unit k ℝ) (crit : ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    Tendsto
+      (fun n => μ {ω |
+        olsLinearCIEventOrZero R
+          (olsHetCovHC2Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)) crit})
+      atTop
+      (𝓝 (((gaussianReal 0 1).map (fun x : ℝ => |x|)) (Set.Iic crit))) := by
+  let θ : ℝ := (R *ᵥ β) ⬝ᵥ (fun _ : Unit => 1)
+  let θhat : ℕ → Ω → ℝ := fun n ω =>
+    (R *ᵥ olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω)) ⬝ᵥ
+      (fun _ : Unit => 1)
+  let se : ℕ → Ω → ℝ := fun n ω =>
+    Real.sqrt ((R * olsHetCovHC2Star
+      (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) () ())
+  let root : ℕ → ℝ := fun n => Real.sqrt (n : ℝ)
+  let c : ℝ := linearRestrictionStdError R (heteroAsymCov μ X e)
+  have hroot : ∀ᶠ n in atTop, 0 < root n := by
+    filter_upwards [eventually_ge_atTop 1] with n hn
+    have hnpos : (0 : ℝ) < n := by exact_mod_cast hn
+    exact Real.sqrt_pos.mpr hnpos
+  have hse : TendstoInMeasure μ se atTop (fun _ => c) := by
+    simpa [se, c] using
+      olsHC2LinSEStar_tendstoInMeasure_of_feasibleHCLeverageConditions
+        (μ := μ) (X := X) (e := e) (y := y) h β R () hc
+  have hAbs :=
+    olsHC2LinTStatOrZero_abs_tendstoInDistribution_standardNormalAbs_of_feasibleHCLeverageConditions
+      (μ := μ) (X := X) (e := e) (y := y) h β R hc hse_pos
+  have hGeneric : TendstoInDistribution
+      (fun n ω => |root n * (θhat n ω - θ) / se n ω|)
+      atTop (fun x : ℝ => |x|) (fun _ => μ) (gaussianReal 0 1) := by
+    refine TendstoInDistribution.congr ?_ (EventuallyEq.rfl) hAbs
+    intro n
+    exact ae_of_all μ (fun ω => by
+      dsimp [θ, θhat, se, root, olsLinearTStatOrZero,
+        olsLinearTNumeratorOrZero, linearRestrictionStdError]
+      rw [linearMapUnit_smul_sub_dot_one])
+  simpa [θ, θhat, se, root, c, olsLinearCIEventOrZero,
+    linearRestrictionEstimate, linearRestrictionStdError] using
+    symmetricCI_coverage_of_abs_tstat_standardNormal_se_tendsto_pos
+      (μ := μ) (θ := θ) (crit := crit)
+      (θhat := θhat) (se := se) (root := root) (c := c)
+      hroot (by simpa [c] using hse_pos) hse hGeneric
+
+set_option linter.style.longLine false in
+/-- Packaged ordinary HC2 one-degree Wald statistic. -/
+theorem olsHC2LinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix Unit k ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearWaldStatOrZero R
+          (olsHetCovHC2Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared 1) :=
+  tendstoInDistribution_sq_standardNormal_chiSquared_one
+    (olsHC2LinTStatOrZero_tendstoInDistribution_standardNormal_of_feasibleHCLeverageConditions
+      (μ := μ) (X := X) (e := e) (y := y) h β R hc hse_pos)
+
+set_option linter.style.longLine false in
+/-- Packaged ordinary HC3 scalar t-statistic with standard-normal limit. -/
+theorem olsHC3LinTStatOrZero_tendstoInDistribution_standardNormal_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix Unit k ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearTStatOrZero R
+          (olsHetCovHC3Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (gaussianReal 0 1) := by
+  let c : ℝ := linearRestrictionStdError R (heteroAsymCov μ X e)
+  let se : ℕ → Ω → ℝ := fun n ω =>
+    Real.sqrt ((R * olsHetCovHC3Star
+      (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) () ())
+  let num : ℕ → Ω → ℝ := fun n ω =>
+    ((Real.sqrt (n : ℝ) •
+      (R *ᵥ (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+        (fun _ : Unit => 1))
+  have hentry_pos : 0 < (R * heteroAsymCov μ X e * Rᵀ) () () := by
+    exact Real.sqrt_pos.mp hse_pos
+  have hentry_eq :
+      (R * heteroAsymCov μ X e * Rᵀ) () () =
+        olsProjectionAsymVar μ X e (Rᵀ *ᵥ (fun _ : Unit => 1)) :=
+    linMapCov_unit_apply_eq_olsProjectionAsymVar
+      (μ := μ) (X := X) (e := e) h.toSampleMomentAssumption71.int_outer R
+  have hσ :
+      olsProjectionAsymVar μ X e (Rᵀ *ᵥ (fun _ : Unit => 1)) = c ^ 2 := by
+    calc
+      olsProjectionAsymVar μ X e (Rᵀ *ᵥ (fun _ : Unit => 1))
+          = (R * heteroAsymCov μ X e * Rᵀ) () () :=
+            hentry_eq.symm
+      _ = c ^ 2 := by
+            simpa [c] using (Real.sq_sqrt hentry_pos.le).symm
+  have hZ : HasLaw (fun x : ℝ => c * x)
+      (gaussianReal 0
+        (olsProjectionAsymVar μ X e (Rᵀ *ᵥ (fun _ : Unit => 1))).toNNReal)
+      (gaussianReal 0 1) :=
+    hasLaw_const_mul_id_gaussianReal_of_variance_eq hσ
+  have hnum : TendstoInDistribution num atTop (fun x : ℝ => c * x)
+      (fun _ => μ) (gaussianReal 0 1) := by
+    simpa [num] using
+      scoreProj_linMap_olsBetaStar_tendstoInDistribution_gaussian_cov
+        (μ := μ) (ν := gaussianReal 0 1) (X := X) (e := e) (y := y)
+        h.toSampleCLTAssumption72 β R (fun _ : Unit => 1) hc.model hZ
+  have hse : TendstoInMeasure μ se atTop (fun _ => c) := by
+    simpa [se, c] using
+      olsHC3LinSEStar_tendstoInMeasure_of_feasibleHCLeverageConditions
+        (μ := μ) (X := X) (e := e) (y := y) h β R () hc
+  have hV_meas :=
+    olsHC3CovarianceStar_stack_aestronglyMeasurable_components
+      (μ := μ) (X := X) (e := e) (y := y)
+      h.toSampleMomentAssumption71 β hc.model
+      hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+  have hse_meas : ∀ n, AEMeasurable (se n) μ := by
+    intro n
+    exact linearCovarianceStdError_aemeasurable
+      (μ := μ) (R := R)
+      (Vhat := fun ω =>
+        olsHetCovHC3Star
+          (stackRegressors X n ω) (stackOutcomes y n ω))
+      (hV_meas n)
+  have hratio := studentizedLimit_tendstoInDistribution
+    (μ := μ) (ν := gaussianReal 0 1) (num := num) (se := se)
+    (Z := fun x : ℝ => c * x) (c := c)
+    (by simpa [c] using hse_pos) hnum hse hse_meas
+  have hstat : TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearTStatOrZero R
+          (olsHetCovHC3Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => c * x / c) (fun _ => μ) (gaussianReal 0 1) := by
+    simpa [num, se, c, olsLinearTStatOrZero, olsLinearTNumeratorOrZero,
+      linearRestrictionStdError] using hratio
+  convert hstat using 2
+  · rename_i x
+    dsimp [c]
+    exact (mul_div_cancel_left₀ x hse_pos.ne').symm
+
+set_option linter.style.longLine false in
+/-- Packaged absolute-value CMT for the ordinary HC3 scalar t-statistic. -/
+theorem olsHC3LinTStatOrZero_abs_tendstoInDistribution_standardNormalAbs_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix Unit k ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        |olsLinearTStatOrZero R
+          (olsHetCovHC3Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ))|)
+      atTop (fun x : ℝ => |x|) (fun _ => μ) (gaussianReal 0 1) :=
+  tendstoInDistribution_abs_real
+    (olsHC3LinTStatOrZero_tendstoInDistribution_standardNormal_of_feasibleHCLeverageConditions
+      (μ := μ) (X := X) (e := e) (y := y) h β R hc hse_pos)
+
+/-- Packaged ordinary HC3 confidence-interval coverage. -/
+theorem olsHC3LinCIOrZero_cov_tendsto_standardNormal_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix Unit k ℝ) (crit : ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    Tendsto
+      (fun n => μ {ω |
+        olsLinearCIEventOrZero R
+          (olsHetCovHC3Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)) crit})
+      atTop
+      (𝓝 (((gaussianReal 0 1).map (fun x : ℝ => |x|)) (Set.Iic crit))) := by
+  let θ : ℝ := (R *ᵥ β) ⬝ᵥ (fun _ : Unit => 1)
+  let θhat : ℕ → Ω → ℝ := fun n ω =>
+    (R *ᵥ olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω)) ⬝ᵥ
+      (fun _ : Unit => 1)
+  let se : ℕ → Ω → ℝ := fun n ω =>
+    Real.sqrt ((R * olsHetCovHC3Star
+      (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ) () ())
+  let root : ℕ → ℝ := fun n => Real.sqrt (n : ℝ)
+  let c : ℝ := linearRestrictionStdError R (heteroAsymCov μ X e)
+  have hroot : ∀ᶠ n in atTop, 0 < root n := by
+    filter_upwards [eventually_ge_atTop 1] with n hn
+    have hnpos : (0 : ℝ) < n := by exact_mod_cast hn
+    exact Real.sqrt_pos.mpr hnpos
+  have hse : TendstoInMeasure μ se atTop (fun _ => c) := by
+    simpa [se, c] using
+      olsHC3LinSEStar_tendstoInMeasure_of_feasibleHCLeverageConditions
+        (μ := μ) (X := X) (e := e) (y := y) h β R () hc
+  have hAbs :=
+    olsHC3LinTStatOrZero_abs_tendstoInDistribution_standardNormalAbs_of_feasibleHCLeverageConditions
+      (μ := μ) (X := X) (e := e) (y := y) h β R hc hse_pos
+  have hGeneric : TendstoInDistribution
+      (fun n ω => |root n * (θhat n ω - θ) / se n ω|)
+      atTop (fun x : ℝ => |x|) (fun _ => μ) (gaussianReal 0 1) := by
+    refine TendstoInDistribution.congr ?_ (EventuallyEq.rfl) hAbs
+    intro n
+    exact ae_of_all μ (fun ω => by
+      dsimp [θ, θhat, se, root, olsLinearTStatOrZero,
+        olsLinearTNumeratorOrZero, linearRestrictionStdError]
+      rw [linearMapUnit_smul_sub_dot_one])
+  simpa [θ, θhat, se, root, c, olsLinearCIEventOrZero,
+    linearRestrictionEstimate, linearRestrictionStdError] using
+    symmetricCI_coverage_of_abs_tstat_standardNormal_se_tendsto_pos
+      (μ := μ) (θ := θ) (crit := crit)
+      (θhat := θhat) (se := se) (root := root) (c := c)
+      hroot (by simpa [c] using hse_pos) hse hGeneric
+
+set_option linter.style.longLine false in
+/-- Packaged ordinary HC3 one-degree Wald statistic. -/
+theorem olsHC3LinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix Unit k ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearWaldStatOrZero R
+          (olsHetCovHC3Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared 1) :=
+  tendstoInDistribution_sq_standardNormal_chiSquared_one
+    (olsHC3LinTStatOrZero_tendstoInDistribution_standardNormal_of_feasibleHCLeverageConditions
+      (μ := μ) (X := X) (e := e) (y := y) h β R hc hse_pos)
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment ordinary HC0 scalar t-statistic endpoint. -/
+theorem olsHC0LinTStatOrZero_tendstoInDistribution_standardNormal_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearTStatOrZero R
+          (olsHetCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (gaussianReal 0 1) :=
+  olsHC0LinTStatOrZero_tendstoInDistribution_standardNormal_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R
+    hm.toFeasibleHCRemainderConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment absolute-value CMT for the ordinary HC0 scalar t-statistic. -/
+theorem olsHC0LinTStatOrZero_abs_tendstoInDistribution_standardNormalAbs_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        |olsLinearTStatOrZero R
+          (olsHetCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ))|)
+      atTop (fun x : ℝ => |x|) (fun _ => μ) (gaussianReal 0 1) :=
+  olsHC0LinTStatOrZero_abs_tendstoInDistribution_standardNormalAbs_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R
+    hm.toFeasibleHCRemainderConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment ordinary HC0 confidence-interval coverage endpoint. -/
+theorem olsHC0LinCIOrZero_cov_tendsto_standardNormal_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ) (crit : ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    Tendsto
+      (fun n => μ {ω |
+        olsLinearCIEventOrZero R
+          (olsHetCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)) crit})
+      atTop
+      (𝓝 (((gaussianReal 0 1).map (fun x : ℝ => |x|)) (Set.Iic crit))) :=
+  olsHC0LinCIOrZero_cov_tendsto_standardNormal_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R crit
+    hm.toFeasibleHCRemainderConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment ordinary HC0 one-degree Wald endpoint. -/
+theorem olsHC0LinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearWaldStatOrZero R
+          (olsHetCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared 1) :=
+  olsHC0LinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R
+    hm.toFeasibleHCRemainderConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment ordinary HC1 scalar t-statistic endpoint. -/
+theorem olsHC1LinTStatOrZero_tendstoInDistribution_standardNormal_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearTStatOrZero R
+          (olsHetCovHC1Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (gaussianReal 0 1) :=
+  olsHC1LinTStatOrZero_tendstoInDistribution_standardNormal_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R
+    hm.toFeasibleHCRemainderConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment absolute-value CMT for the ordinary HC1 scalar t-statistic. -/
+theorem olsHC1LinTStatOrZero_abs_tendstoInDistribution_standardNormalAbs_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        |olsLinearTStatOrZero R
+          (olsHetCovHC1Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ))|)
+      atTop (fun x : ℝ => |x|) (fun _ => μ) (gaussianReal 0 1) :=
+  olsHC1LinTStatOrZero_abs_tendstoInDistribution_standardNormalAbs_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R
+    hm.toFeasibleHCRemainderConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment ordinary HC1 confidence-interval coverage endpoint. -/
+theorem olsHC1LinCIOrZero_cov_tendsto_standardNormal_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ) (crit : ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    Tendsto
+      (fun n => μ {ω |
+        olsLinearCIEventOrZero R
+          (olsHetCovHC1Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)) crit})
+      atTop
+      (𝓝 (((gaussianReal 0 1).map (fun x : ℝ => |x|)) (Set.Iic crit))) :=
+  olsHC1LinCIOrZero_cov_tendsto_standardNormal_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R crit
+    hm.toFeasibleHCRemainderConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment ordinary HC1 one-degree Wald endpoint. -/
+theorem olsHC1LinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearWaldStatOrZero R
+          (olsHetCovHC1Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared 1) :=
+  olsHC1LinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R
+    hm.toFeasibleHCRemainderConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment ordinary HC2 scalar t-statistic endpoint. -/
+theorem olsHC2LinTStatOrZero_tendstoInDistribution_standardNormal_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearTStatOrZero R
+          (olsHetCovHC2Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (gaussianReal 0 1) :=
+  olsHC2LinTStatOrZero_tendstoInDistribution_standardNormal_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R
+    hm.toFeasibleHCLeverageConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment absolute-value CMT for the ordinary HC2 scalar t-statistic. -/
+theorem olsHC2LinTStatOrZero_abs_tendstoInDistribution_standardNormalAbs_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        |olsLinearTStatOrZero R
+          (olsHetCovHC2Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ))|)
+      atTop (fun x : ℝ => |x|) (fun _ => μ) (gaussianReal 0 1) :=
+  olsHC2LinTStatOrZero_abs_tendstoInDistribution_standardNormalAbs_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R
+    hm.toFeasibleHCLeverageConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment ordinary HC2 confidence-interval coverage endpoint. -/
+theorem olsHC2LinCIOrZero_cov_tendsto_standardNormal_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ) (crit : ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    Tendsto
+      (fun n => μ {ω |
+        olsLinearCIEventOrZero R
+          (olsHetCovHC2Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)) crit})
+      atTop
+      (𝓝 (((gaussianReal 0 1).map (fun x : ℝ => |x|)) (Set.Iic crit))) :=
+  olsHC2LinCIOrZero_cov_tendsto_standardNormal_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R crit
+    hm.toFeasibleHCLeverageConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment ordinary HC2 one-degree Wald endpoint. -/
+theorem olsHC2LinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearWaldStatOrZero R
+          (olsHetCovHC2Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared 1) :=
+  olsHC2LinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R
+    hm.toFeasibleHCLeverageConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment ordinary HC3 scalar t-statistic endpoint. -/
+theorem olsHC3LinTStatOrZero_tendstoInDistribution_standardNormal_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearTStatOrZero R
+          (olsHetCovHC3Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (gaussianReal 0 1) :=
+  olsHC3LinTStatOrZero_tendstoInDistribution_standardNormal_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R
+    hm.toFeasibleHCLeverageConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment absolute-value CMT for the ordinary HC3 scalar t-statistic. -/
+theorem olsHC3LinTStatOrZero_abs_tendstoInDistribution_standardNormalAbs_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        |olsLinearTStatOrZero R
+          (olsHetCovHC3Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ))|)
+      atTop (fun x : ℝ => |x|) (fun _ => μ) (gaussianReal 0 1) :=
+  olsHC3LinTStatOrZero_abs_tendstoInDistribution_standardNormalAbs_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R
+    hm.toFeasibleHCLeverageConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment ordinary HC3 confidence-interval coverage endpoint. -/
+theorem olsHC3LinCIOrZero_cov_tendsto_standardNormal_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ) (crit : ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    Tendsto
+      (fun n => μ {ω |
+        olsLinearCIEventOrZero R
+          (olsHetCovHC3Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)) crit})
+      atTop
+      (𝓝 (((gaussianReal 0 1).map (fun x : ℝ => |x|)) (Set.Iic crit))) :=
+  olsHC3LinCIOrZero_cov_tendsto_standardNormal_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R crit
+    hm.toFeasibleHCLeverageConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment ordinary HC3 one-degree Wald endpoint. -/
+theorem olsHC3LinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearWaldStatOrZero R
+          (olsHetCovHC3Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared 1) :=
+  olsHC3LinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y)
+    hm.toRobustCovarianceConsistencyConditions β R
+    hm.toFeasibleHCLeverageConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- IID joint-observation ordinary HC0 scalar t-statistic endpoint. -/
+theorem olsHC0LinTStatOrZero_tendstoInDistribution_standardNormal_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearTStatOrZero R
+          (olsHetCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (gaussianReal 0 1) :=
+  olsHC0LinTStatOrZero_tendstoInDistribution_standardNormal_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β R
+    hm.toRobustFeasibleHCMomentConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- IID joint-observation ordinary HC1 scalar t-statistic endpoint. -/
+theorem olsHC1LinTStatOrZero_tendstoInDistribution_standardNormal_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearTStatOrZero R
+          (olsHetCovHC1Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (gaussianReal 0 1) :=
+  olsHC1LinTStatOrZero_tendstoInDistribution_standardNormal_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β R
+    hm.toRobustFeasibleHCMomentConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- IID joint-observation ordinary HC2 scalar t-statistic endpoint. -/
+theorem olsHC2LinTStatOrZero_tendstoInDistribution_standardNormal_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearTStatOrZero R
+          (olsHetCovHC2Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (gaussianReal 0 1) :=
+  olsHC2LinTStatOrZero_tendstoInDistribution_standardNormal_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β R
+    hm.toRobustFeasibleHCMomentConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- IID joint-observation ordinary HC3 scalar t-statistic endpoint. -/
+theorem olsHC3LinTStatOrZero_tendstoInDistribution_standardNormal_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearTStatOrZero R
+          (olsHetCovHC3Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (gaussianReal 0 1) :=
+  olsHC3LinTStatOrZero_tendstoInDistribution_standardNormal_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β R
+    hm.toRobustFeasibleHCMomentConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- IID joint-observation ordinary HC0 confidence-interval coverage endpoint. -/
+theorem olsHC0LinCIOrZero_cov_tendsto_standardNormal_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ) (crit : ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    Tendsto
+      (fun n => μ {ω |
+        olsLinearCIEventOrZero R
+          (olsHetCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)) crit})
+      atTop
+      (𝓝 (((gaussianReal 0 1).map (fun x : ℝ => |x|)) (Set.Iic crit))) :=
+  olsHC0LinCIOrZero_cov_tendsto_standardNormal_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β R crit
+    hm.toRobustFeasibleHCMomentConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- IID joint-observation ordinary HC1 confidence-interval coverage endpoint. -/
+theorem olsHC1LinCIOrZero_cov_tendsto_standardNormal_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ) (crit : ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    Tendsto
+      (fun n => μ {ω |
+        olsLinearCIEventOrZero R
+          (olsHetCovHC1Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)) crit})
+      atTop
+      (𝓝 (((gaussianReal 0 1).map (fun x : ℝ => |x|)) (Set.Iic crit))) :=
+  olsHC1LinCIOrZero_cov_tendsto_standardNormal_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β R crit
+    hm.toRobustFeasibleHCMomentConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- IID joint-observation ordinary HC2 confidence-interval coverage endpoint. -/
+theorem olsHC2LinCIOrZero_cov_tendsto_standardNormal_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ) (crit : ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    Tendsto
+      (fun n => μ {ω |
+        olsLinearCIEventOrZero R
+          (olsHetCovHC2Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)) crit})
+      atTop
+      (𝓝 (((gaussianReal 0 1).map (fun x : ℝ => |x|)) (Set.Iic crit))) :=
+  olsHC2LinCIOrZero_cov_tendsto_standardNormal_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β R crit
+    hm.toRobustFeasibleHCMomentConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- IID joint-observation ordinary HC3 confidence-interval coverage endpoint. -/
+theorem olsHC3LinCIOrZero_cov_tendsto_standardNormal_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ) (crit : ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    Tendsto
+      (fun n => μ {ω |
+        olsLinearCIEventOrZero R
+          (olsHetCovHC3Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)) crit})
+      atTop
+      (𝓝 (((gaussianReal 0 1).map (fun x : ℝ => |x|)) (Set.Iic crit))) :=
+  olsHC3LinCIOrZero_cov_tendsto_standardNormal_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β R crit
+    hm.toRobustFeasibleHCMomentConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- IID joint-observation ordinary HC0 one-degree Wald endpoint. -/
+theorem olsHC0LinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearWaldStatOrZero R
+          (olsHetCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared 1) :=
+  olsHC0LinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β R
+    hm.toRobustFeasibleHCMomentConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- IID joint-observation ordinary HC1 one-degree Wald endpoint. -/
+theorem olsHC1LinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearWaldStatOrZero R
+          (olsHetCovHC1Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared 1) :=
+  olsHC1LinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β R
+    hm.toRobustFeasibleHCMomentConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- IID joint-observation ordinary HC2 one-degree Wald endpoint. -/
+theorem olsHC2LinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearWaldStatOrZero R
+          (olsHetCovHC2Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared 1) :=
+  olsHC2LinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β R
+    hm.toRobustFeasibleHCMomentConditions hse_pos
+
+set_option linter.style.longLine false in
+/-- IID joint-observation ordinary HC3 one-degree Wald endpoint. -/
+theorem olsHC3LinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (β : k → ℝ) (R : Matrix Unit k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hse_pos : 0 <
+      linearRestrictionStdError R (heteroAsymCov μ X e)) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        olsLinearWaldStatOrZero R
+          (olsHetCovHC3Star
+            (stackRegressors X n ω) (stackOutcomes y n ω))
+          (stackRegressors X n ω) (stackOutcomes y n ω) β
+          (Real.sqrt (n : ℝ)))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared 1) :=
+  olsHC3LinWaldStatOrZero_tendstoInDistribution_chiSquared_one_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) β R
+    hm.toRobustFeasibleHCMomentConditions hse_pos
+
 /-- **Hansen Theorem 7.3, all scalar projections for totalized OLS with `Ω`.**
 
 For every fixed direction `a`, the scaled totalized OLS error has Gaussian
@@ -1683,6 +3270,71 @@ theorem scoreProj_olsBetaOrZero_tendstoInDistribution_gaussian_cov_all
   fun a =>
     scoreProj_olsBetaOrZero_tendstoInDistribution_gaussian_cov
       (μ := μ) (ν := ν) (X := X) (e := e) (y := y) h β a hmodel (hZ a)
+
+/-- **Hansen Theorem 7.3 for literal ordinary OLS under sample-Gram invertibility,
+scalar-projection form.**
+
+When every realized stacked sample Gram is invertible, the textbook `olsBeta`
+estimator is available pointwise and agrees with `olsBetaOrZero`, so the
+ordinary-wrapper scalar projection CLT transfers to the dependent ordinary-OLS
+surface. -/
+theorem scoreProj_olsBeta_tendstoInDistribution_gaussian_cov_of_invertible
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : ScoreCLTConditions μ X e) (β a : k → ℝ)
+    (hInv : ∀ n ω,
+      Invertible ((stackRegressors X n ω)ᵀ * stackRegressors X n ω))
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    {Z : Ω' → ℝ}
+    (hZ : HasLaw Z
+      (gaussianReal 0 (olsProjectionAsymVar μ X e a).toNNReal) ν) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (Real.sqrt (n : ℝ) •
+          ((letI : Invertible
+              ((stackRegressors X n ω)ᵀ * stackRegressors X n ω) := hInv n ω
+            olsBeta (stackRegressors X n ω) (stackOutcomes y n ω)) - β)) ⬝ᵥ a)
+      atTop Z (fun _ => μ) ν := by
+  have hOrZero := scoreProj_olsBetaOrZero_tendstoInDistribution_gaussian_cov
+    (μ := μ) (ν := ν) (X := X) (e := e) (y := y) h β a hmodel hZ
+  refine TendstoInDistribution.congr ?_ EventuallyEq.rfl hOrZero
+  intro n
+  exact ae_of_all μ (fun ω => by
+    letI : Invertible ((stackRegressors X n ω)ᵀ * stackRegressors X n ω) :=
+      hInv n ω
+    change
+      (Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)) ⬝ᵥ a =
+        (Real.sqrt (n : ℝ) •
+          (olsBeta (stackRegressors X n ω) (stackOutcomes y n ω) - β)) ⬝ᵥ a
+    rw [olsBetaOrZero_eq_olsBeta])
+
+/-- **Hansen Theorem 7.3, all scalar projections for literal ordinary OLS under
+sample-Gram invertibility.** -/
+theorem scoreProj_olsBeta_tendstoInDistribution_gaussian_cov_all_of_invertible
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : ScoreCLTConditions μ X e) (β : k → ℝ)
+    (hInv : ∀ n ω,
+      Invertible ((stackRegressors X n ω)ᵀ * stackRegressors X n ω))
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    {Z : (k → ℝ) → Ω' → ℝ}
+    (hZ : ∀ a : k → ℝ,
+      HasLaw (Z a)
+        (gaussianReal 0 (olsProjectionAsymVar μ X e a).toNNReal) ν) :
+    ∀ a : k → ℝ,
+      TendstoInDistribution
+        (fun (n : ℕ) ω =>
+          (Real.sqrt (n : ℝ) •
+            ((letI : Invertible
+                ((stackRegressors X n ω)ᵀ * stackRegressors X n ω) := hInv n ω
+              olsBeta (stackRegressors X n ω) (stackOutcomes y n ω)) - β)) ⬝ᵥ a)
+        atTop (Z a) (fun _ => μ) ν :=
+  fun a =>
+    scoreProj_olsBeta_tendstoInDistribution_gaussian_cov_of_invertible
+      (μ := μ) (ν := ν) (X := X) (e := e) (y := y) h β a hInv hmodel (hZ a)
 
 end Assumption72
 

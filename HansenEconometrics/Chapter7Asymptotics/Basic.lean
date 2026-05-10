@@ -14,7 +14,7 @@ asymptotic modules:
 * stacking bridges from triangular-array sequences to finite matrices.
 -/
 
-open scoped Matrix Real
+open scoped Matrix Real Matrix.Norms.Elementwise
 
 namespace HansenEconometrics
 
@@ -166,6 +166,35 @@ theorem abs_dotProduct_le_card_mul_norm_mul_norm (x y : k → ℝ) :
     _ = (Fintype.card k : ℝ) * ‖x‖ * ‖y‖ := by
           simp [Finset.sum_const, nsmul_eq_mul, mul_assoc]
 
+omit [DecidableEq k] in
+/-- Matrix-vector multiplication is bounded by entrywise sup norms, with the
+explicit finite-dimensional factor used by the leverage-rate layer. -/
+theorem norm_mulVec_le_card_mul_matrix_norm_mul_norm
+    (A : Matrix k k ℝ) (x : k → ℝ) :
+    ‖A *ᵥ x‖ ≤ (Fintype.card k : ℝ) * ‖A‖ * ‖x‖ := by
+  have hnonneg : 0 ≤ (Fintype.card k : ℝ) * ‖A‖ * ‖x‖ := by
+    positivity
+  refine (pi_norm_le_iff_of_nonneg hnonneg).2 ?_
+  intro i
+  calc
+    ‖(A *ᵥ x) i‖
+        = |∑ j : k, A i j * x j| := by simp [Matrix.mulVec, dotProduct, Real.norm_eq_abs]
+    _ ≤ ∑ j : k, |A i j * x j| := by
+          simpa using
+            (Finset.abs_sum_le_sum_abs (fun j : k => A i j * x j) Finset.univ)
+    _ ≤ ∑ _j : k, ‖A‖ * ‖x‖ := by
+          refine Finset.sum_le_sum ?_
+          intro j _
+          rw [abs_mul]
+          have hAij : |A i j| ≤ ‖A‖ := by
+            simpa [Real.norm_eq_abs] using
+              Matrix.norm_entry_le_entrywise_sup_norm (A := A) (i := i) (j := j)
+          have hxj : |x j| ≤ ‖x‖ := by
+            simpa [Real.norm_eq_abs] using norm_le_pi_norm x j
+          exact mul_le_mul hAij hxj (abs_nonneg _) (norm_nonneg _)
+    _ = (Fintype.card k : ℝ) * ‖A‖ * ‖x‖ := by
+          simp [Finset.sum_const, nsmul_eq_mul, mul_assoc]
+
 /-- **Hansen Theorem 7.16, deterministic pointwise residual bound.**
 
 For the totalized estimator, the finite-sample residual error at row `i` is
@@ -185,6 +214,53 @@ theorem residualStar_sub_error_abs_le_card_rowNorm_betaErrorNorm
     ring
   rw [hres, abs_neg]
   exact abs_dotProduct_le_card_mul_norm_mul_norm (X i) d
+
+/-- Maximum row norm over a finite design matrix. -/
+noncomputable def maxRowNorm (X : Matrix n k ℝ) : ℝ :=
+  ‖fun i : n => ‖X i‖‖
+
+/-- Maximum absolute residual error for the totalized estimator. -/
+noncomputable def maxResidualErrorStar (X : Matrix n k ℝ) (β : k → ℝ) (e : n → ℝ) : ℝ :=
+  ‖fun i : n => olsResidualStar X (X *ᵥ β + e) i - e i‖
+
+/-- **Hansen Theorem 7.16, deterministic max residual bound.**
+
+The pointwise residual-error inequality upgrades to a max-over-sample bound:
+the largest residual error is bounded by the largest regressor row norm times
+the coefficient error, up to the finite-dimensional sup-norm factor. -/
+theorem maxResidualErrorStar_le_card_maxRowNorm_betaErrorNorm
+    (X : Matrix n k ℝ) (β : k → ℝ) (e : n → ℝ) :
+    maxResidualErrorStar X β e ≤
+      (Fintype.card k : ℝ) * maxRowNorm X *
+        ‖olsBetaStar X (X *ᵥ β + e) - β‖ := by
+  have hnonneg : 0 ≤
+      (Fintype.card k : ℝ) * maxRowNorm X *
+        ‖olsBetaStar X (X *ᵥ β + e) - β‖ := by
+    exact mul_nonneg
+      (mul_nonneg (Nat.cast_nonneg _) (norm_nonneg _))
+      (norm_nonneg _)
+  unfold maxResidualErrorStar
+  refine
+    (@pi_norm_le_iff_of_nonneg n (fun _ : n => ℝ) _
+      (fun _ => (by infer_instance : SeminormedAddGroup ℝ))
+      (fun i : n => olsResidualStar X (X *ᵥ β + e) i - e i)
+      ((Fintype.card k : ℝ) * maxRowNorm X *
+        ‖olsBetaStar X (X *ᵥ β + e) - β‖)
+      hnonneg).2 ?_
+  intro i
+  have hpoint := residualStar_sub_error_abs_le_card_rowNorm_betaErrorNorm X β e i
+  have hrow : ‖X i‖ ≤ maxRowNorm X := by
+    simpa [maxRowNorm, Real.norm_eq_abs, abs_of_nonneg (norm_nonneg (X i))] using
+      (norm_le_pi_norm (fun j : n => ‖X j‖) i)
+  have hprod :
+      (Fintype.card k : ℝ) * ‖X i‖ *
+          ‖olsBetaStar X (X *ᵥ β + e) - β‖ ≤
+        (Fintype.card k : ℝ) * maxRowNorm X *
+          ‖olsBetaStar X (X *ᵥ β + e) - β‖ := by
+    exact mul_le_mul_of_nonneg_right
+      (mul_le_mul_of_nonneg_left hrow (by positivity))
+      (norm_nonneg _)
+  simpa [Real.norm_eq_abs] using hpoint.trans hprod
 
 /-- **Hansen Theorem 7.16, ordinary OLS pointwise residual bound.**
 

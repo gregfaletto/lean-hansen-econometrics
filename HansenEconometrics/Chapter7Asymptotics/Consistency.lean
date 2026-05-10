@@ -1137,6 +1137,44 @@ theorem continuousAt_function_olsBetaStar_tendstoInMeasure
       (μ := μ) (X := X) (e := e) (y := y) β h hmodel)
     hφ
 
+/-- **Hansen Theorem 7.8, finite-dimensional parameter transforms.**
+
+For a vector-valued parameter transform `r : ℝᵏ → ℝᵠ`, totalized OLS
+consistency transfers to the plug-in transform `r(β̂*ₙ)`. This is the
+textbook-shaped finite-dimensional wrapper around
+`continuous_function_olsBetaStar_tendstoInMeasure`. -/
+theorem parameterTransform_olsBetaStar_tendstoInMeasure
+    {μ : Measure Ω} [IsFiniteMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ} (β : k → ℝ)
+    (h : LeastSquaresConsistencyConditions μ X e)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    {q : Type*} [Fintype q]
+    (r : (k → ℝ) → q → ℝ) (hr : Continuous r) :
+    TendstoInMeasure μ
+      (fun n ω => r (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω)))
+      atTop (fun _ => r β) := by
+  exact continuous_function_olsBetaStar_tendstoInMeasure
+    (μ := μ) (X := X) (e := e) (y := y) β h hmodel r hr
+
+/-- **Hansen Theorem 7.8, local finite-dimensional parameter transforms.**
+
+The finite-dimensional transform need only be continuous at the true parameter
+`β`; measurability of the composed plug-in transform is kept explicit. -/
+theorem parameterTransform_olsBetaStar_tendstoInMeasure_of_continuousAt
+    {μ : Measure Ω} [IsFiniteMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ} (β : k → ℝ)
+    (h : LeastSquaresConsistencyConditions μ X e)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    {q : Type*} [Fintype q]
+    (r : (k → ℝ) → q → ℝ) (hr : ContinuousAt r β)
+    (hr_meas : ∀ n, AEStronglyMeasurable
+      (fun ω => r (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω))) μ) :
+    TendstoInMeasure μ
+      (fun n ω => r (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω)))
+      atTop (fun _ => r β) := by
+  exact continuousAt_function_olsBetaStar_tendstoInMeasure
+    (μ := μ) (X := X) (e := e) (y := y) β h hmodel r hr hr_meas
+
 /-- **Hansen Theorem 7.8 for ordinary OLS on nonsingular samples.**
 
 The same continuous-function consistency statement holds for `olsBetaOrZero`,
@@ -1172,6 +1210,35 @@ theorem olsBetaOrZero_stack_tendstoInMeasure_beta
   simpa using
     olsBetaStar_stack_tendstoInMeasure_beta
       (μ := μ) (X := X) (e := e) (y := y) β h hmodel
+
+/-- **Theorem 7.1 for literal ordinary OLS under sample-Gram invertibility.**
+
+When every realized stacked sample Gram is invertible, the textbook `olsBeta`
+estimator is available pointwise and agrees with `olsBetaOrZero`, so the
+ordinary-wrapper consistency theorem transfers to the dependent ordinary-OLS
+surface. -/
+theorem olsBeta_stack_tendstoInMeasure_beta_of_invertible
+    {μ : Measure Ω} [IsFiniteMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ} (β : k → ℝ)
+    (hInv : ∀ n ω,
+      Invertible ((stackRegressors X n ω)ᵀ * stackRegressors X n ω))
+    (h : LeastSquaresConsistencyConditions μ X e)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        letI : Invertible ((stackRegressors X n ω)ᵀ * stackRegressors X n ω) :=
+          hInv n ω
+        olsBeta (stackRegressors X n ω) (stackOutcomes y n ω))
+      atTop (fun _ => β) := by
+  refine TendstoInMeasure.congr' ?_ EventuallyEq.rfl
+    (olsBetaOrZero_stack_tendstoInMeasure_beta
+      (μ := μ) (X := X) (e := e) (y := y) β h hmodel)
+  filter_upwards with n
+  exact ae_of_all μ (fun ω => by
+    letI : Invertible ((stackRegressors X n ω)ᵀ * stackRegressors X n ω) :=
+      hInv n ω
+    exact olsBetaOrZero_eq_olsBeta
+      (stackRegressors X n ω) (stackOutcomes y n ω))
 
 /-- AEMeasurability of the ordinary-on-nonsingular OLS wrapper. -/
 theorem olsBetaOrZero_stack_aestronglyMeasurable
@@ -1211,6 +1278,91 @@ theorem continuousAt_function_olsBetaOrZero_tendstoInMeasure
     (olsBetaOrZero_stack_tendstoInMeasure_beta
       (μ := μ) (X := X) (e := e) (y := y) β h hmodel)
     hφ
+
+/-- **Hansen Theorem 7.8, ordinary-wrapper finite-dimensional transforms.**
+
+For a vector-valued parameter transform `r`, the ordinary-on-nonsingular OLS
+wrapper has the same plug-in consistency as the totalized estimator. -/
+theorem parameterTransform_olsBetaOrZero_tendstoInMeasure
+    {μ : Measure Ω} [IsFiniteMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ} (β : k → ℝ)
+    (h : LeastSquaresConsistencyConditions μ X e)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    {q : Type*} [Fintype q]
+    (r : (k → ℝ) → q → ℝ) (hr : Continuous r) :
+    TendstoInMeasure μ
+      (fun n ω => r (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω)))
+      atTop (fun _ => r β) := by
+  exact continuous_function_olsBetaOrZero_tendstoInMeasure
+    (μ := μ) (X := X) (e := e) (y := y) β h hmodel r hr
+
+/-- **Hansen Theorem 7.8, local ordinary-wrapper parameter transforms.**
+
+The ordinary-on-nonsingular plug-in transform is consistent under continuity at
+`β`, with the composed-transform measurability supplied explicitly. -/
+theorem parameterTransform_olsBetaOrZero_tendstoInMeasure_of_continuousAt
+    {μ : Measure Ω} [IsFiniteMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ} (β : k → ℝ)
+    (h : LeastSquaresConsistencyConditions μ X e)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    {q : Type*} [Fintype q]
+    (r : (k → ℝ) → q → ℝ) (hr : ContinuousAt r β)
+    (hr_meas : ∀ n, AEStronglyMeasurable
+      (fun ω => r (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω))) μ) :
+    TendstoInMeasure μ
+      (fun n ω => r (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω)))
+      atTop (fun _ => r β) := by
+  exact continuousAt_function_olsBetaOrZero_tendstoInMeasure
+    (μ := μ) (X := X) (e := e) (y := y) β h hmodel r hr hr_meas
+
+/-- **Hansen Theorem 7.16, max residual rate packaging.**
+
+If a deterministic rate scaling sends the product of the maximal row norm and
+the totalized coefficient error to zero in probability, then the scaled maximum
+residual error is also `oₚ(1)`.  The remaining textbook-specific work is to
+combine this wrapper with the Chapter 6 maximum bound for the regressor row
+norm and the Chapter 7 OLS rate. -/
+theorem scaledMaxResidualErrorStar_tendstoInMeasure_zero_of_scaled_product
+    {μ : Measure Ω} [IsFiniteMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} (β : k → ℝ)
+    (scale : ℕ → ℝ) (hscale_nonneg : ∀ n, 0 ≤ scale n)
+    (hProduct :
+      TendstoInMeasure μ
+        (fun n ω =>
+          scale n *
+            ((Fintype.card k : ℝ) * maxRowNorm (stackRegressors X n ω) *
+              ‖olsBetaStar
+                (stackRegressors X n ω)
+                (stackRegressors X n ω *ᵥ β + stackErrors e n ω) - β‖))
+        atTop (fun _ => 0)) :
+    TendstoInMeasure μ
+      (fun n ω =>
+        scale n * maxResidualErrorStar
+          (stackRegressors X n ω) β (stackErrors e n ω))
+      atTop (fun _ => 0) := by
+  refine TendstoInMeasure.of_abs_le_zero_real hProduct ?_
+  intro n ω
+  let Xn : Matrix (Fin n) k ℝ := stackRegressors X n ω
+  let en : Fin n → ℝ := stackErrors e n ω
+  have hdet := maxResidualErrorStar_le_card_maxRowNorm_betaErrorNorm Xn β en
+  have hleft_nonneg :
+      0 ≤ scale n * maxResidualErrorStar Xn β en :=
+    mul_nonneg (hscale_nonneg n) (norm_nonneg _)
+  have hright_nonneg :
+      0 ≤ scale n *
+        ((Fintype.card k : ℝ) * maxRowNorm Xn *
+          ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖) := by
+    exact mul_nonneg (hscale_nonneg n)
+      (mul_nonneg
+        (mul_nonneg (Nat.cast_nonneg _) (norm_nonneg _))
+        (norm_nonneg _))
+  have hscaled :
+      scale n * maxResidualErrorStar Xn β en ≤
+        scale n *
+          ((Fintype.card k : ℝ) * maxRowNorm Xn *
+            ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖) :=
+    mul_le_mul_of_nonneg_left hdet (hscale_nonneg n)
+  simpa [Xn, en, abs_of_nonneg hleft_nonneg, abs_of_nonneg hright_nonneg] using hscaled
 
 /-- **Theorem 7.4 cross remainder.**
 

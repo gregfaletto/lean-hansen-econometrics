@@ -1,0 +1,641 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=0.9in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{longtable}
+\usepackage{xcolor}
+\usepackage{xurl}
+\usepackage[hidelinks]{hyperref}
+
+\setlist[itemize]{leftmargin=1.2em,itemsep=0.25em,topsep=0.25em}
+\setlist[enumerate]{leftmargin=1.4em,itemsep=0.25em,topsep=0.25em}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+\emergencystretch=2em
+\sloppy
+
+\newcommand{\lean}[1]{\path{#1}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\toP}{\xrightarrow{p}}
+\newcommand{\toD}{\xrightarrow{d}}
+\newcommand{\op}{o_p}
+\newcommand{\Op}{O_p}
+\newcommand{\iid}{\mathrm{i.i.d.}}
+\newcommand{\Var}{\operatorname{Var}}
+\newcommand{\Cov}{\operatorname{Cov}}
+\newcommand{\rank}{\operatorname{rank}}
+
+\title{Issue 42 Proof Summary: Consolidated Chapter 2--7 Theorem Progress}
+\author{Hansen Econometrics Lean Formalization}
+\date{Branch \lean{codex/issue-42-ch7-unblocked}, compiled May 9, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This document is a self-contained mathematical map of the results added in the
+consolidated issue-42 branch.  The branch is large because it collects many
+small theorem slices that were first developed as separate checkpoints.  This
+summary explains the mathematical surface now present in Lean, records the main
+public theorem names, and separates completed theorem coverage from remaining
+gaps.  It is not a replacement for the Lean files; it is intended to make the
+pull request reviewable.
+\end{abstract}
+
+\tableofcontents
+
+\section{Conventions and Proof Architecture}
+
+The formalization keeps three recurring conventions.
+
+\begin{itemize}
+  \item Convergence in probability is written in Lean with
+  \lean{TendstoInMeasure}; convergence in distribution is written with
+  \lean{TendstoInDistribution}.
+  \item Finite-sample ordinary least squares has a base API requiring an
+  invertibility typeclass.  Large-sample theorem statements use totalized
+  estimators such as \lean{olsBetaStar} and textbook-facing wrappers such as
+  \lean{olsBetaOrZero}.  The star estimator uses the nonsingular inverse and is
+  total; the OrZero wrapper is the reader-facing branch that agrees with
+  ordinary OLS when the Gram matrix is nonsingular.
+  \item Many Chapter 7 theorems are stated at a condition-package layer.  The
+  branch adds direct compact and iid sufficient-condition packages for several
+  robust-HC endpoints, but some assumption surfaces remain stronger than the
+  literal textbook assumptions.
+\end{itemize}
+
+The key organizing idea is to prove reusable asymptotic infrastructure once in
+Chapter 6 and then reuse it in Chapter 7.  The Chapter 7 results are mostly
+composition theorems: consistency plus score CLTs, continuous mapping, Slutsky,
+matrix inverse continuity, and Gaussian linear-image laws.
+
+\section{Chapter 2: Potential Outcomes and CIA}
+
+The branch adds a variable-facing potential-outcomes layer for Hansen's causal
+notation.  Given a treatment indicator $D$, untreated and treated potential
+outcomes $Y(0),Y(1)$, and covariates $X$, the Lean API defines:
+\[
+  Y = D Y(1) + (1-D)Y(0), \qquad
+  ACE = \E[Y(1)-Y(0)],
+\]
+and a variable-conditioned CATE
+\[
+  ACE(X) = \E[Y(1)-Y(0)\mid X].
+\]
+
+Main declarations:
+\begin{itemize}
+  \item \lean{observedOutcome}, \lean{treatmentEffect},
+  \lean{averageTreatmentEffect}, and
+  \lean{conditionalAverageTreatmentEffectOn}.
+  \item \lean{PotentialOutcomeCIAOn}: the conditional-independence assumption
+  for potential outcomes, treatment, and covariates.
+  \item \lean{PotentialOutcomeCIAOn.toTreatmentMeanIndependentOn}: CIA implies
+  the mean-independence condition needed for regression-style CATE statements.
+  \item \lean{condExpOn_observedOutcome_treatment_covariates_eq_branch_of_CIA}:
+  the observed-outcome regression on $(D,X)$ selects the treated or untreated
+  branch under CIA.
+  \item \lean{conditionalAverageTreatmentEffectOn_treatment_covariates_eq_of_CIA}:
+  conditioning the treatment effect on $(D,X)$ gives the same CATE as
+  conditioning on $X$ alone, almost everywhere.
+  \item \lean{conditionalAverageTreatmentEffectSurface},
+  \lean{observedRegressionSurface}, and
+  \lean{observedRegressionTreatmentContrastSurface}: thin pointwise notation
+  bridges for $ACE(x)$, $m(d,x)$, and $m(1,x)-m(0,x)$.
+  \item \lean{conditionalAverageTreatmentEffectOn_eq_surface} and
+  \lean{conditionalAverageTreatmentEffectOn_eq_observedRegressionTreatmentContrastSurface}:
+  supplied pointwise versions pull back to the existing variable-facing CATE.
+\end{itemize}
+
+The result is a usable a.e. version of the potential-outcomes and conditional
+average-treatment-effect story with pointwise notation bridges layered on top
+of the a.e. conditional-expectation core.
+
+\section{Chapter 3: Finite-Sample Least-Squares Algebra}
+
+Chapter 3 receives finite-sample algebra useful for later asymptotics and
+diagnostics.
+
+\subsection{Partitioned Regression and FWL}
+
+For a column partition $X=[X_1\;X_2]$, the branch formalizes the Frisch--Waugh--
+Lovell coefficient formulas.  The central public theorem is
+\lean{fromColsBeta_eq_partitionedBetaFormulas}, which packages the two block
+coefficient identities.  The supporting definitions
+\lean{partitionedLeftBetaFormula} and \lean{partitionedRightBetaFormula}
+match Hansen's displayed formulas for the two coefficient blocks.
+
+\subsection{Projection, Leverage, and Influence}
+
+The branch adds leverage and leave-one-out identities.  The formal statements
+include:
+\begin{itemize}
+  \item \lean{leaveOneOutBetaDeleted_eq_leaveOneOutBeta}: the literal row-deleted
+  regression agrees with the reduced Gram/cross-product formula.
+  \item \lean{leaveOneOutBeta_eq_olsBeta_sub_invGram_mulVec}: the leave-one-out
+  coefficient differs from the full-sample coefficient by a leverage-weighted
+  correction.
+  \item \lean{leaveOneOutResidual_eq_inv_one_sub_leverage_mul_residual}: the
+  leave-one-out residual is $e_i/(1-h_{ii})$.
+  \item \lean{fitted_sub_leaveOneOutPrediction_eq_leverage_mul_residual}: the
+  prediction change equals the leverage times the leave-one-out residual.
+  \item \lean{maxPredictionInfluence_eq_maxLeveragePredictionErrorInfluence}:
+  the maximum leave-one-out prediction influence has the leverage-residual
+  expression advertised by the diagnostics.
+\end{itemize}
+
+These are deterministic matrix identities.  They later feed Chapter 7 leverage
+and residual-rate statements.
+
+\section{Chapter 4: Finite-Sample Covariance Estimators}
+
+The branch extends the finite-sample covariance-estimator layer that Chapter 7
+uses asymptotically.
+
+\subsection{HC Ordering}
+
+For leverage values $0\le h_{ii}<1$, the branch proves the positive-semidefinite
+ordering
+\[
+  HC0 \preceq HC2 \preceq HC3.
+\]
+The public matrix-level results are
+\lean{olsHuberWhiteVarianceEstimator_le_HC2_posSemidef} and
+\lean{olsHuberWhiteHC2VarianceEstimator_le_HC3_posSemidef}.
+
+\subsection{HC2 and HC3 Conditional Expectations}
+
+The branch records exact conditional-expectation formulas for leverage-adjusted
+residual squares:
+\begin{itemize}
+  \item \lean{condExp_HC2_adjusted_annihilator_row_sq_eq_sigmaSq} and
+  \lean{condExp_HC2_adjusted_annihilator_row_sq_eq_diagonal}.
+  \item \lean{condExp_HC3_adjusted_annihilator_row_sq_eq_sigmaSq_mul_inv} and
+  \lean{condExp_HC3_adjusted_annihilator_row_sq_eq_diagonal}.
+  \item Matrix-valued expectation wrappers for the corresponding HC2 and HC3
+  covariance estimators.
+\end{itemize}
+
+The branch also adds singleton-cluster bridges showing that singleton clustered
+covariance estimators reduce to the heteroskedastic sandwich estimators.  The
+cluster score middle matrix and the unadjusted clustered sandwich are proved
+positive semidefinite via \lean{sum_vecMulVec_posSemidef},
+\lean{olsClusteredScoreMiddle_posSemidef}, and
+\lean{olsClusteredVarianceEstimator_posSemidef}; the adjusted sandwich is PSD
+whenever its finite-sample scale factor is nonnegative, and
+\lean{clusterFiniteSampleAdjustment_nonneg} discharges that condition from
+$k<n$ and $G>1$.  The CR3-style leave-cluster-out layer now has
+\lean{ClusterIndex}, \lean{clusterDesign}, \lean{clusterCR3Residual},
+\lean{clusterLeaveOutBeta_eq_olsBeta_sub_invGram_mulVec_cr3Residual},
+\lean{clusterCR3Score}, \lean{clusterCR3ScoreMiddle},
+\lean{olsClusteredCR3VarianceEstimator},
+\lean{olsClusteredCR3VarianceEstimator_eq_clusterCR3Score},
+\lean{olsClusteredCR3VarianceEstimator_eq_clusterCR3ScoreMiddle},
+\lean{olsClusteredCR3VarianceEstimator_conservative_of_middle},
+\lean{condExp_deterministic_sandwich_eq},
+\lean{condExp_olsClusteredCR3VarianceEstimator_eq_sandwich_of_middle},
+\lean{condExp_olsClusteredCR3VarianceEstimator_conservative_of_middle},
+\lean{condExp_olsClusteredCR3VarianceEstimator_conservative_of_block_middle}, and
+\lean{olsClusteredCR3VarianceEstimator_posSemidef}, covering the deterministic
+equations (4.52), (4.53), and (4.54) at the estimator-definition/named-score/PSD
+level and reducing deterministic and conditional CR3 conservativeness to
+middle-matrix PSD dominance.  The block monotonicity lemmas
+\lean{clusterCovarianceMiddle_mono_posSemidef} and
+\lean{olsClusterConditionalVarianceMatrix_mono_posSemidef} reduce that dominance
+to clusterwise block dominance.  The CR3 linear-model rewrites
+\lean{clusterResidual_linear_model}, \lean{clusterCR3Residual_linear_model},
+\lean{clusterCR3Score_linear_model}, and
+\lean{clusterCR3ScoreMiddle_linear_model} reduce the remaining CR3 block moments
+to deterministic transforms of annihilator-transformed structural errors.  This
+tightens the finite-sample Gauss--Markov and covariance-estimator proof layer.
+The cluster-block layer now also proves the finite partition identity
+\lean{clusterIndex_sum_eq_sum}, the Gram and cross-product decompositions
+\lean{sum_clusterGramContribution_eq_gram} and
+\lean{sum_clusterCrossContribution_eq_cross}, the named-score sandwich rewrite
+\lean{olsClusteredVarianceEstimator_eq_clusterScore}, and the residual
+cluster-score normal-equation consequence \lean{sum_clusterScore_eq_zero}.
+It also names Hansen's clustered covariance middle and sandwich formulas through
+\lean{clusterCovarianceMiddle} and
+\lean{olsClusterConditionalVarianceMatrix}, proves PSD inheritance from PSD
+cluster covariance blocks, and records the block outer-product/score-middle
+bridges \lean{clusterCovarianceMiddle_outer_eq_scoreMiddle},
+\lean{clusterErrorScore},
+\lean{olsBeta_linear_decomposition_clusterScores},
+\lean{clusterCovarianceMiddle_errorOuter_eq_clusterErrorScoreMiddle},
+\lean{condExp_clusterErrorScoreMiddle_entry_eq_clusterCovarianceMiddle},
+\lean{condExp_clusterErrorScoreMiddle_eq_clusterCovarianceMiddle},
+\lean{condExp_clusterErrorScoreSandwich_eq_olsClusterConditionalVarianceMatrix},
+\lean{olsClusteredVarianceEstimator_eq_clusterCovarianceMiddle_residualOuter},
+and \lean{olsClusteredCR3VarianceEstimator_eq_clusterCovarianceMiddle_cr3Outer}.
+
+\section{Chapter 5: Normal-Regression Moment Face}
+
+The exact random-design Kinal threshold is still not proved.  The branch does
+now record the fixed-design finite-moment consequence of the Gaussian
+coefficient law: \lean{olsBeta_memLp_of_error_gaussian} shows that, once $X$ is
+fixed and nonsingular and the error vector is Gaussian, the OLS coefficient
+vector belongs to every finite $L^p$ space.  This isolates the remaining Kinal
+work as the inverse random-Gram tail threshold rather than the Gaussian
+finite-moment part.
+
+\section{Chapter 6: Asymptotic Infrastructure}
+
+Chapter 6 is the main infrastructure layer for issue 42.  The branch adds or
+extends large-sample theorem wrappers that Chapter 7 reuses.
+
+\subsection{Convergence in Probability and Distribution}
+
+The core CMT and WLLN declarations are:
+\begin{itemize}
+  \item \lean{tendstoInMeasure_continuous_comp}: global CMT in probability.
+  \item \lean{tendstoInMeasure_continuousAt_const_comp}: CMT at a point for a
+  constant limit.
+  \item \lean{tendstoInDistribution_continuous_comp}: global CMT in
+  distribution.
+  \item \lean{probabilityMeasure_tendsto_map_of_tendsto_of_ae_continuous}
+  and \lean{tendstoInDistribution_ae_continuous_comp}: the textbook
+  a.s.-continuity CMT in distribution, proved by a Portmanteau closed-set
+  push-forward argument.
+  \item \lean{tendstoInMeasure_wlln}: Banach-valued iid WLLN, obtained by
+  upgrading Mathlib's strong law to convergence in measure.
+  \item \lean{tendstoInMeasure_transformed_wlln}: transformed WLLN for
+  sample means of $h(Y_i)$.
+\end{itemize}
+
+The branch also adds product, sum, matrix-vector, matrix-multiplication, matrix
+inverse, coordinatewise-product, and finite-sum convergence lemmas used in
+Chapter 7.
+
+\subsection{Cramer--Wold and CLTs}
+
+The branch formalizes the Cramer--Wold bridge and iid finite-dimensional CLTs:
+\begin{itemize}
+  \item \lean{cramerWold_tendstoInDistribution}: convergence of all scalar
+  projections implies vector convergence in distribution.
+  \item \lean{iidScalarCLT_tendstoInDistribution_gaussian}: scalar iid CLT
+  wrapper over Mathlib.
+  \item \lean{iidVectorProjectionCLT_tendstoInDistribution_gaussian_cov}:
+  scalar projection CLT with covariance identified by the vector covariance
+  matrix.
+  \item \lean{iidVectorCLT_tendstoInDistribution_multivariateGaussian}:
+  multivariate iid CLT with limit $N(0,\operatorname{covMat}(Y_0))$.
+\end{itemize}
+
+The branch also introduces projection-level endpoints for heterogeneous and
+Lindeberg triangular-array CLTs:
+\lean{MultivariateLindebergCLTConditions},
+\lean{multivariateLindebergCLT_tendstoInDistribution},
+\lean{HeterogeneousArrayCLTConditions}, and
+\lean{heterogeneousArrayCLT_tendstoInDistribution}.  These are Cramer--Wold
+endpoints.  The scalar Lyapunov-to-Lindeberg algebra now includes
+\lean{sq_le_even_moment_div_threshold} and
+\lean{sq_tail_indicator_le_even_moment_div_threshold}, which bound the scalar
+Lindeberg tail summand by an even higher moment over the threshold power, plus
+\lean{integral_sq_tail_le_integral_even_moment_div_threshold}, which lifts that
+bound to expectations.  The finite-row and normalized forms are
+\lean{sum_integral_sq_tail_le_sum_integral_even_moment_div_threshold} and
+\lean{normalized_sum_integral_sq_tail_le_normalized_even_moment_bound}.  The
+remaining scalar triangular-array probability engine remains outside this
+branch.
+
+\subsection{Delta Method}
+
+The new Delta-method module proves the deterministic remainder statement
+\[
+  g(x)-g(\theta)-Dg(\theta)(x-\theta) = o(\|x-\theta\|)
+\]
+from Frechet differentiability and packages the distributional conclusion:
+\[
+  p_n(\hat\theta_n-\theta)\toD Z
+  \quad\Longrightarrow\quad
+  p_n(g(\hat\theta_n)-g(\theta))\toD Dg(\theta)Z,
+\]
+assuming the linearization remainder is $o_p(1)$.
+
+Main declarations:
+\begin{itemize}
+  \item \lean{deltaMethod_remainder_isLittleO}.
+  \item \lean{deltaMethod_tendstoInDistribution}.
+  \item \lean{smoothFunction_consistency}.
+  \item \lean{smoothFunction_asymptoticNormality_gaussian}.
+\end{itemize}
+
+Concrete examples cover coordinate square, inverse, product, and ratio maps,
+with derivative matrices and Gaussian linear-image laws:
+\lean{coordinateSquareDerivativeMatrix_hasLaw_multivariateGaussian_zero},
+\lean{coordinateInvDerivativeMatrix_hasLaw_multivariateGaussian_zero},
+\lean{coordinateProductDerivativeMatrix_hasLaw_multivariateGaussian_zero}, and
+\lean{coordinateRatioDerivativeMatrix_hasLaw_multivariateGaussian_zero}.
+
+\subsection{Stochastic Order}
+
+The branch adds a local stochastic-order layer:
+\begin{itemize}
+  \item \lean{BoundedInProbability}: scalar $O_p(1)$.
+  \item \lean{BoundedInProbabilityNorm}: norm-valued $O_p(1)$.
+  \item moment-to-$O_p$ and moment-to-$o_p$ bridges, including scaled first
+  moments, natural powers, and positive real powers.
+  \item closure under addition, multiplication, deterministic scaling, and
+  ``small times bounded is small''.
+\end{itemize}
+
+These statements are the workhorse behind Chapter 7 remainder terms, inverse
+gaps, max-row rates, residual rates, and leverage rates.
+
+\subsection{Uniform Integrability, Maximum Bounds, and Weak Moments}
+
+The maximum theorem for row norms is formalized on the nonnegative power scale:
+\[
+  n^{-1}\max_{i<n} Z_i \toP 0
+\]
+from uniform integrability of $Z_i$.  In applications $Z_i=\|X_i\|^r$, and a
+root CMT gives Hansen's displayed maximum-rate form.  Main declarations are
+\lean{uniformIntegrable_tail_eLpNorm_one},
+\lean{uniformIntegrable_one_iff_tail_eLpNorm},
+\lean{uniformIntegrable_one_of_identDistrib_memLp},
+\lean{max_norm_scaled_tendstoInMeasure_zero_of_uniformIntegrable_norm_r}, and
+\lean{max_norm_scaled_tendstoInMeasure_zero_of_identDistrib_memLp}.
+
+For weak convergence and moments, the branch adds:
+\begin{itemize}
+  \item bounded-continuous Portmanteau moment wrappers;
+  \item norm-truncation functions and weak-convergence norm-bound transfer;
+  \item limit integrability under eventual first-moment bounds;
+  \item real clipping functions and clipped-identity weak-moment convergence;
+  \item pointwise and integral bounds showing clipping error is controlled by
+  large-tail integrals;
+  \item conversion from Mathlib's \lean{UniformIntegrable} tail seminorms to
+  real clipping-tail bounds, and the resulting weak-convergence/UI moment
+  theorem.
+\end{itemize}
+
+The main theorem names are
+\lean{TendstoInDistribution.integral_norm_limit_le_of_eventually_integral_norm_bound},
+\lean{realClipBoundedContinuousFunction},
+\lean{TendstoInDistribution.integral_realClip_tendsto},
+\lean{abs_integral_sub_realClip_le_two_mul_integral_tail_abs}, and
+\lean{TendstoInDistribution.integral_tendsto_of_uniformIntegrable}.
+
+\subsection{Sample-Mean Sharpness}
+
+The branch adds exact scalar and vector sample-mean variance formulas:
+\begin{itemize}
+  \item \lean{iidSampleMean_variance_eq_inv_card_mul}.
+  \item \lean{iidLinearUnbiasedEstimator_variance_ge_sampleMean}.
+  \item \lean{iidLinearUnbiasedEstimator_covMat_sub_sampleMean_posSemidef}.
+  \item \lean{variance_le_of_eq_add_uncorrelated}.
+  \item \lean{covMat_sub_posSemidef_of_eq_add_uncorrelated}.
+  \item \lean{iidEstimator_variance_ge_sampleMean_of_mean_add_uncorrelated}.
+  \item \lean{iidEstimator_covMat_sub_sampleMean_posSemidef_of_mean_add_uncorrelated}.
+  \item \lean{iidSampleMean_covMat_eq_inv_card_smul}.
+  \item \lean{iidSampleMean_covMat_eq_inv_card_smul_of_identDistrib}.
+\end{itemize}
+
+These prove the sample mean attains the $n^{-1}$ variance/covariance scale for
+iid observations and that no scalar or finite-dimensional scalar-weighted linear
+unbiased estimator improves on the equal-weight sample mean.  The orthogonal
+residual lemmas also isolate the Hilbert-space variance algebra and compose it
+with the sample mean for estimators of the form sample mean plus an uncorrelated
+residual.  They are not the full arbitrary-unbiased-estimator lower bound of
+Hansen Theorem 6.11 because the theorem-specific orthogonality discharge remains
+missing.
+
+\section{Chapter 7: Least-Squares Asymptotics}
+
+The Chapter 7 additions assemble the Chapter 6 infrastructure into OLS
+asymptotic statements.
+
+\subsection{Condition Packages}
+
+The public condition structures now include:
+\begin{itemize}
+  \item \lean{LeastSquaresConsistencyConditions};
+  \item \lean{ErrorVarianceConsistencyConditions};
+  \item \lean{ScoreCLTConditions};
+  \item \lean{RobustCovarianceConsistencyConditions};
+  \item \lean{HomoskedasticErrorVariance};
+  \item \lean{RobustFeasibleHCMomentConditions};
+  \item \lean{IidRobustFeasibleHCMomentConditions}.
+\end{itemize}
+
+The branch adds conversions among these packages and direct compact/iid
+sufficient-condition endpoints for many theorem statements.  These packages are
+review aids as well as proof infrastructure: they isolate exactly what is being
+assumed for each theorem surface.
+
+\subsection{OLS Consistency and Normality}
+
+The branch proves consistency and asymptotic normality for the totalized and
+ordinary-wrapper estimators.  Key statements include:
+\begin{itemize}
+  \item \lean{olsBetaStar_consistent} and OrZero/literal wrappers.
+  \item \lean{scoreVector_sampleCrossMoment_tendstoInDistribution_multivariateGaussian}.
+  \item \lean{feasibleScore_tendstoInDistribution_scoreCLT}.
+  \item \lean{olsBetaStar_vector_tendstoInDistribution_scoreCLT}.
+  \item \lean{olsBetaStar_vector_tendstoInDistribution_multivariateGaussian}.
+  \item \lean{olsBetaOrZero_vector_tendstoInDistribution_multivariateGaussian}.
+  \item \lean{scoreProj_olsBetaStar_tendstoInDistribution_gaussian_cov_all}.
+\end{itemize}
+
+Mathematically, these statements show
+\[
+  \sqrt{n}(\hat\beta_n-\beta)\toD N(0,Q^{-1}\Omega Q^{-1})
+\]
+at the current condition layer, with projection-family and vector forms.
+
+\subsection{Residual Variance and Homoskedastic Covariance}
+
+For Hansen Theorems 7.4 and 7.5, the branch proves consistency of totalized
+residual-variance and homoskedastic plug-in covariance estimators:
+\begin{itemize}
+  \item \lean{olsSigmaSqHatStar_tendstoInMeasure_errorVariance}.
+  \item \lean{olsS2Star_tendstoInMeasure_errorVariance}.
+  \item \lean{olsHomoCovStar_tendstoInMeasure}.
+  \item direct iid endpoints under
+  \lean{IidRobustFeasibleHCMomentConditions}.
+\end{itemize}
+
+\subsection{HC0, HC1, HC2, and HC3 Covariance Consistency}
+
+For Theorems 7.6 and 7.7, the branch adds a substantial robust-HC consistency
+layer:
+\begin{itemize}
+  \item HC0 middle-matrix and sandwich consistency for feasible residuals.
+  \item HC1 consistency using the finite-sample scale factor
+  \lean{hc1FiniteSampleScale_tendsto_one}.
+  \item HC2 and HC3 consistency through a generic leverage-adjusted middle
+  matrix and max-leverage control.
+  \item compact moment and iid joint-observation endpoints for HC0--HC3.
+\end{itemize}
+
+Representative theorem names are
+\lean{olsHetCovStar_tendstoInMeasure_of_robustFeasibleHCMomentConditions},
+\lean{olsHetCovHC1Star_tendstoInMeasure_of_robustFeasibleHCMomentConditions},
+\lean{olsHetCovHC2Star_tendstoInMeasure_of_robustFeasibleHCMomentConditions},
+\lean{olsHetCovHC3Star_tendstoInMeasure_of_robustFeasibleHCMomentConditions},
+and the corresponding
+\lean{..._of_iidRobustFeasibleHCMomentConditions} endpoints.
+
+\subsection{Functions of Parameters}
+
+For Theorems 7.8--7.10, the branch proves both fixed-linear and nonlinear
+function-of-parameter results:
+\begin{itemize}
+  \item continuous-map consistency for $r(\hat\beta)$;
+  \item nonlinear Delta-method Gaussian limits for totalized and OrZero OLS;
+  \item fixed-linear and random-linear covariance CMTs;
+  \item plug-in derivative covariance consistency for nonlinear functions.
+\end{itemize}
+
+Representative names include
+\lean{nonlinearFunction_olsBetaStar_delta_tendstoInDistribution_gaussian},
+\lean{nonlinearFunction_olsBetaOrZero_delta_tendstoInDistribution_gaussian},
+\lean{linMapCov_tendstoInMeasure},
+\lean{randomLinearMapCovariance_tendstoInMeasure},
+\lean{nonlinearDerivativeCovariance_olsBetaStar_tendstoInMeasure}, and
+\lean{nonlinearDerivativeCovariance_olsBetaOrZero_tendstoInMeasure}.
+
+\subsection{Standard Errors, t Statistics, Confidence Intervals, and Wald Tests}
+
+For Theorems 7.11--7.14, the branch adds the inference layer:
+\begin{itemize}
+  \item standard-error consistency by continuous mapping;
+  \item studentized scalar limits;
+  \item symmetric confidence-interval coverage from absolute t-statistic
+  convergence;
+  \item multivariate Wald statistic convergence;
+  \item homoskedastic and heteroskedastic HC0--HC3 versions;
+  \item direct compact and iid endpoints where the required condition packages
+  can be discharged.
+\end{itemize}
+
+Core declarations include
+\lean{studentizedLimit_tendstoInDistribution},
+\lean{linMapCovStdError_tendstoInMeasure},
+\lean{symmetricCI_coverage_of_abs_tstat_nonpos_tendsto_zero},
+\lean{symmetricCI_coverage_of_abs_tstat_standardNormal_se_tendsto_pos},
+\lean{waldQuadForm_tendstoInDistribution_of_vector_and_covariance},
+\lean{hasLaw_gaussian_mahalanobis_chiSquared}, and the HC0--HC3 scalar and
+multivariate wrappers in \lean{Inference.lean}, \lean{Normality.lean}, and
+\lean{SandwichAssembly.lean}.
+
+\subsection{Residual Uniformity and Leverage Rates}
+
+For Theorems 7.16 and 7.17, the branch proves deterministic inequalities and
+probabilistic rate wrappers:
+\begin{itemize}
+  \item the max residual error is bounded by a coefficient-error factor times a
+  max-row-norm factor;
+  \item the coefficient-error factor is $O_p(1)$ by the vector OLS CLT;
+  \item the max-row-norm factor is $o_p(1)$ by the Chapter 6 maximum theorem;
+  \item max leverage is controlled by inverse-Gram bounds and max row norms.
+\end{itemize}
+
+Representative theorem names are
+\lean{sqrt_smul_olsBetaStar_sub_boundedInProbabilityNorm},
+\lean{sqrt_scaledMaxRowNorm_sq_tendstoInMeasure_zero_of_uniformIntegrable_norm_sq},
+\lean{maxResidualErrorStar_tendstoInMeasure_zero_of_uniformIntegrable_rowNorm_sq},
+\lean{maxResidualErrorStar_tendstoInMeasure_zero_of_identDistrib_memLp_rowNorm_sq},
+\lean{scaledMaxLeverageStar_tendstoInMeasure_zero_of_scaled_maxRowNorm_sq},
+\lean{maxLeverageStar_tendstoInMeasure_zero_of_uniformIntegrable_rowNorm_sq}, and
+\lean{maxLeverageStar_tendstoInMeasure_zero_of_identDistrib_memLp_rowNorm_sq}.
+The direct iid feasible-HC package derives the squared-row $L^1$ input for
+these wrappers from its fourth-row-moment assumption. The branch also adds
+\lean{IidAssumption72FourthMomentConditions}, which derives the squared-error
+moment and true-error score outer-product moment from structural-error and
+regressor fourth moments, then converts to
+\lean{IidRobustFeasibleHCMomentConditions}. It further adds
+\lean{IidAssumption72ResponseMomentConditions}, which derives the structural-error
+fourth moment from the response fourth moment, the linear-model identity, and the
+regressor fourth-row moment before reusing the fourth-moment package. The
+combined robust feasible-HC
+package and the iid package now also derive the feasible-HC third absolute
+row-weight moment $\mathbb{E}\{|e_0|\|X_0\|^3\}<\infty$ from the score
+outer-product moment and the fourth-row moment, rather than carrying it as a
+separate primitive field in those public packages.
+
+\subsection{Edgeworth Interface}
+
+The branch does not prove Hansen's concrete high-moment cumulant expansion.
+It does add generic interfaces and the polynomial-shape layer that future work
+can instantiate:
+\begin{itemize}
+  \item \lean{FirstOrderEdgeworthExpansion};
+  \item \lean{SecondOrderEdgeworthExpansion};
+  \item scaled-remainder consequences;
+  \item unscaled second-order approximation-error consequences;
+  \item CDF convergence consequences;
+  \item a bridge from the second-order interface to the first-order interface;
+  \item \lean{edgeworthP1Polynomial} and \lean{edgeworthP2Polynomial}, recording
+    the even quadratic and odd degree-five textbook shapes;
+  \item \lean{SecondOrderEdgeworthExpansion.symmetric_interval_scaled_remainder_tendsto_zero},
+    proving the two-sided cancellation of the $n^{-1/2}$ Edgeworth term.
+  \item \lean{SecondOrderEdgeworthExpansion.symmetric_interval_scaled_remainder_tendsto_zero_polynomial},
+    the coefficient-specialized version for the Hansen polynomial forms.
+\end{itemize}
+
+Thus Theorem 7.15 has a reusable formal target shape and the central-interval
+cancellation consequence, but not the high-moment cumulant coefficient proof.
+
+\section{Remaining Gaps}
+
+The branch is not a claim that Chapters 2--7 are literally complete.  The main
+remaining gaps are:
+
+\begin{longtable}{p{0.16\textwidth}p{0.77\textwidth}}
+\toprule
+Area & Remaining work \\
+\midrule
+Chapter 4 & Clustered covariance asymptotics beyond the finite cluster-block
+identities; raw CR3 middle-moment identification needed to construct conditional
+covariance matrices for adjusted annihilator-error blocks from primitive cluster
+error assumptions. Hansen's Section 4.23 CR3 conservativeness sentence appears
+to be a finite-sample conditional-on-\(X\) claim, not an asymptotic claim; the
+remaining proof should identify the leave-cluster conditional moment
+\(E[\tilde e_g \tilde e_g' \mid X]\) and feed the resulting blockwise positive
+semidefinite dominance into the existing CR3 sandwich bridge. \\
+Chapter 5 & Exact random-design Kinal theorem 5.5 inverse-Gram moment threshold. \\
+Chapter 6 & Scalar triangular-array Lindeberg/Lyapunov sufficient-condition
+probability-engine discharge for Theorems 6.4 and 6.5 beyond the deterministic
+and expected finite-row even-moment tail inequalities; arbitrary-unbiased-estimator
+lower bound for Theorem 6.11. \\
+Chapter 7 & Further tightening of the remaining score-CLT public package toward
+literal textbook iid assumptions; concrete high-moment cumulant expansion for
+Theorem 7.15. \\
+\bottomrule
+\end{longtable}
+
+\section{Files Touched by the Consolidated Branch}
+
+The main proof files changed by the branch are:
+\begin{itemize}
+  \item \lean{HansenEconometrics/AsymptoticUtils.lean}
+  \item \lean{HansenEconometrics/AsymptoticUtils/DeltaMethod.lean}
+  \item \lean{HansenEconometrics/AsymptoticUtils/MaxBounds.lean}
+  \item \lean{HansenEconometrics/AsymptoticUtils/StochasticOrder.lean}
+  \item \lean{HansenEconometrics/Chapter2PotentialOutcomes.lean}
+  \item \lean{HansenEconometrics/Chapter3FWL.lean}
+  \item \lean{HansenEconometrics/Chapter3LeastSquaresAlgebra.lean}
+  \item \lean{HansenEconometrics/Chapter3Projections.lean}
+  \item \lean{HansenEconometrics/Chapter4LeastSquaresRegression.lean}
+  \item \lean{HansenEconometrics/Chapter6Asymptotics.lean}
+  \item \lean{HansenEconometrics/Chapter7Asymptotics/Consistency.lean}
+  \item \lean{HansenEconometrics/Chapter7Asymptotics/Inference.lean}
+  \item \lean{HansenEconometrics/Chapter7Asymptotics/MiddleConsistency.lean}
+  \item \lean{HansenEconometrics/Chapter7Asymptotics/Normality.lean}
+  \item \lean{HansenEconometrics/Chapter7Asymptotics/SampleMiddle.lean}
+  \item \lean{HansenEconometrics/Chapter7Asymptotics/SandwichAssembly.lean}
+  \item \lean{HansenEconometrics/ProbabilityUtils.lean}
+\end{itemize}
+
+The chapter inventories were updated alongside the Lean files, and this document
+is intended as a single reviewable guide to the mathematical content.
+
+\end{document}

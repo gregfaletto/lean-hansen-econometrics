@@ -1,6 +1,7 @@
 import Mathlib.Algebra.Order.Ring.Star
 import Mathlib.Analysis.Matrix.Normed
 import Mathlib.MeasureTheory.Function.ConvergenceInDistribution
+import Mathlib.MeasureTheory.Function.UniformIntegrable
 import Mathlib.MeasureTheory.Measure.LevyConvergence
 import Mathlib.MeasureTheory.Measure.Tight
 import Mathlib.Probability.StrongLaw
@@ -19,13 +20,19 @@ Mathlib does not currently provide as named lemmas:
 * `tendstoInMeasure_wlln` — a **weak law of large numbers** wrapper: strong
   law gives a.s. convergence, and in a finite-measure space a.s. convergence
   implies convergence in measure.
+* `tendstoInMeasure_transformed_wlln` — Hansen Theorem 6.2 as a transformed
+  WLLN wrapper over `tendstoInMeasure_wlln`.
+* `tendstoInDistribution_continuous_comp` — Hansen Theorem 6.7 in the global
+  continuous-map case, wrapping Mathlib's distributional CMT.
+* `tendstoInDistribution_ae_continuous_comp` — Hansen Theorem 6.7 in its
+  textbook a.s.-continuity form, proved from a Portmanteau closed-set argument.
 
 Both are stated for general Banach-space codomains, so they specialize
 directly to scalar, vector, and matrix random variables.
 -/
 
 open MeasureTheory ProbabilityTheory Filter
-open scoped ENNReal Topology MeasureTheory ProbabilityTheory Function
+open scoped NNReal ENNReal Topology MeasureTheory ProbabilityTheory Function
 
 namespace HansenEconometrics
 
@@ -82,6 +89,907 @@ theorem tendstoInMeasure_continuousAt_const_comp
   refine ⟨ns', hns', ?_⟩
   filter_upwards [hae] with ω hω
   exact hh.tendsto.comp hω
+
+/-- **Hansen Theorem 6.7, global continuous-mapping theorem in distribution.**
+
+If `Xₙ ⇒ Z` and `g` is globally continuous, then `g(Xₙ) ⇒ g(Z)`. This is the
+Mathlib-backed global-continuity face of Hansen's distributional CMT; see
+`tendstoInDistribution_ae_continuous_comp` for the textbook a.s.-continuity
+form. -/
+theorem tendstoInDistribution_continuous_comp
+    {Ω Ω' E F : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {P : ℕ → Measure Ω} [∀ n, IsProbabilityMeasure (P n)]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    [TopologicalSpace E] [MeasurableSpace E] [OpensMeasurableSpace E]
+    [TopologicalSpace F] [MeasurableSpace F] [BorelSpace F]
+    {X : ℕ → Ω → E} {Z : Ω' → E} {g : E → F}
+    (hX : TendstoInDistribution X atTop Z P ν) (hg : Continuous g) :
+    TendstoInDistribution (fun n ω => g (X n ω)) atTop (fun ω => g (Z ω)) P ν := by
+  simpa [Function.comp_def] using hX.continuous_comp hg
+
+/-- **Push-forward CMT for maps continuous outside a limit-null set.**
+
+If probability laws `νs` converge weakly to `ν`, and a measurable map `g` is
+continuous away from a `ν`-null set `D`, then the push-forward laws converge
+weakly.  This is the probability-measure core of Hansen's a.s.-continuity
+continuous-mapping theorem.
+
+The proof is the standard Portmanteau closed-set argument: for closed `C`, the
+closure of `g ⁻¹' C` is contained in `g ⁻¹' C ∪ D`; weak convergence controls
+the closed closure, and the null set removes the discontinuity contribution. -/
+theorem probabilityMeasure_tendsto_map_of_tendsto_of_ae_continuous
+    {ι E F : Type*} {L : Filter ι} [L.IsCountablyGenerated]
+    [TopologicalSpace E] [MeasurableSpace E] [OpensMeasurableSpace E]
+    [HasOuterApproxClosed E]
+    [TopologicalSpace F] [MeasurableSpace F] [BorelSpace F]
+    {νs : ι → ProbabilityMeasure E} {ν : ProbabilityMeasure E}
+    (hν : Tendsto νs L (𝓝 ν))
+    {g : E → F} (hg : Measurable g) {D : Set E}
+    (hD : (ν : Measure E) D = 0)
+    (hcont : ∀ x, x ∉ D → ContinuousAt g x) :
+    Tendsto (fun i => (νs i).map (hg.aemeasurable : AEMeasurable g (νs i)))
+      L (𝓝 (ν.map (hg.aemeasurable : AEMeasurable g ν))) := by
+  refine tendsto_of_forall_isClosed_limsup_le' ?_
+  intro C hC
+  let A : Set E := g ⁻¹' C
+  have hclosure_subset : closure A ⊆ A ∪ D := by
+    intro x hx
+    by_cases hxD : x ∈ D
+    · exact Or.inr hxD
+    · left
+      have hxC_closure : g x ∈ closure C :=
+        (hcont x hxD).continuousWithinAt.mem_closure hx (by intro y hy; exact hy)
+      exact hC.closure_subset hxC_closure
+  have hpre_le :
+      (fun i => ((νs i).map (hg.aemeasurable : AEMeasurable g (νs i)) : Measure F) C)
+        ≤ᶠ[L] fun i => (νs i : Measure E) (closure A) := by
+    refine Filter.Eventually.of_forall ?_
+    intro i
+    change ((νs i : Measure E).map g) C ≤ (νs i : Measure E) (closure A)
+    rw [Measure.map_apply_of_aemeasurable (hg.aemeasurable : AEMeasurable g (νs i))
+      hC.measurableSet]
+    exact measure_mono subset_closure
+  have hclosed_bound :
+      L.limsup (fun i => (νs i : Measure E) (closure A)) ≤
+        (ν : Measure E) (closure A) :=
+    ProbabilityMeasure.limsup_measure_closed_le_of_tendsto hν isClosed_closure
+  have hlimit_le : (ν : Measure E) (closure A) ≤ (ν : Measure E) A := by
+    calc
+      (ν : Measure E) (closure A) ≤ (ν : Measure E) (A ∪ D) :=
+        measure_mono hclosure_subset
+      _ ≤ (ν : Measure E) A + (ν : Measure E) D := measure_union_le A D
+      _ = (ν : Measure E) A := by simp [hD]
+  calc
+    L.limsup
+        (fun i => ((νs i).map (hg.aemeasurable : AEMeasurable g (νs i)) : Measure F) C)
+        ≤ L.limsup (fun i => (νs i : Measure E) (closure A)) :=
+          limsup_le_limsup hpre_le
+    _ ≤ (ν : Measure E) (closure A) := hclosed_bound
+    _ ≤ (ν : Measure E) A := hlimit_le
+    _ = ((ν.map (hg.aemeasurable : AEMeasurable g ν) : ProbabilityMeasure F) : Measure F) C := by
+      change (ν : Measure E) A = ((ν : Measure E).map g) C
+      rw [Measure.map_apply_of_aemeasurable (hg.aemeasurable : AEMeasurable g ν)
+        hC.measurableSet]
+
+/-- **Hansen Theorem 6.7, a.s.-continuity CMT in distribution.**
+
+If `Xₙ ⇒ Z` and a measurable map `g` is continuous off a set with zero
+limit-law probability, then `g(Xₙ) ⇒ g(Z)`.  This is the textbook
+a.s.-continuity face of the continuous-mapping theorem; the null set is stated
+on the law of `Z`, i.e. `(ν.map Z) D = 0`. -/
+theorem tendstoInDistribution_ae_continuous_comp
+    {Ω Ω' E F : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {P : ℕ → Measure Ω} [∀ n, IsProbabilityMeasure (P n)]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    [TopologicalSpace E] [MeasurableSpace E] [OpensMeasurableSpace E]
+    [HasOuterApproxClosed E]
+    [TopologicalSpace F] [MeasurableSpace F] [BorelSpace F]
+    {X : ℕ → Ω → E} {Z : Ω' → E} {g : E → F}
+    (hX : TendstoInDistribution X atTop Z P ν)
+    (hg : Measurable g) {D : Set E}
+    (hD : (ν.map Z) D = 0)
+    (hcont : ∀ x, x ∉ D → ContinuousAt g x) :
+    TendstoInDistribution (fun n ω => g (X n ω)) atTop (fun ω => g (Z ω)) P ν := by
+  have hcomp :
+      TendstoInDistribution (fun n => g ∘ X n) atTop (g ∘ Z) P ν := by
+    refine ⟨?_, ?_, ?_⟩
+    · intro n
+      exact hg.comp_aemeasurable (hX.forall_aemeasurable n)
+    · exact hg.comp_aemeasurable hX.aemeasurable_limit
+    let law : ℕ → ProbabilityMeasure E := fun n =>
+      ⟨(P n).map (X n), Measure.isProbabilityMeasure_map (hX.forall_aemeasurable n)⟩
+    let lawZ : ProbabilityMeasure E :=
+      ⟨ν.map Z, Measure.isProbabilityMeasure_map hX.aemeasurable_limit⟩
+    have hmap :=
+      probabilityMeasure_tendsto_map_of_tendsto_of_ae_continuous
+        (νs := law) (ν := lawZ) (L := atTop) hX.tendsto hg
+        (by simpa [lawZ] using hD) hcont
+    convert hmap with n
+    · simp only [law, ProbabilityMeasure.map, ProbabilityMeasure.coe_mk, Subtype.mk.injEq]
+      rw [AEMeasurable.map_map_of_aemeasurable hg.aemeasurable (hX.forall_aemeasurable n)]
+    · apply ProbabilityMeasure.toMeasure_injective
+      simp only [lawZ, ProbabilityMeasure.map, ProbabilityMeasure.coe_mk]
+      rw [AEMeasurable.map_map_of_aemeasurable hg.aemeasurable hX.aemeasurable_limit]
+  simpa [Function.comp_def] using hcomp
+
+/-- **Portmanteau lower-bound wrapper for bounded continuous moments.**
+
+If `Xₙ ⇒ Z`, then every nonnegative bounded continuous test function has
+limit-law expectation bounded by the liminf of the sequence expectations. This
+is the weak-convergence-facing core behind Hansen Theorems 6.13 and 6.15; the
+unbounded norm and uniform-integrability wrappers build on this Portmanteau
+direction. -/
+theorem TendstoInDistribution.integral_boundedContinuous_nonneg_le_liminf
+    {Ω Ω' E : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    [TopologicalSpace E] [MeasurableSpace E] [OpensMeasurableSpace E]
+    [HasOuterApproxClosed E]
+    {X : ℕ → Ω → E} {Z : Ω' → E}
+    (hX : TendstoInDistribution X atTop Z (fun _ => μ) ν)
+    (f : BoundedContinuousFunction E ℝ) (hf_nonneg : 0 ≤ f) :
+    ∫ ω, f (Z ω) ∂ν ≤
+      atTop.liminf (fun n => ∫ ω, f (X n ω) ∂μ) := by
+  let law : ℕ → ProbabilityMeasure E := fun n =>
+    ⟨μ.map (X n), Measure.isProbabilityMeasure_map (hX.forall_aemeasurable n)⟩
+  let lawZ : ProbabilityMeasure E :=
+    ⟨ν.map Z, Measure.isProbabilityMeasure_map hX.aemeasurable_limit⟩
+  have hlaw : Tendsto law atTop (𝓝 lawZ) := by
+    simpa [law, lawZ] using hX.tendsto
+  haveI : ∀ n, IsProbabilityMeasure (μ.map (X n)) :=
+    fun n => Measure.isProbabilityMeasure_map (hX.forall_aemeasurable n)
+  have hopens : ∀ G : Set E, IsOpen G →
+      (ν.map Z) G ≤ atTop.liminf (fun n => (μ.map (X n)) G) := by
+    intro G hG
+    simpa [law, lawZ] using
+      (ProbabilityMeasure.le_liminf_measure_open_of_tendsto
+        (μs_lim := hlaw) (G_open := hG))
+  have hlower :
+      ∫ x, f x ∂(ν.map Z) ≤
+        atTop.liminf (fun n => ∫ x, f x ∂(μ.map (X n))) :=
+    integral_le_liminf_integral_of_forall_isOpen_measure_le_liminf_measure
+      (μ := ν.map Z) (μs := fun n => μ.map (X n))
+      (f := f) hf_nonneg hopens
+  have hlimit :
+      ∫ x, f x ∂(ν.map Z) = ∫ ω, f (Z ω) ∂ν := by
+    rw [integral_map hX.aemeasurable_limit (by fun_prop)]
+  have hseq :
+      (fun n => ∫ x, f x ∂(μ.map (X n))) =
+        fun n => ∫ ω, f (X n ω) ∂μ := by
+    funext n
+    rw [integral_map (hX.forall_aemeasurable n) (by fun_prop)]
+  simpa [hlimit, hseq] using hlower
+
+/-- **Hansen Theorem 6.13, bounded continuous weak-moment face.**
+
+If `Xₙ ⇒ Z` and the expectations of a nonnegative bounded continuous transform
+are eventually bounded by `C`, then the limit-law expectation of the same
+transform is bounded by `C`. This is the direct bounded-continuous Portmanteau
+face of bounded first moments passing to the weak limit. -/
+theorem TendstoInDistribution.integral_boundedContinuous_nonneg_limit_le_of_eventually_bound
+    {Ω Ω' E : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    [TopologicalSpace E] [MeasurableSpace E] [OpensMeasurableSpace E]
+    [HasOuterApproxClosed E]
+    {X : ℕ → Ω → E} {Z : Ω' → E}
+    (hX : TendstoInDistribution X atTop Z (fun _ => μ) ν)
+    (f : BoundedContinuousFunction E ℝ) (hf_nonneg : 0 ≤ f) {C : ℝ}
+    (hBound : ∀ᶠ n in atTop, ∫ ω, f (X n ω) ∂μ ≤ C) :
+    ∫ ω, f (Z ω) ∂ν ≤ C := by
+  have hlower :=
+    TendstoInDistribution.integral_boundedContinuous_nonneg_le_liminf
+      (μ := μ) (ν := ν) (X := X) (Z := Z) hX f hf_nonneg
+  have hliminf_le :
+      atTop.liminf (fun n => ∫ ω, f (X n ω) ∂μ) ≤ C := by
+    have hbelow : atTop.IsBoundedUnder (fun x y : ℝ => x ≥ y)
+        (fun n => ∫ ω, f (X n ω) ∂μ) :=
+      isBoundedUnder_of_eventually_ge
+        (Eventually.of_forall fun n => integral_nonneg (fun ω => hf_nonneg (X n ω)))
+    refine liminf_le_of_le hbelow ?_
+    intro b hb
+    obtain ⟨N, hN⟩ := eventually_atTop.1 (hb.and hBound)
+    exact ((hN N le_rfl).1).trans ((hN N le_rfl).2)
+  exact hlower.trans hliminf_le
+
+/-- Bounded continuous truncation of the norm: `x ↦ min ‖x‖ R`.
+
+The nonnegative bound `hR` is included so the function has range in `[0, R]`.
+This is the truncation used for the weak-convergence-facing bounded-moment
+layer in Hansen Theorem 6.13. -/
+noncomputable def normTruncBoundedContinuousFunction
+    (E : Type*) [SeminormedAddCommGroup E] (R : ℝ) (hR : 0 ≤ R) :
+    BoundedContinuousFunction E ℝ :=
+  BoundedContinuousFunction.mkOfBound (α := E) (β := ℝ)
+    ⟨fun x : E => min ‖x‖ R, continuous_norm.min continuous_const⟩ R
+    (fun x y => by
+      rw [Real.dist_eq]
+      change |min ‖x‖ R - min ‖y‖ R| ≤ R
+      have hx0 : 0 ≤ min ‖x‖ R := le_min (norm_nonneg x) hR
+      have hy0 : 0 ≤ min ‖y‖ R := le_min (norm_nonneg y) hR
+      have hxR : min ‖x‖ R ≤ R := min_le_right _ _
+      have hyR : min ‖y‖ R ≤ R := min_le_right _ _
+      exact abs_le.mpr ⟨by linarith, by linarith⟩)
+
+@[simp]
+theorem normTruncBoundedContinuousFunction_apply
+    {E : Type*} [SeminormedAddCommGroup E] {R : ℝ} (hR : 0 ≤ R) (x : E) :
+    normTruncBoundedContinuousFunction E R hR x = min ‖x‖ R :=
+  rfl
+
+/-- The norm truncation is nonnegative. -/
+theorem normTruncBoundedContinuousFunction_nonneg
+    {E : Type*} [SeminormedAddCommGroup E] {R : ℝ} (hR : 0 ≤ R) :
+    0 ≤ normTruncBoundedContinuousFunction E R hR :=
+  fun x => by
+    change (0 : ℝ) ≤ normTruncBoundedContinuousFunction E R hR x
+    rw [normTruncBoundedContinuousFunction_apply]
+    exact le_min (norm_nonneg x) hR
+
+/-- The norm truncation is bounded above by the norm. -/
+theorem normTruncBoundedContinuousFunction_le_norm
+    {E : Type*} [SeminormedAddCommGroup E] {R : ℝ} (hR : 0 ≤ R) (x : E) :
+    normTruncBoundedContinuousFunction E R hR x ≤ ‖x‖ := by
+  rw [normTruncBoundedContinuousFunction_apply]
+  exact min_le_left _ _
+
+/-- **Hansen Theorem 6.13, norm-truncation weak-moment layer.**
+
+If `Xₙ ⇒ Z` and the expected norms of `Xₙ` are eventually bounded by `C`, then
+every bounded continuous norm truncation of the limit has expectation at most
+`C`. This is the reusable truncation step toward the textbook unbounded norm
+statement. -/
+theorem TendstoInDistribution.integral_normTrunc_limit_le_of_eventually_integral_norm_bound
+    {Ω Ω' E : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    [SeminormedAddCommGroup E] [MeasurableSpace E] [OpensMeasurableSpace E]
+    [BorelSpace E] [HasOuterApproxClosed E]
+    {X : ℕ → Ω → E} {Z : Ω' → E}
+    (hX : TendstoInDistribution X atTop Z (fun _ => μ) ν)
+    {C R : ℝ} (hR : 0 ≤ R)
+    (hBound : ∀ᶠ n in atTop,
+      Integrable (fun ω => ‖X n ω‖) μ ∧ ∫ ω, ‖X n ω‖ ∂μ ≤ C) :
+    ∫ ω, normTruncBoundedContinuousFunction E R hR (Z ω) ∂ν ≤ C := by
+  let f := normTruncBoundedContinuousFunction E R hR
+  have hfBound : ∀ᶠ n in atTop, ∫ ω, f (X n ω) ∂μ ≤ C := by
+    filter_upwards [hBound] with n hn
+    have hf_map_int : Integrable f (μ.map (X n)) :=
+      f.integrable (μ := μ.map (X n))
+    have hf_int : Integrable (fun ω => f (X n ω)) μ := by
+      simpa [Function.comp_def] using
+        hf_map_int.comp_aemeasurable (hX.forall_aemeasurable n)
+    have hle : ∫ ω, f (X n ω) ∂μ ≤ ∫ ω, ‖X n ω‖ ∂μ :=
+      integral_mono hf_int hn.1
+        (fun ω => normTruncBoundedContinuousFunction_le_norm hR (X n ω))
+    exact hle.trans hn.2
+  exact TendstoInDistribution.integral_boundedContinuous_nonneg_limit_le_of_eventually_bound
+    (μ := μ) (ν := ν) (X := X) (Z := Z) hX f
+    (normTruncBoundedContinuousFunction_nonneg hR) hfBound
+
+/-- **Hansen Theorem 6.13, limit-integrability weak-moment face.**
+
+If `Xₙ ⇒ Z` and the expected norms of `Xₙ` are eventually bounded by `C`, then
+the limit-law norm is integrable. The proof bounds all bounded continuous norm
+truncations and passes to the monotone limit at the `lintegral` level. -/
+theorem TendstoInDistribution.integrable_norm_limit_of_eventually_integral_norm_bound
+    {Ω Ω' E : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    [SeminormedAddCommGroup E] [MeasurableSpace E] [OpensMeasurableSpace E]
+    [BorelSpace E] [HasOuterApproxClosed E]
+    {X : ℕ → Ω → E} {Z : Ω' → E}
+    (hX : TendstoInDistribution X atTop Z (fun _ => μ) ν)
+    {C : ℝ}
+    (hBound : ∀ᶠ n in atTop,
+      Integrable (fun ω => ‖X n ω‖) μ ∧ ∫ ω, ‖X n ω‖ ∂μ ≤ C) :
+    Integrable (fun ω => ‖Z ω‖) ν := by
+  have htrunc_bound :
+      ∀ n : ℕ, ∫ ω, min ‖Z ω‖ (n : ℝ) ∂ν ≤ C := by
+    intro n
+    have hn_nonneg : 0 ≤ (n : ℝ) := by positivity
+    simpa [normTruncBoundedContinuousFunction_apply] using
+      TendstoInDistribution.integral_normTrunc_limit_le_of_eventually_integral_norm_bound
+        (μ := μ) (ν := ν) (X := X) (Z := Z) hX hn_nonneg hBound
+  have hnorm_aemeas : AEMeasurable (fun ω => ‖Z ω‖) ν :=
+    continuous_norm.measurable.comp_aemeasurable hX.aemeasurable_limit
+  have htrunc_int :
+      ∀ n : ℕ, Integrable (fun ω => min ‖Z ω‖ (n : ℝ)) ν := by
+    intro n
+    have hn_nonneg : 0 ≤ (n : ℝ) := by positivity
+    let f := normTruncBoundedContinuousFunction E (n : ℝ) hn_nonneg
+    have hf_map_int : Integrable f (ν.map Z) :=
+      f.integrable (μ := ν.map Z)
+    have hf_int : Integrable (fun ω => f (Z ω)) ν := by
+      simpa [Function.comp_def] using
+        hf_map_int.comp_aemeasurable hX.aemeasurable_limit
+    simpa [f, normTruncBoundedContinuousFunction_apply] using hf_int
+  have htrunc_lintegral_bound :
+      ∀ n : ℕ, ∫⁻ ω, ENNReal.ofReal (min ‖Z ω‖ (n : ℝ)) ∂ν ≤ ENNReal.ofReal C := by
+    intro n
+    have hnn : 0 ≤ᵐ[ν] fun ω => min ‖Z ω‖ (n : ℝ) :=
+      ae_of_all ν (fun ω => le_min (norm_nonneg _) (by positivity))
+    rw [← ofReal_integral_eq_lintegral_ofReal (htrunc_int n) hnn]
+    exact ENNReal.ofReal_le_ofReal (htrunc_bound n)
+  have htrunc_lintegral_tendsto :
+      Tendsto
+        (fun n : ℕ => ∫⁻ ω, ENNReal.ofReal (min ‖Z ω‖ (n : ℝ)) ∂ν)
+        atTop (𝓝 (∫⁻ ω, ENNReal.ofReal ‖Z ω‖ ∂ν)) := by
+    refine lintegral_tendsto_of_tendsto_of_monotone ?_ ?_ ?_
+    · intro n
+      exact (hnorm_aemeas.min aemeasurable_const).ennreal_ofReal
+    · exact ae_of_all ν (fun ω => by
+        intro n m hnm
+        exact ENNReal.ofReal_le_ofReal (min_le_min le_rfl (by exact_mod_cast hnm)))
+    · exact ae_of_all ν (fun ω => by
+        have hreal :
+            Tendsto (fun n : ℕ => min ‖Z ω‖ (n : ℝ)) atTop (𝓝 ‖Z ω‖) := by
+          have hcast : ∀ᶠ n : ℕ in atTop, ‖Z ω‖ ≤ (n : ℝ) :=
+            (tendsto_natCast_atTop_atTop (R := ℝ)).eventually
+              (eventually_ge_atTop (‖Z ω‖))
+          have heq :
+              (fun n : ℕ => min ‖Z ω‖ (n : ℝ)) =ᶠ[atTop] fun _ => ‖Z ω‖ := by
+            filter_upwards [hcast] with n hn
+            exact min_eq_left hn
+          rw [tendsto_congr' heq]
+          exact tendsto_const_nhds
+        exact ENNReal.tendsto_ofReal hreal)
+  have hlimit_lintegral_bound :
+      ∫⁻ ω, ENNReal.ofReal ‖Z ω‖ ∂ν ≤ ENNReal.ofReal C :=
+    le_of_tendsto' htrunc_lintegral_tendsto htrunc_lintegral_bound
+  refine ⟨?_, ?_⟩
+  · rw [aestronglyMeasurable_iff_aemeasurable]
+    exact hnorm_aemeas
+  · rw [hasFiniteIntegral_iff_ofReal (ae_of_all ν (fun ω => norm_nonneg (Z ω)))]
+    exact hlimit_lintegral_bound.trans_lt ENNReal.ofReal_lt_top
+
+/-- **Hansen Theorem 6.13, integrable-limit norm weak-moment face.**
+
+If `Xₙ ⇒ Z`, the expected norms of `Xₙ` are eventually bounded by `C`, and the
+limit norm is integrable, then the limit-law expected norm is at most `C`. The
+proof applies the norm-truncation bound for every truncation level and then
+uses monotone convergence. -/
+theorem TendstoInDistribution.integral_norm_limit_le_of_eventually_integral_norm_bound_of_integrable
+    {Ω Ω' E : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    [SeminormedAddCommGroup E] [MeasurableSpace E] [OpensMeasurableSpace E]
+    [BorelSpace E] [HasOuterApproxClosed E]
+    {X : ℕ → Ω → E} {Z : Ω' → E}
+    (hX : TendstoInDistribution X atTop Z (fun _ => μ) ν)
+    {C : ℝ}
+    (hBound : ∀ᶠ n in atTop,
+      Integrable (fun ω => ‖X n ω‖) μ ∧ ∫ ω, ‖X n ω‖ ∂μ ≤ C)
+    (hZNorm : Integrable (fun ω => ‖Z ω‖) ν) :
+    ∫ ω, ‖Z ω‖ ∂ν ≤ C := by
+  have htrunc_bound :
+      ∀ n : ℕ, ∫ ω, min ‖Z ω‖ (n : ℝ) ∂ν ≤ C := by
+    intro n
+    have hn_nonneg : 0 ≤ (n : ℝ) := by positivity
+    simpa [normTruncBoundedContinuousFunction_apply] using
+      TendstoInDistribution.integral_normTrunc_limit_le_of_eventually_integral_norm_bound
+        (μ := μ) (ν := ν) (X := X) (Z := Z) hX hn_nonneg hBound
+  have htrunc_tendsto :
+      Tendsto (fun n : ℕ => ∫ ω, min ‖Z ω‖ (n : ℝ) ∂ν) atTop
+        (𝓝 (∫ ω, ‖Z ω‖ ∂ν)) := by
+    refine integral_tendsto_of_tendsto_of_monotone ?_ hZNorm ?_ ?_
+    · intro n
+      refine hZNorm.mono' ?_ ?_
+      · rw [aestronglyMeasurable_iff_aemeasurable]
+        exact hZNorm.aestronglyMeasurable.aemeasurable.min aemeasurable_const
+      · exact ae_of_all ν (fun ω => by
+          have hnonneg : 0 ≤ min ‖Z ω‖ (n : ℝ) :=
+            le_min (norm_nonneg _) (by positivity)
+          rw [Real.norm_of_nonneg hnonneg]
+          exact min_le_left _ _)
+    · exact ae_of_all ν (fun ω => by
+        intro n m hnm
+        exact min_le_min le_rfl (by exact_mod_cast hnm))
+    · exact ae_of_all ν (fun ω => by
+        have hcast : ∀ᶠ n : ℕ in atTop, ‖Z ω‖ ≤ (n : ℝ) :=
+          (tendsto_natCast_atTop_atTop (R := ℝ)).eventually
+            (eventually_ge_atTop (‖Z ω‖))
+        have heq :
+            (fun n : ℕ => min ‖Z ω‖ (n : ℝ)) =ᶠ[atTop] fun _ => ‖Z ω‖ := by
+          filter_upwards [hcast] with n hn
+          exact min_eq_left hn
+        rw [tendsto_congr' heq]
+        exact tendsto_const_nhds)
+  exact le_of_tendsto' htrunc_tendsto htrunc_bound
+
+/-- **Hansen Theorem 6.13, weak-convergence bounded first moments pass to the limit.**
+
+If `Xₙ ⇒ Z` and the expected norms of `Xₙ` are eventually bounded by `C`, then
+the limit-law expected norm is at most `C`. -/
+theorem TendstoInDistribution.integral_norm_limit_le_of_eventually_integral_norm_bound
+    {Ω Ω' E : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    [SeminormedAddCommGroup E] [MeasurableSpace E] [OpensMeasurableSpace E]
+    [BorelSpace E] [HasOuterApproxClosed E]
+    {X : ℕ → Ω → E} {Z : Ω' → E}
+    (hX : TendstoInDistribution X atTop Z (fun _ => μ) ν)
+    {C : ℝ}
+    (hBound : ∀ᶠ n in atTop,
+      Integrable (fun ω => ‖X n ω‖) μ ∧ ∫ ω, ‖X n ω‖ ∂μ ≤ C) :
+    ∫ ω, ‖Z ω‖ ∂ν ≤ C := by
+  have hZNorm :
+      Integrable (fun ω => ‖Z ω‖) ν :=
+    TendstoInDistribution.integrable_norm_limit_of_eventually_integral_norm_bound
+      (μ := μ) (ν := ν) (X := X) (Z := Z) hX hBound
+  exact
+    TendstoInDistribution.integral_norm_limit_le_of_eventually_integral_norm_bound_of_integrable
+      (μ := μ) (ν := ν) (X := X) (Z := Z) hX hBound hZNorm
+
+/-- Real identity clipped to `[-R, R]`. -/
+def realClip (R x : ℝ) : ℝ :=
+  max (-R) (min x R)
+
+/-- Bounded continuous clipping of the real identity to `[-R, R]`. -/
+noncomputable def realClipBoundedContinuousFunction (R : ℝ) (hR : 0 ≤ R) :
+    BoundedContinuousFunction ℝ ℝ :=
+  BoundedContinuousFunction.mkOfBound (α := ℝ) (β := ℝ)
+    ⟨realClip R, by
+      simpa [realClip] using
+        (continuous_const.max (continuous_id.min continuous_const) : Continuous
+          (fun x : ℝ => max (-R) (min x R)))⟩ (2 * R)
+    (fun x y => by
+      rw [Real.dist_eq]
+      change |max (-R) (min x R) - max (-R) (min y R)| ≤ 2 * R
+      have hx_lo : -R ≤ max (-R) (min x R) := le_max_left _ _
+      have hy_lo : -R ≤ max (-R) (min y R) := le_max_left _ _
+      have hx_hi : max (-R) (min x R) ≤ R :=
+        max_le (by linarith) (min_le_right _ _)
+      have hy_hi : max (-R) (min y R) ≤ R :=
+        max_le (by linarith) (min_le_right _ _)
+      exact abs_le.mpr ⟨by linarith, by linarith⟩)
+
+@[simp]
+theorem realClipBoundedContinuousFunction_apply {R : ℝ} (hR : 0 ≤ R) (x : ℝ) :
+    realClipBoundedContinuousFunction R hR x = realClip R x :=
+  rfl
+
+/-- Real clipping agrees with the identity inside the clipping interval. -/
+theorem realClip_eq_self_of_abs_le {R x : ℝ} (hx : |x| ≤ R) :
+    realClip R x = x := by
+  have hx_interval := abs_le.mp hx
+  rw [realClip, min_eq_left hx_interval.2, max_eq_right hx_interval.1]
+
+/-- Real clipping agrees with the identity inside the clipping interval. -/
+theorem realClipBoundedContinuousFunction_eq_self_of_abs_le
+    {R x : ℝ} (hR : 0 ≤ R) (hx : |x| ≤ R) :
+    realClipBoundedContinuousFunction R hR x = x := by
+  rw [realClipBoundedContinuousFunction_apply, realClip_eq_self_of_abs_le hx]
+
+/-- The clipped value stays in absolute value below the clipping radius. -/
+theorem abs_realClip_le (R x : ℝ) (hR : 0 ≤ R) :
+    |realClip R x| ≤ R := by
+  have hlo : -R ≤ realClip R x := by
+    rw [realClip]
+    exact le_max_left _ _
+  have hhi : realClip R x ≤ R := by
+    rw [realClip]
+    exact max_le (by linarith) (min_le_right _ _)
+  exact abs_le.mpr ⟨hlo, hhi⟩
+
+/-- Clipping cannot increase absolute value when the clipping radius is nonnegative. -/
+theorem abs_realClip_le_abs (R x : ℝ) (hR : 0 ≤ R) :
+    |realClip R x| ≤ |x| := by
+  by_cases hx : |x| ≤ R
+  · rw [realClip_eq_self_of_abs_le hx]
+  · exact (abs_realClip_le R x hR).trans (le_of_lt (lt_of_not_ge hx))
+
+/-- The clipping error is supported on the large-tail event, up to a factor two. -/
+theorem abs_sub_realClip_le_two_mul_tail_abs (R x : ℝ) (hR : 0 ≤ R) :
+    |x - realClip R x| ≤
+      2 * Set.indicator {y : ℝ | R ≤ |y|} (fun y => |y|) x := by
+  by_cases htail : x ∈ {y : ℝ | R ≤ |y|}
+  · rw [Set.indicator_of_mem htail]
+    calc
+      |x - realClip R x| ≤ |x| + |realClip R x| := by
+        simpa [sub_eq_add_neg] using abs_add_le x (-(realClip R x))
+      _ ≤ |x| + |x| := by
+        linarith [abs_realClip_le_abs R x hR]
+      _ = 2 * |x| := by ring
+  · rw [Set.indicator_of_notMem htail]
+    have hx : |x| ≤ R := le_of_not_ge htail
+    rw [realClip_eq_self_of_abs_le hx, sub_self, abs_zero, mul_zero]
+
+/-- Integral tail bound for replacing an integrable real variable by its clip. -/
+theorem abs_integral_sub_realClip_le_two_mul_integral_tail_abs
+    [IsFiniteMeasure μ] {Y : α → ℝ} (hY : Integrable Y μ) {R : ℝ} (hR : 0 ≤ R) :
+    |(∫ ω, Y ω ∂μ) - ∫ ω, realClip R (Y ω) ∂μ| ≤
+      2 * ∫ ω, Set.indicator {ω | R ≤ |Y ω|} (fun ω => |Y ω|) ω ∂μ := by
+  let clip := realClipBoundedContinuousFunction R hR
+  have hclip_int : Integrable (fun ω => realClip R (Y ω)) μ := by
+    have hmap : Integrable clip (μ.map Y) := clip.integrable (μ := μ.map Y)
+    simpa [clip, Function.comp_def, realClipBoundedContinuousFunction_apply] using
+      hmap.comp_aemeasurable hY.aemeasurable
+  have htail_null : NullMeasurableSet {ω | R ≤ |Y ω|} μ :=
+    nullMeasurableSet_le aemeasurable_const
+      (continuous_abs.measurable.comp_aemeasurable hY.aemeasurable)
+  have htail_int :
+      Integrable (Set.indicator {ω | R ≤ |Y ω|} (fun ω => |Y ω|)) μ := by
+    simpa [Real.norm_eq_abs] using hY.norm.indicator₀ htail_null
+  have hmono :
+      ∫ ω, |Y ω - realClip R (Y ω)| ∂μ ≤
+        ∫ ω, 2 * Set.indicator {ω | R ≤ |Y ω|} (fun ω => |Y ω|) ω ∂μ := by
+    refine integral_mono (hY.sub hclip_int).norm (htail_int.const_mul 2) ?_
+    intro ω
+    exact abs_sub_realClip_le_two_mul_tail_abs R (Y ω) hR
+  calc
+    |(∫ ω, Y ω ∂μ) - ∫ ω, realClip R (Y ω) ∂μ| =
+        |∫ ω, Y ω - realClip R (Y ω) ∂μ| := by
+      rw [integral_sub hY hclip_int]
+    _ ≤ ∫ ω, |Y ω - realClip R (Y ω)| ∂μ := abs_integral_le_integral_abs
+    _ ≤ ∫ ω, 2 * Set.indicator {ω | R ≤ |Y ω|} (fun ω => |Y ω|) ω ∂μ := hmono
+    _ = 2 * ∫ ω, Set.indicator {ω | R ≤ |Y ω|} (fun ω => |Y ω|) ω ∂μ := by
+      rw [integral_const_mul]
+
+/-- Raising the tail threshold can only reduce the real absolute-tail integral. -/
+theorem integral_tail_abs_mono_threshold
+    [IsFiniteMeasure μ] {Y : α → ℝ} (hY : Integrable Y μ) {C R : ℝ} (hCR : C ≤ R) :
+    ∫ ω, Set.indicator {ω | R ≤ |Y ω|} (fun ω => |Y ω|) ω ∂μ ≤
+      ∫ ω, Set.indicator {ω | C ≤ |Y ω|} (fun ω => |Y ω|) ω ∂μ := by
+  have hR_null : NullMeasurableSet {ω | R ≤ |Y ω|} μ :=
+    nullMeasurableSet_le aemeasurable_const
+      (continuous_abs.measurable.comp_aemeasurable hY.aemeasurable)
+  have hC_null : NullMeasurableSet {ω | C ≤ |Y ω|} μ :=
+    nullMeasurableSet_le aemeasurable_const
+      (continuous_abs.measurable.comp_aemeasurable hY.aemeasurable)
+  have hR_int :
+      Integrable (Set.indicator {ω | R ≤ |Y ω|} (fun ω => |Y ω|)) μ := by
+    simpa [Real.norm_eq_abs] using hY.norm.indicator₀ hR_null
+  have hC_int :
+      Integrable (Set.indicator {ω | C ≤ |Y ω|} (fun ω => |Y ω|)) μ := by
+    simpa [Real.norm_eq_abs] using hY.norm.indicator₀ hC_null
+  refine integral_mono hR_int hC_int ?_
+  intro ω
+  by_cases hωR : R ≤ |Y ω|
+  · have hωC : C ≤ |Y ω| := hCR.trans hωR
+    simp [hωR, hωC]
+  · have hnot : ω ∉ {ω | R ≤ |Y ω|} := hωR
+    rw [Set.indicator_of_notMem hnot]
+    exact Set.indicator_nonneg (fun ω _ => abs_nonneg (Y ω)) ω
+
+/-- Convert Mathlib's `L¹` tail seminorm bound into a real absolute-tail integral bound. -/
+theorem integral_tail_abs_le_of_eLpNorm_tail
+    [IsFiniteMeasure μ] {Y : α → ℝ} (hY : Integrable Y μ) {C : ℝ≥0} {ε : ℝ}
+    (hε : 0 ≤ ε)
+    (hTail : eLpNorm ({ω | C ≤ ‖Y ω‖₊}.indicator Y) 1 μ ≤ ENNReal.ofReal ε) :
+    ∫ ω, Set.indicator {ω | (C : ℝ) ≤ |Y ω|} (fun ω => |Y ω|) ω ∂μ ≤ ε := by
+  let sNN : Set α := {ω | C ≤ ‖Y ω‖₊}
+  let sR : Set α := {ω | (C : ℝ) ≤ |Y ω|}
+  have hs_eq : sNN = sR := by
+    ext ω
+    simp [sNN, sR, Real.norm_eq_abs, ← NNReal.coe_le_coe]
+  have hsNN_null : NullMeasurableSet sNN μ :=
+    by
+      simpa [sNN] using
+        (aestronglyMeasurable_const.nullMeasurableSet_le hY.aestronglyMeasurable.nnnorm :
+          NullMeasurableSet {ω | C ≤ ‖Y ω‖₊} μ)
+  have hg_aesm : AEStronglyMeasurable (sNN.indicator Y) μ :=
+    hY.aestronglyMeasurable.indicator₀ hsNN_null
+  have htail_eq :
+      (fun ω => Set.indicator sR (fun ω => |Y ω|) ω) =
+        fun ω => ‖sNN.indicator Y ω‖ := by
+    funext ω
+    by_cases hω : ω ∈ sNN
+    · have hωR : ω ∈ sR := by simpa [hs_eq] using hω
+      rw [Set.indicator_of_mem hωR, Set.indicator_of_mem hω, Real.norm_eq_abs]
+    · have hωR : ω ∉ sR := by simpa [hs_eq] using hω
+      rw [Set.indicator_of_notMem hωR, Set.indicator_of_notMem hω, norm_zero]
+  have hreal_eq :
+      ∫ ω, Set.indicator {ω | (C : ℝ) ≤ |Y ω|} (fun ω => |Y ω|) ω ∂μ =
+        (eLpNorm ({ω | C ≤ ‖Y ω‖₊}.indicator Y) 1 μ).toReal := by
+    calc
+      ∫ ω, Set.indicator {ω | (C : ℝ) ≤ |Y ω|} (fun ω => |Y ω|) ω ∂μ =
+          ∫ ω, ‖sNN.indicator Y ω‖ ∂μ := by
+        rw [show {ω | (C : ℝ) ≤ |Y ω|} = sR by rfl, htail_eq]
+      _ = (∫⁻ ω, ‖sNN.indicator Y ω‖ₑ ∂μ).toReal :=
+        integral_norm_eq_lintegral_enorm hg_aesm
+      _ = (eLpNorm ({ω | C ≤ ‖Y ω‖₊}.indicator Y) 1 μ).toReal := by
+        rw [eLpNorm_one_eq_lintegral_enorm]
+  rw [hreal_eq]
+  exact ENNReal.toReal_le_of_le_ofReal hε hTail
+
+/-- **Hansen Theorem 6.15, bounded continuous weak-moment face.**
+
+Weak convergence is exactly convergence of expectations for bounded continuous
+test functions. This records the theorem-facing integral version for random
+variables: if `Xₙ ⇒ Z`, then `∫ f(Xₙ) → ∫ f(Z)` for every bounded continuous
+real transform `f`. The unbounded/UI moment theorem needs an additional
+truncation layer on top of this bounded-continuous core. -/
+theorem TendstoInDistribution.integral_boundedContinuous_tendsto
+    {Ω Ω' E : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    [TopologicalSpace E] [MeasurableSpace E] [OpensMeasurableSpace E]
+    {X : ℕ → Ω → E} {Z : Ω' → E}
+    (hX : TendstoInDistribution X atTop Z (fun _ => μ) ν)
+    (f : BoundedContinuousFunction E ℝ) :
+    Tendsto (fun n => ∫ ω, f (X n ω) ∂μ) atTop
+      (𝓝 (∫ ω, f (Z ω) ∂ν)) := by
+  have hmap :
+      Tendsto (fun n => ∫ x, f x ∂(μ.map (X n))) atTop
+        (𝓝 (∫ x, f x ∂(ν.map Z))) := by
+    let lawZ : ProbabilityMeasure E :=
+      ⟨ν.map Z, Measure.isProbabilityMeasure_map hX.aemeasurable_limit⟩
+    have hcont :=
+      (ProbabilityMeasure.continuous_integral_boundedContinuousFunction f).tendsto lawZ
+    simpa [lawZ] using hcont.comp hX.tendsto
+  have hlimit :
+      ∫ x, f x ∂(ν.map Z) = ∫ ω, f (Z ω) ∂ν := by
+    rw [integral_map hX.aemeasurable_limit (by fun_prop)]
+  have hseq :
+      (fun n => ∫ x, f x ∂(μ.map (X n))) =
+        fun n => ∫ ω, f (X n ω) ∂μ := by
+    funext n
+    rw [integral_map (hX.forall_aemeasurable n) (by fun_prop)]
+  simpa [hlimit, hseq] using hmap
+
+/-- **Hansen Theorem 6.15, clipped real weak-moment face.**
+
+If `Xₙ ⇒ Z`, then expectations of every bounded continuous clipped identity
+`x ↦ max (-R) (min x R)` converge. This is the truncation bridge used before
+adding the tail-control step for the full uniform-integrability theorem. -/
+theorem TendstoInDistribution.integral_realClip_tendsto
+    {Ω Ω' : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    {X : ℕ → Ω → ℝ} {Z : Ω' → ℝ}
+    (hX : TendstoInDistribution X atTop Z (fun _ => μ) ν)
+    {R : ℝ} (hR : 0 ≤ R) :
+    Tendsto
+      (fun n => ∫ ω, realClip R (X n ω) ∂μ)
+      atTop
+      (𝓝 (∫ ω, realClip R (Z ω) ∂ν)) := by
+  simpa [realClipBoundedContinuousFunction_apply] using
+    TendstoInDistribution.integral_boundedContinuous_tendsto
+      (μ := μ) (ν := ν) (X := X) (Z := Z) hX
+      (realClipBoundedContinuousFunction R hR)
+
+/-- **Hansen Theorem 6.15, weak-moment tail-control assembly.**
+
+If clipped expectations converge by weak convergence and the source and limit
+integral tails can be made uniformly small, then the untruncated real
+expectations converge. The remaining theorem-facing task is to derive the tail
+premise from Mathlib uniform integrability. -/
+theorem TendstoInDistribution.integral_tendsto_of_realClip_tails
+    {Ω Ω' : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    {X : ℕ → Ω → ℝ} {Z : Ω' → ℝ}
+    (hX : TendstoInDistribution X atTop Z (fun _ => μ) ν)
+    (hTail : ∀ ε > 0, ∃ R : ℝ, 0 ≤ R ∧
+      |(∫ ω, Z ω ∂ν) - ∫ ω, realClip R (Z ω) ∂ν| ≤ ε ∧
+      ∀ᶠ n in atTop,
+        |(∫ ω, X n ω ∂μ) - ∫ ω, realClip R (X n ω) ∂μ| ≤ ε) :
+    Tendsto (fun n => ∫ ω, X n ω ∂μ) atTop (𝓝 (∫ ω, Z ω ∂ν)) := by
+  rw [Metric.tendsto_atTop]
+  intro ε hε
+  set η : ℝ := ε / 4 with hη_def
+  have hη_pos : 0 < η := by positivity
+  obtain ⟨R, hR, hTailZ, hTailX⟩ := hTail η hη_pos
+  have hClip :
+      ∀ᶠ n in atTop,
+        dist (∫ ω, realClip R (X n ω) ∂μ) (∫ ω, realClip R (Z ω) ∂ν) < η :=
+    eventually_atTop.2
+      ((Metric.tendsto_atTop.1
+        (TendstoInDistribution.integral_realClip_tendsto
+          (μ := μ) (ν := ν) (X := X) (Z := Z) hX hR)) η hη_pos)
+  have hEventually :
+      ∀ᶠ n in atTop, dist (∫ ω, X n ω ∂μ) (∫ ω, Z ω ∂ν) < ε := by
+    filter_upwards [hClip, hTailX] with n hClip_n hTailX_n
+    rw [Real.dist_eq] at hClip_n ⊢
+    have hTailZ' :
+        |(∫ ω, realClip R (Z ω) ∂ν) - ∫ ω, Z ω ∂ν| ≤ η := by
+      simpa [abs_sub_comm] using hTailZ
+    calc
+      |(∫ ω, X n ω ∂μ) - ∫ ω, Z ω ∂ν| ≤
+          |(∫ ω, X n ω ∂μ) - ∫ ω, realClip R (X n ω) ∂μ| +
+            |(∫ ω, realClip R (X n ω) ∂μ) -
+              ∫ ω, realClip R (Z ω) ∂ν| +
+            |(∫ ω, realClip R (Z ω) ∂ν) - ∫ ω, Z ω ∂ν| := by
+        have hdecomp :
+            (∫ ω, X n ω ∂μ) - ∫ ω, Z ω ∂ν =
+              ((∫ ω, X n ω ∂μ) - ∫ ω, realClip R (X n ω) ∂μ) +
+                ((∫ ω, realClip R (X n ω) ∂μ) -
+                  ∫ ω, realClip R (Z ω) ∂ν) +
+                ((∫ ω, realClip R (Z ω) ∂ν) - ∫ ω, Z ω ∂ν) := by
+          ring
+        rw [hdecomp]
+        calc
+          |((∫ ω, X n ω ∂μ) - ∫ ω, realClip R (X n ω) ∂μ) +
+                ((∫ ω, realClip R (X n ω) ∂μ) -
+                  ∫ ω, realClip R (Z ω) ∂ν) +
+                ((∫ ω, realClip R (Z ω) ∂ν) - ∫ ω, Z ω ∂ν)| ≤
+              |((∫ ω, X n ω ∂μ) - ∫ ω, realClip R (X n ω) ∂μ) +
+                ((∫ ω, realClip R (X n ω) ∂μ) -
+                  ∫ ω, realClip R (Z ω) ∂ν)| +
+                |(∫ ω, realClip R (Z ω) ∂ν) - ∫ ω, Z ω ∂ν| := by
+            exact abs_add_le _ _
+          _ ≤
+              |(∫ ω, X n ω ∂μ) - ∫ ω, realClip R (X n ω) ∂μ| +
+                |(∫ ω, realClip R (X n ω) ∂μ) -
+                  ∫ ω, realClip R (Z ω) ∂ν| +
+                |(∫ ω, realClip R (Z ω) ∂ν) - ∫ ω, Z ω ∂ν| := by
+            gcongr
+            exact abs_add_le _ _
+      _ < ε := by
+        linarith
+  exact eventually_atTop.1 hEventually
+
+/-- **Hansen Theorem 6.15, weak-convergence UI moment wrapper.**
+
+If `Xₙ ⇒ Z` and the source sequence is uniformly integrable in `L¹`, then the
+real expectations converge.  The proof derives the explicit clipping-tail
+premise from Mathlib's `UniformIntegrable` tail characterization and the
+limit-law integrability supplied by the bounded-first-moment weak-convergence
+wrapper above. -/
+theorem TendstoInDistribution.integral_tendsto_of_uniformIntegrable
+    {Ω Ω' : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    {X : ℕ → Ω → ℝ} {Z : Ω' → ℝ}
+    (hX : TendstoInDistribution X atTop Z (fun _ => μ) ν)
+    (hUI : UniformIntegrable X 1 μ) :
+    Tendsto (fun n => ∫ ω, X n ω ∂μ) atTop (𝓝 (∫ ω, Z ω ∂ν)) := by
+  have hX_int : ∀ n, Integrable (X n) μ :=
+    fun n => memLp_one_iff_integrable.mp (hUI.memLp n)
+  obtain ⟨B, hB⟩ := hUI.2.2
+  have hBound :
+      ∀ᶠ n in atTop,
+        Integrable (fun ω => ‖X n ω‖) μ ∧ ∫ ω, ‖X n ω‖ ∂μ ≤ (B : ℝ) :=
+    Eventually.of_forall fun n => by
+      have hreal_eq :
+          ∫ ω, ‖X n ω‖ ∂μ = (eLpNorm (X n) 1 μ).toReal := by
+        calc
+          ∫ ω, ‖X n ω‖ ∂μ = (∫⁻ ω, ‖X n ω‖ₑ ∂μ).toReal :=
+            integral_norm_eq_lintegral_enorm (hX_int n).aestronglyMeasurable
+          _ = (eLpNorm (X n) 1 μ).toReal := by
+            rw [eLpNorm_one_eq_lintegral_enorm]
+      refine ⟨(hX_int n).norm, ?_⟩
+      rw [hreal_eq]
+      exact ENNReal.toReal_le_of_le_ofReal (NNReal.coe_nonneg B) (by
+        simpa [ENNReal.ofReal_coe_nnreal] using hB n)
+  have hZ_norm_int : Integrable (fun ω => ‖Z ω‖) ν :=
+    TendstoInDistribution.integrable_norm_limit_of_eventually_integral_norm_bound
+      (μ := μ) (ν := ν) (X := X) (Z := Z) hX hBound
+  have hZ_aesm : AEStronglyMeasurable Z ν := by
+    rw [aestronglyMeasurable_iff_aemeasurable]
+    exact hX.aemeasurable_limit
+  have hZ_int : Integrable Z ν :=
+    (integrable_norm_iff hZ_aesm).mp hZ_norm_int
+  have hZ_memLp : MemLp Z 1 ν :=
+    memLp_one_iff_integrable.mpr hZ_int
+  refine TendstoInDistribution.integral_tendsto_of_realClip_tails
+    (μ := μ) (ν := ν) (X := X) (Z := Z) hX ?_
+  intro ε hε
+  set η : ℝ := ε / 2 with hη_def
+  have hη_pos : 0 < η := by positivity
+  have hη_nonneg : 0 ≤ η := hη_pos.le
+  obtain ⟨Csrc, hCsrc_tail⟩ :=
+    UniformIntegrable.spec (μ := μ) (f := X)
+      (p := (1 : ℝ≥0∞)) (by simp) (by simp) hUI hη_pos
+  obtain ⟨Mlim, hMlim_nonneg, hMlim_tail⟩ :=
+    MemLp.integral_indicator_norm_ge_nonneg_le (μ := ν) (f := Z) hZ_memLp hη_pos
+  let Clim : ℝ≥0 := ⟨Mlim, hMlim_nonneg⟩
+  set R : ℝ := max (Csrc : ℝ) (Clim : ℝ) with hR_def
+  have hR_nonneg : 0 ≤ R := by
+    rw [hR_def]
+    exact (NNReal.coe_nonneg Csrc).trans (le_max_left _ _)
+  refine ⟨R, hR_nonneg, ?_, ?_⟩
+  · have hMlim_tail_e :
+        eLpNorm ({ω | Clim ≤ ‖Z ω‖₊}.indicator Z) 1 ν ≤ ENNReal.ofReal η := by
+      have hset :
+          {ω | Clim ≤ ‖Z ω‖₊} = {ω | Mlim ≤ (‖Z ω‖₊ : ℝ)} := by
+        ext ω
+        simp [Clim, ← NNReal.coe_le_coe]
+      simpa [eLpNorm_one_eq_lintegral_enorm, hset] using hMlim_tail
+    have htail_base :
+        ∫ ω, Set.indicator {ω | (Clim : ℝ) ≤ |Z ω|} (fun ω => |Z ω|) ω ∂ν ≤ η :=
+      integral_tail_abs_le_of_eLpNorm_tail (μ := ν) hZ_int hη_nonneg hMlim_tail_e
+    have htail_R :
+        ∫ ω, Set.indicator {ω | R ≤ |Z ω|} (fun ω => |Z ω|) ω ∂ν ≤ η :=
+      (integral_tail_abs_mono_threshold (μ := ν) hZ_int
+        (C := (Clim : ℝ)) (R := R) (by
+          rw [hR_def]
+          exact le_max_right _ _)).trans htail_base
+    have hclip :=
+      abs_integral_sub_realClip_le_two_mul_integral_tail_abs
+        (μ := ν) (Y := Z) hZ_int hR_nonneg
+    calc
+      |(∫ ω, Z ω ∂ν) - ∫ ω, realClip R (Z ω) ∂ν| ≤
+          2 * ∫ ω, Set.indicator {ω | R ≤ |Z ω|} (fun ω => |Z ω|) ω ∂ν := hclip
+      _ ≤ 2 * η := by nlinarith
+      _ = ε := by
+        rw [hη_def]
+        ring
+  · exact Eventually.of_forall fun n => by
+      have htail_base :
+          ∫ ω, Set.indicator {ω | (Csrc : ℝ) ≤ |X n ω|} (fun ω => |X n ω|) ω ∂μ ≤
+            η :=
+        integral_tail_abs_le_of_eLpNorm_tail (μ := μ) (Y := X n)
+          (hX_int n) hη_nonneg (hCsrc_tail n)
+      have htail_R :
+          ∫ ω, Set.indicator {ω | R ≤ |X n ω|} (fun ω => |X n ω|) ω ∂μ ≤ η :=
+        (integral_tail_abs_mono_threshold (μ := μ) (Y := X n) (hX_int n)
+          (C := (Csrc : ℝ)) (R := R) (by
+            rw [hR_def]
+            exact le_max_left _ _)).trans htail_base
+      have hclip :=
+        abs_integral_sub_realClip_le_two_mul_integral_tail_abs
+          (μ := μ) (Y := X n) (hX_int n) hR_nonneg
+      calc
+        |(∫ ω, X n ω ∂μ) - ∫ ω, realClip R (X n ω) ∂μ| ≤
+            2 * ∫ ω, Set.indicator {ω | R ≤ |X n ω|} (fun ω => |X n ω|) ω ∂μ := hclip
+        _ ≤ 2 * η := by nlinarith
+        _ = ε := by
+          rw [hη_def]
+          ring
+
+/-- Square-root continuous mapping at zero for nonnegative real-valued sequences.
+
+This avoids any additional measurability side condition by comparing the tail
+events `{sqrt Xₙ ≥ ε}` and `{Xₙ ≥ ε²}` directly. -/
+theorem TendstoInMeasure.sqrt_nonneg_zero_real
+    {X : ℕ → α → ℝ}
+    (hX : TendstoInMeasure μ X atTop (fun _ => 0))
+    (hX_nonneg : ∀ n ω, 0 ≤ X n ω) :
+    TendstoInMeasure μ (fun n ω => Real.sqrt (X n ω)) atTop (fun _ => 0) := by
+  rw [tendstoInMeasure_iff_dist] at hX ⊢
+  intro ε hε
+  have hε2 : 0 < ε ^ 2 := sq_pos_of_pos hε
+  have htail := hX (ε ^ 2) hε2
+  refine tendsto_of_tendsto_of_tendsto_of_le_of_le tendsto_const_nhds htail
+    (fun _ => zero_le _) ?_
+  intro n
+  refine measure_mono ?_
+  intro ω hω
+  have hsqrt : ε ≤ Real.sqrt (X n ω) := by
+    simpa [Real.dist_eq, abs_of_nonneg (Real.sqrt_nonneg _)] using hω
+  have hsquare : ε ^ 2 ≤ (Real.sqrt (X n ω)) ^ 2 := by
+    exact pow_le_pow_left₀ hε.le hsqrt 2
+  have hdist : ε ^ 2 ≤ dist (X n ω) 0 := by
+    rw [Real.sq_sqrt (hX_nonneg n ω)] at hsquare
+    simpa [Real.dist_eq, abs_of_nonneg (hX_nonneg n ω)] using hsquare
+  exact hdist
+
+/-- **Hansen Theorem 6.13, convergence-in-measure bounded-moment wrapper.**
+
+If a real sequence converges in measure and has eventually bounded `L¹`
+seminorm, the limit has the same `L¹` bound. This is the
+convergence-in-measure face of Hansen's bounded-first-moment passage to the
+limit; the textbook weak-convergence statement is stronger. -/
+theorem eLpNorm_one_limit_le_of_tendstoInMeasure_bound
+    {Z : ℕ → α → ℝ} {Zlim : α → ℝ} {C : ℝ≥0∞}
+    (hBound : ∀ᶠ n in atTop, eLpNorm (Z n) 1 μ ≤ C)
+    (hZ : TendstoInMeasure μ Z atTop Zlim)
+    (hMeas : ∀ n, AEStronglyMeasurable (Z n) μ) :
+    eLpNorm Zlim 1 μ ≤ C := by
+  exact eLpNorm_le_of_tendstoInMeasure
+    (μ := μ) (f := Z) (g := Zlim) (p := (1 : ℝ≥0∞)) hBound hZ hMeas
+
+/-- **Hansen Theorem 6.15, convergence-in-measure UI moment wrapper.**
+
+If real random variables are uniformly integrable and converge in measure, then
+their expectations converge. This is the Vitali/convergence-in-measure face of
+Hansen's moment-convergence theorem; the textbook weak-convergence version has a
+stronger mode-of-convergence premise than this wrapper exposes. -/
+theorem tendsto_integral_of_tendstoInMeasure_uniformIntegrable
+    [IsFiniteMeasure μ]
+    {Z : ℕ → α → ℝ} {Zlim : α → ℝ}
+    (hUI : UniformIntegrable Z 1 μ)
+    (hZ : TendstoInMeasure μ Z atTop Zlim) :
+    Tendsto (fun n => ∫ ω, Z n ω ∂μ) atTop (𝓝 (∫ ω, Zlim ω ∂μ)) := by
+  have hZlim_mem : MemLp Zlim 1 μ := hUI.memLp_of_tendstoInMeasure hZ
+  have hLp : Tendsto (fun n => eLpNorm (Z n - Zlim) 1 μ) atTop (𝓝 0) :=
+    tendsto_Lp_finite_of_tendstoInMeasure
+      (μ := μ) (f := Z) (g := Zlim) le_rfl ENNReal.one_ne_top
+      (fun n => hUI.aestronglyMeasurable n) hZlim_mem hUI.unifIntegrable hZ
+  exact tendsto_integral_of_L1' Zlim (memLp_one_iff_integrable.mp hZlim_mem)
+    (Eventually.of_forall fun n => memLp_one_iff_integrable.mp (hUI.memLp n)) hLp
 
 /-- **Coordinate projection of `TendstoInMeasure`**: if a sequence of `∀ b, X b`-valued
 functions converges in measure, then each coordinate converges in measure.
@@ -744,6 +1652,398 @@ theorem BoundedInProbability.of_tendstoInMeasure_const
     simpa [Real.dist_eq] using hdist
   exact le_of_lt (lt_of_le_of_lt (measure_mono hcover) hn)
 
+/-- A uniform eventual first absolute-moment bound implies scalar `Oₚ(1)`.
+
+This is the Markov-inequality face of Hansen Theorem 6.12 for the case
+`aₙ = 1` and moment exponent one. Higher-moment statements reduce to this
+after applying the theorem to the nonnegative transformed sequence. -/
+theorem BoundedInProbability.of_eventually_integral_norm_bound
+    [IsFiniteMeasure μ] {X : ℕ → α → ℝ} {C : ℝ}
+    (hC : 0 ≤ C)
+    (hInt : ∀ n, Integrable (fun ω => ‖X n ω‖) μ)
+    (hBound : ∀ᶠ n in atTop, ∫ ω, ‖X n ω‖ ∂μ ≤ C) :
+    BoundedInProbability μ X := by
+  intro δ hδ
+  by_cases hδtop : δ = ∞
+  · refine ⟨1, by norm_num, Eventually.of_forall ?_⟩
+    intro n
+    rw [hδtop]
+    exact le_top
+  have hδreal_pos : 0 < δ.toReal := ENNReal.toReal_pos hδ.ne' hδtop
+  let M : ℝ := (C + 1) / δ.toReal
+  have hC1pos : 0 < C + 1 := by linarith
+  have hMpos : 0 < M := div_pos hC1pos hδreal_pos
+  refine ⟨M, hMpos, hBound.mono ?_⟩
+  intro n hn
+  have hmarkov :
+      M * μ.real {ω | M ≤ ‖X n ω‖} ≤ ∫ ω, ‖X n ω‖ ∂μ :=
+    mul_meas_ge_le_integral_of_nonneg
+      (ae_of_all μ fun ω => norm_nonneg (X n ω)) (hInt n) M
+  have hreal_le : μ.real {ω | M ≤ ‖X n ω‖} ≤ C / M := by
+    have hmul_le : μ.real {ω | M ≤ ‖X n ω‖} * M ≤ C := by
+      calc
+        μ.real {ω | M ≤ ‖X n ω‖} * M
+            = M * μ.real {ω | M ≤ ‖X n ω‖} := by ring
+        _ ≤ ∫ ω, ‖X n ω‖ ∂μ := hmarkov
+        _ ≤ C := hn
+    exact (le_div_iff₀ hMpos).2 hmul_le
+  have hratio : C / M ≤ δ.toReal := by
+    dsimp [M]
+    have hC1ne : C + 1 ≠ 0 := by linarith
+    have hδne : δ.toReal ≠ 0 := hδreal_pos.ne'
+    field_simp [hC1ne, hδne]
+    nlinarith [hC, hδreal_pos.le]
+  have htail_ofReal :
+      μ {ω | M ≤ ‖X n ω‖} ≤ ENNReal.ofReal (C / M) := by
+    rw [ENNReal.le_ofReal_iff_toReal_le (measure_ne_top μ _) (div_nonneg hC hMpos.le)]
+    simpa [measureReal_def] using hreal_le
+  have htail_delta : ENNReal.ofReal (C / M) ≤ δ := by
+    rw [ENNReal.ofReal_le_iff_le_toReal hδtop]
+    exact hratio
+  exact htail_ofReal.trans htail_delta
+
+/-- An eventual higher natural-moment bound implies scalar `Oₚ(1)`.
+
+This is the natural-power Markov-inequality face of Hansen Theorem 6.12.
+The positive-real-exponent face is
+`BoundedInProbability.of_eventually_integral_norm_rpow_bound`; this wrapper
+keeps the common integer-moment cases convenient. -/
+theorem BoundedInProbability.of_eventually_integral_norm_pow_bound
+    [IsFiniteMeasure μ] {X : ℕ → α → ℝ} {C : ℝ} {r : ℕ}
+    (hr : r ≠ 0)
+    (hC : 0 ≤ C)
+    (hInt : ∀ n, Integrable (fun ω => ‖X n ω‖ ^ r) μ)
+    (hBound : ∀ᶠ n in atTop, ∫ ω, ‖X n ω‖ ^ r ∂μ ≤ C) :
+    BoundedInProbability μ X := by
+  intro δ hδ
+  by_cases hδtop : δ = ∞
+  · refine ⟨1, by norm_num, Eventually.of_forall ?_⟩
+    intro n
+    rw [hδtop]
+    exact le_top
+  have hδreal_pos : 0 < δ.toReal := ENNReal.toReal_pos hδ.ne' hδtop
+  let B : ℝ := (C + 1) / δ.toReal
+  let M : ℝ := B + 1
+  have hC1pos : 0 < C + 1 := by linarith
+  have hBpos : 0 < B := div_pos hC1pos hδreal_pos
+  have hMpos : 0 < M := by dsimp [M]; linarith
+  have hMge_one : 1 ≤ M := by dsimp [M]; linarith
+  let T : ℝ := M ^ r
+  have hTpos : 0 < T := pow_pos hMpos r
+  refine ⟨M, hMpos, hBound.mono ?_⟩
+  intro n hn
+  have hcover :
+      {ω | M ≤ ‖X n ω‖} ⊆ {ω | T ≤ ‖X n ω‖ ^ r} := by
+    intro ω hω
+    exact pow_le_pow_left₀ hMpos.le hω r
+  have hmarkov :
+      T * μ.real {ω | T ≤ ‖X n ω‖ ^ r} ≤ ∫ ω, ‖X n ω‖ ^ r ∂μ :=
+    mul_meas_ge_le_integral_of_nonneg
+      (ae_of_all μ fun ω => pow_nonneg (norm_nonneg (X n ω)) r) (hInt n) T
+  have hreal_le : μ.real {ω | T ≤ ‖X n ω‖ ^ r} ≤ C / T := by
+    have hmul_le : μ.real {ω | T ≤ ‖X n ω‖ ^ r} * T ≤ C := by
+      calc
+        μ.real {ω | T ≤ ‖X n ω‖ ^ r} * T
+            = T * μ.real {ω | T ≤ ‖X n ω‖ ^ r} := by ring
+        _ ≤ ∫ ω, ‖X n ω‖ ^ r ∂μ := hmarkov
+        _ ≤ C := hn
+    exact (le_div_iff₀ hTpos).2 hmul_le
+  have hratio : C / T ≤ δ.toReal := by
+    have hB_le_M : B ≤ M := by dsimp [M]; linarith
+    have hM_le_T : M ≤ T := by
+      dsimp [T]
+      exact Bound.le_self_pow_of_pos hMge_one (Nat.pos_of_ne_zero hr)
+    have hB_le_T : B ≤ T := hB_le_M.trans hM_le_T
+    have hδB_le : δ.toReal * B ≤ δ.toReal * T :=
+      mul_le_mul_of_nonneg_left hB_le_T hδreal_pos.le
+    have hδB : δ.toReal * B = C + 1 := by
+      dsimp [B]
+      field_simp [hδreal_pos.ne']
+    exact (div_le_iff₀ hTpos).2 (by nlinarith)
+  have htail_power :
+      μ {ω | T ≤ ‖X n ω‖ ^ r} ≤ ENNReal.ofReal (C / T) := by
+    rw [ENNReal.le_ofReal_iff_toReal_le (measure_ne_top μ _) (div_nonneg hC hTpos.le)]
+    simpa [measureReal_def] using hreal_le
+  have htail_delta : ENNReal.ofReal (C / T) ≤ δ := by
+    rw [ENNReal.ofReal_le_iff_le_toReal hδtop]
+    exact hratio
+  exact (measure_mono hcover).trans (htail_power.trans htail_delta)
+
+/-- An eventual positive-real moment bound implies scalar `Oₚ(1)`.
+
+This is the arbitrary positive-real-exponent Markov-inequality face of Hansen
+Theorem 6.12 for the unit scale: if `E|Xₙ|^p` is eventually bounded for some
+`p > 0`, then `Xₙ = Oₚ(1)`. -/
+theorem BoundedInProbability.of_eventually_integral_norm_rpow_bound
+    [IsFiniteMeasure μ] {X : ℕ → α → ℝ} {C p : ℝ}
+    (hp : 0 < p)
+    (hC : 0 ≤ C)
+    (hInt : ∀ n, Integrable (fun ω => ‖X n ω‖ ^ p) μ)
+    (hBound : ∀ᶠ n in atTop, ∫ ω, ‖X n ω‖ ^ p ∂μ ≤ C) :
+    BoundedInProbability μ X := by
+  intro δ hδ
+  by_cases hδtop : δ = ∞
+  · refine ⟨1, by norm_num, Eventually.of_forall ?_⟩
+    intro n
+    rw [hδtop]
+    exact le_top
+  have hδreal_pos : 0 < δ.toReal := ENNReal.toReal_pos hδ.ne' hδtop
+  let B : ℝ := (C + 1) / δ.toReal
+  let T : ℝ := B + 1
+  let M : ℝ := T ^ p⁻¹
+  have hC1pos : 0 < C + 1 := by linarith
+  have hBpos : 0 < B := div_pos hC1pos hδreal_pos
+  have hTpos : 0 < T := by dsimp [T]; linarith
+  have hMpos : 0 < M := Real.rpow_pos_of_pos hTpos p⁻¹
+  have hMpow : M ^ p = T := by
+    dsimp [M]
+    simpa using Real.rpow_inv_rpow hTpos.le hp.ne'
+  refine ⟨M, hMpos, hBound.mono ?_⟩
+  intro n hn
+  have hcover :
+      {ω | M ≤ ‖X n ω‖} ⊆ {ω | T ≤ ‖X n ω‖ ^ p} := by
+    intro ω hω
+    have hpow : M ^ p ≤ ‖X n ω‖ ^ p :=
+      Real.rpow_le_rpow hMpos.le hω hp.le
+    simpa [hMpow] using hpow
+  have hmarkov :
+      T * μ.real {ω | T ≤ ‖X n ω‖ ^ p} ≤ ∫ ω, ‖X n ω‖ ^ p ∂μ :=
+    mul_meas_ge_le_integral_of_nonneg
+      (ae_of_all μ fun ω => Real.rpow_nonneg (norm_nonneg (X n ω)) p) (hInt n) T
+  have hreal_le : μ.real {ω | T ≤ ‖X n ω‖ ^ p} ≤ C / T := by
+    have hmul_le : μ.real {ω | T ≤ ‖X n ω‖ ^ p} * T ≤ C := by
+      calc
+        μ.real {ω | T ≤ ‖X n ω‖ ^ p} * T
+            = T * μ.real {ω | T ≤ ‖X n ω‖ ^ p} := by ring
+        _ ≤ ∫ ω, ‖X n ω‖ ^ p ∂μ := hmarkov
+        _ ≤ C := hn
+    exact (le_div_iff₀ hTpos).2 hmul_le
+  have hratio : C / T ≤ δ.toReal := by
+    have hδB : δ.toReal * B = C + 1 := by
+      dsimp [B]
+      field_simp [hδreal_pos.ne']
+    exact (div_le_iff₀ hTpos).2 (by
+      dsimp [T]
+      nlinarith [hδB, hδreal_pos])
+  have htail_power :
+      μ {ω | T ≤ ‖X n ω‖ ^ p} ≤ ENNReal.ofReal (C / T) := by
+    rw [ENNReal.le_ofReal_iff_toReal_le (measure_ne_top μ _) (div_nonneg hC hTpos.le)]
+    simpa [measureReal_def] using hreal_le
+  have htail_delta : ENNReal.ofReal (C / T) ≤ δ := by
+    rw [ENNReal.ofReal_le_iff_le_toReal hδtop]
+    exact hratio
+  exact (measure_mono hcover).trans (htail_power.trans htail_delta)
+
+/-- Scaled natural-moment bounds imply scaled scalar `Oₚ(1)`.
+
+If `E|Xₙ|^m` is eventually bounded by `C aₙ^m` for a positive deterministic
+scale `aₙ`, then `aₙ⁻¹ Xₙ` is bounded in probability. This is the integer-power
+scaled version of Hansen Theorem 6.12; see
+`BoundedInProbability.of_eventually_integral_norm_rpow_scaled_bound` for the
+positive-real-exponent version. -/
+theorem BoundedInProbability.of_eventually_integral_norm_pow_scaled_bound
+    [IsFiniteMeasure μ] {X : ℕ → α → ℝ} {a : ℕ → ℝ} {C : ℝ} {r : ℕ}
+    (hr : r ≠ 0)
+    (hC : 0 ≤ C)
+    (ha : ∀ᶠ n in atTop, 0 < a n)
+    (hInt : ∀ n, Integrable (fun ω => ‖X n ω‖ ^ r) μ)
+    (hBound : ∀ᶠ n in atTop, ∫ ω, ‖X n ω‖ ^ r ∂μ ≤ C * (a n) ^ r) :
+    BoundedInProbability μ (fun n ω => (a n)⁻¹ * X n ω) := by
+  refine BoundedInProbability.of_eventually_integral_norm_pow_bound
+    (C := C) (r := r) hr hC ?_ ?_
+  · intro n
+    simpa [norm_mul, mul_pow, mul_comm, mul_left_comm, mul_assoc] using
+      (hInt n).const_mul (‖(a n)⁻¹‖ ^ r)
+  · filter_upwards [ha, hBound] with n hapos hn
+    have hscale_nonneg : 0 ≤ ‖(a n)⁻¹‖ ^ r := pow_nonneg (norm_nonneg _) r
+    calc
+      ∫ ω, ‖(a n)⁻¹ * X n ω‖ ^ r ∂μ
+          = ∫ ω, ‖(a n)⁻¹‖ ^ r * ‖X n ω‖ ^ r ∂μ := by
+            congr 1
+            ext ω
+            simp [norm_mul, mul_pow]
+      _ = ‖(a n)⁻¹‖ ^ r * ∫ ω, ‖X n ω‖ ^ r ∂μ := by
+            rw [integral_const_mul]
+      _ ≤ ‖(a n)⁻¹‖ ^ r * (C * (a n) ^ r) :=
+            mul_le_mul_of_nonneg_left hn hscale_nonneg
+      _ = C := by
+            have hpow_ne : (a n) ^ r ≠ 0 := pow_ne_zero r hapos.ne'
+            rw [Real.norm_eq_abs, abs_of_pos (inv_pos.mpr hapos), inv_pow]
+            field_simp [hpow_ne]
+
+/-- Scaled positive-real moment bounds imply scaled scalar `Oₚ(1)`.
+
+If `E|Xₙ|^p` is eventually bounded by `C aₙ^p` for a positive deterministic
+scale `aₙ` and `p > 0`, then `aₙ⁻¹ Xₙ` is bounded in probability. This is the
+positive-real-exponent scaled face of Hansen Theorem 6.12. -/
+theorem BoundedInProbability.of_eventually_integral_norm_rpow_scaled_bound
+    [IsFiniteMeasure μ] {X : ℕ → α → ℝ} {a : ℕ → ℝ} {C p : ℝ}
+    (hp : 0 < p)
+    (hC : 0 ≤ C)
+    (ha : ∀ᶠ n in atTop, 0 < a n)
+    (hInt : ∀ n, Integrable (fun ω => ‖X n ω‖ ^ p) μ)
+    (hBound : ∀ᶠ n in atTop, ∫ ω, ‖X n ω‖ ^ p ∂μ ≤ C * (a n) ^ p) :
+    BoundedInProbability μ (fun n ω => (a n)⁻¹ * X n ω) := by
+  refine BoundedInProbability.of_eventually_integral_norm_rpow_bound
+    (C := C) (p := p) hp hC ?_ ?_
+  · intro n
+    have hEq :
+        (fun ω => ‖(a n)⁻¹ * X n ω‖ ^ p) =
+          fun ω => ‖(a n)⁻¹‖ ^ p * ‖X n ω‖ ^ p := by
+      funext ω
+      rw [norm_mul, Real.mul_rpow (norm_nonneg _) (norm_nonneg _)]
+    rw [hEq]
+    exact (hInt n).const_mul (‖(a n)⁻¹‖ ^ p)
+  · filter_upwards [ha, hBound] with n hapos hn
+    have hscale_nonneg : 0 ≤ ‖(a n)⁻¹‖ ^ p :=
+      Real.rpow_nonneg (norm_nonneg _) p
+    calc
+      ∫ ω, ‖(a n)⁻¹ * X n ω‖ ^ p ∂μ
+          = ∫ ω, ‖(a n)⁻¹‖ ^ p * ‖X n ω‖ ^ p ∂μ := by
+            congr 1
+            ext ω
+            rw [norm_mul, Real.mul_rpow (norm_nonneg _) (norm_nonneg _)]
+      _ = ‖(a n)⁻¹‖ ^ p * ∫ ω, ‖X n ω‖ ^ p ∂μ := by
+            rw [integral_const_mul]
+      _ ≤ ‖(a n)⁻¹‖ ^ p * (C * (a n) ^ p) :=
+            mul_le_mul_of_nonneg_left hn hscale_nonneg
+      _ = C := by
+            rw [Real.norm_eq_abs, abs_of_pos (inv_pos.mpr hapos), Real.inv_rpow hapos.le p]
+            have hpow_ne : (a n) ^ p ≠ 0 := (Real.rpow_pos_of_pos hapos p).ne'
+            field_simp [hpow_ne]
+
+/-- Scaled positive-real moments tending to zero imply scaled `oₚ(1)`.
+
+This is the little-`oₚ` Markov-inequality face of Hansen Theorem 6.12: if
+`E|Xₙ|^p / aₙ^p → 0` for a positive deterministic scale `aₙ` and `p > 0`, then
+`aₙ⁻¹ Xₙ →ₚ 0`. -/
+theorem TendstoInMeasure.of_integral_norm_rpow_scaled_tendsto_zero
+    [IsFiniteMeasure μ] {X : ℕ → α → ℝ} {a : ℕ → ℝ} {p : ℝ}
+    (hp : 0 < p)
+    (ha : ∀ᶠ n in atTop, 0 < a n)
+    (hInt : ∀ n, Integrable (fun ω => ‖X n ω‖ ^ p) μ)
+    (hScaled :
+      Tendsto (fun n => (∫ ω, ‖X n ω‖ ^ p ∂μ) / (a n) ^ p) atTop (𝓝 0)) :
+    TendstoInMeasure μ (fun n ω => (a n)⁻¹ * X n ω) atTop (fun _ => 0) := by
+  rw [tendstoInMeasure_iff_dist]
+  intro ε hε
+  rw [ENNReal.tendsto_atTop_zero]
+  intro δ hδ
+  by_cases hδtop : δ = ∞
+  · refine ⟨0, fun n _ => ?_⟩
+    rw [hδtop]
+    exact le_top
+  have hδreal_pos : 0 < δ.toReal := ENNReal.toReal_pos hδ.ne' hδtop
+  let T : ℝ := ε ^ p
+  have hTpos : 0 < T := Real.rpow_pos_of_pos hε p
+  have htarget_pos : 0 < δ.toReal * T := mul_pos hδreal_pos hTpos
+  have hsmall : ∀ᶠ n in atTop,
+      dist ((∫ ω, ‖X n ω‖ ^ p ∂μ) / (a n) ^ p) 0 < δ.toReal * T :=
+    eventually_atTop.2 ((Metric.tendsto_atTop.1 hScaled) (δ.toReal * T) htarget_pos)
+  obtain ⟨N, hN⟩ := eventually_atTop.1 (ha.and hsmall)
+  refine ⟨N, fun n hn => ?_⟩
+  have hapos : 0 < a n := (hN n hn).1
+  have hsmalln :
+      dist ((∫ ω, ‖X n ω‖ ^ p ∂μ) / (a n) ^ p) 0 < δ.toReal * T :=
+    (hN n hn).2
+  have hscaled_eq :
+      ∫ ω, ‖(a n)⁻¹ * X n ω‖ ^ p ∂μ =
+        (∫ ω, ‖X n ω‖ ^ p ∂μ) / (a n) ^ p := by
+    calc
+      ∫ ω, ‖(a n)⁻¹ * X n ω‖ ^ p ∂μ
+          = ∫ ω, ‖(a n)⁻¹‖ ^ p * ‖X n ω‖ ^ p ∂μ := by
+            congr 1
+            ext ω
+            rw [norm_mul, Real.mul_rpow (norm_nonneg _) (norm_nonneg _)]
+      _ = ‖(a n)⁻¹‖ ^ p * ∫ ω, ‖X n ω‖ ^ p ∂μ := by
+            rw [integral_const_mul]
+      _ = (∫ ω, ‖X n ω‖ ^ p ∂μ) / (a n) ^ p := by
+            rw [Real.norm_eq_abs, abs_of_pos (inv_pos.mpr hapos), Real.inv_rpow hapos.le p]
+            ring
+  have hscaled_nonneg :
+      0 ≤ (∫ ω, ‖X n ω‖ ^ p ∂μ) / (a n) ^ p := by
+    rw [← hscaled_eq]
+    exact integral_nonneg_of_ae (ae_of_all μ fun ω =>
+      Real.rpow_nonneg (norm_nonneg ((a n)⁻¹ * X n ω)) p)
+  have hratio_lt :
+      (∫ ω, ‖X n ω‖ ^ p ∂μ) / (a n) ^ p < δ.toReal * T := by
+    have hdist_eq :
+        dist ((∫ ω, ‖X n ω‖ ^ p ∂μ) / (a n) ^ p) 0 =
+          (∫ ω, ‖X n ω‖ ^ p ∂μ) / (a n) ^ p := by
+      rw [Real.dist_eq, sub_zero, abs_of_nonneg hscaled_nonneg]
+    rwa [hdist_eq] at hsmalln
+  have hscaled_lt :
+      ∫ ω, ‖(a n)⁻¹ * X n ω‖ ^ p ∂μ < δ.toReal * T := by
+    rw [hscaled_eq]
+    exact hratio_lt
+  let A : Set α := {ω | ε ≤ dist ((a n)⁻¹ * X n ω) 0}
+  let B : Set α := {ω | T ≤ ‖(a n)⁻¹ * X n ω‖ ^ p}
+  have hcover : A ⊆ B := by
+    intro ω hω
+    have hnorm : ε ≤ ‖(a n)⁻¹ * X n ω‖ := by
+      simpa [A, Real.dist_eq] using hω
+    exact Real.rpow_le_rpow hε.le hnorm hp.le
+  have hint_scaled : Integrable (fun ω => ‖(a n)⁻¹ * X n ω‖ ^ p) μ := by
+    have hEq :
+        (fun ω => ‖(a n)⁻¹ * X n ω‖ ^ p) =
+          fun ω => ‖(a n)⁻¹‖ ^ p * ‖X n ω‖ ^ p := by
+      funext ω
+      rw [norm_mul, Real.mul_rpow (norm_nonneg _) (norm_nonneg _)]
+    rw [hEq]
+    exact (hInt n).const_mul (‖(a n)⁻¹‖ ^ p)
+  have hmarkov :
+      T * μ.real B ≤ ∫ ω, ‖(a n)⁻¹ * X n ω‖ ^ p ∂μ :=
+    mul_meas_ge_le_integral_of_nonneg
+      (ae_of_all μ fun ω => Real.rpow_nonneg (norm_nonneg ((a n)⁻¹ * X n ω)) p)
+      hint_scaled T
+  have hreal_B_lt : μ.real B < δ.toReal := by
+    have hle : μ.real B ≤ (∫ ω, ‖(a n)⁻¹ * X n ω‖ ^ p ∂μ) / T := by
+      exact (le_div_iff₀ hTpos).2 (by
+        calc
+          μ.real B * T = T * μ.real B := by ring
+          _ ≤ ∫ ω, ‖(a n)⁻¹ * X n ω‖ ^ p ∂μ := hmarkov)
+    have hdiv_lt : (∫ ω, ‖(a n)⁻¹ * X n ω‖ ^ p ∂μ) / T < δ.toReal := by
+      exact (div_lt_iff₀ hTpos).2 (by
+        simpa [mul_comm] using hscaled_lt)
+    exact lt_of_le_of_lt hle hdiv_lt
+  have hB_lt : μ B < ENNReal.ofReal δ.toReal := by
+    rw [ENNReal.lt_ofReal_iff_toReal_lt (measure_ne_top μ B)]
+    simpa [measureReal_def] using hreal_B_lt
+  have hA_lt : μ A < ENNReal.ofReal δ.toReal :=
+    lt_of_le_of_lt (measure_mono hcover) hB_lt
+  exact le_of_lt (by simpa [A, ENNReal.ofReal_toReal hδtop] using hA_lt)
+
+/-- Scaled first absolute-moment bounds imply scaled scalar `Oₚ(1)`.
+
+This is the `δ = 1` scaled face of Hansen Theorem 6.12: if the first absolute
+moment of `Xₙ` is eventually bounded by a positive deterministic scale `aₙ`,
+then `aₙ⁻¹ Xₙ` is bounded in probability. -/
+theorem BoundedInProbability.of_eventually_integral_norm_scaled_bound
+    [IsFiniteMeasure μ] {X : ℕ → α → ℝ} {a : ℕ → ℝ} {C : ℝ}
+    (hC : 0 ≤ C)
+    (ha : ∀ᶠ n in atTop, 0 < a n)
+    (hInt : ∀ n, Integrable (fun ω => ‖X n ω‖) μ)
+    (hBound : ∀ᶠ n in atTop, ∫ ω, ‖X n ω‖ ∂μ ≤ C * a n) :
+    BoundedInProbability μ (fun n ω => (a n)⁻¹ * X n ω) := by
+  refine BoundedInProbability.of_eventually_integral_norm_bound (C := C) hC ?_ ?_
+  · intro n
+    simpa [norm_mul, mul_comm, mul_left_comm, mul_assoc] using
+      (hInt n).const_mul ‖(a n)⁻¹‖
+  · filter_upwards [ha, hBound] with n hapos hn
+    have hscale_nonneg : 0 ≤ ‖(a n)⁻¹‖ := norm_nonneg _
+    calc
+      ∫ ω, ‖(a n)⁻¹ * X n ω‖ ∂μ
+          = ∫ ω, ‖(a n)⁻¹‖ * ‖X n ω‖ ∂μ := by
+            congr 1
+            ext ω
+            simp [norm_mul]
+      _ = ‖(a n)⁻¹‖ * ∫ ω, ‖X n ω‖ ∂μ := by
+            rw [integral_const_mul]
+      _ ≤ ‖(a n)⁻¹‖ * (C * a n) := mul_le_mul_of_nonneg_left hn hscale_nonneg
+      _ = C := by
+            rw [Real.norm_eq_abs, abs_of_pos (inv_pos.mpr hapos)]
+            field_simp [hapos.ne']
+
 /-- A pointwise absolute bound transfers boundedness in probability. -/
 theorem BoundedInProbability.of_abs_le
     {μ : Measure α} {X Y : ℕ → α → ℝ}
@@ -788,6 +2088,41 @@ theorem BoundedInProbability.add
       exact (not_le_of_gt hsum_lt) hω
   calc
     μ {ω | MX + MY ≤ ‖X n ω + Y n ω‖}
+        ≤ μ ({ω | MX ≤ ‖X n ω‖} ∪ {ω | MY ≤ ‖Y n ω‖}) := measure_mono hcover
+    _ ≤ μ {ω | MX ≤ ‖X n ω‖} + μ {ω | MY ≤ ‖Y n ω‖} := measure_union_le _ _
+    _ ≤ δ / 2 + δ / 2 := add_le_add hnX hnY
+    _ = δ := ENNReal.add_halves δ
+
+/-- Real-valued `Oₚ(1)` sequences are closed under multiplication. -/
+theorem BoundedInProbability.mul
+    {μ : Measure α} {X Y : ℕ → α → ℝ}
+    (hX : BoundedInProbability μ X)
+    (hY : BoundedInProbability μ Y) :
+    BoundedInProbability μ (fun n ω => X n ω * Y n ω) := by
+  intro δ hδ
+  have hδ2 : 0 < δ / 2 := ENNReal.div_pos hδ.ne' ENNReal.ofNat_ne_top
+  rcases hX (δ / 2) hδ2 with ⟨MX, hMXpos, hMX⟩
+  rcases hY (δ / 2) hδ2 with ⟨MY, hMYpos, hMY⟩
+  refine ⟨MX * MY, mul_pos hMXpos hMYpos, ?_⟩
+  filter_upwards [hMX, hMY] with n hnX hnY
+  have hcover :
+      {ω | MX * MY ≤ ‖X n ω * Y n ω‖} ⊆
+        {ω | MX ≤ ‖X n ω‖} ∪ {ω | MY ≤ ‖Y n ω‖} := by
+    intro ω hω
+    simp only [Set.mem_union, Set.mem_setOf_eq]
+    by_cases hXbig : MX ≤ ‖X n ω‖
+    · exact Or.inl hXbig
+    · right
+      have hXlt : ‖X n ω‖ < MX := not_le.mp hXbig
+      by_contra hYbig
+      have hYlt : ‖Y n ω‖ < MY := not_le.mp hYbig
+      have hprod_lt : ‖X n ω * Y n ω‖ < MX * MY := by
+        rw [norm_mul]
+        exact mul_lt_mul_of_lt_of_le_of_nonneg_of_pos
+          hXlt hYlt.le (norm_nonneg _) hMYpos
+      exact (not_le_of_gt hprod_lt) hω
+  calc
+    μ {ω | MX * MY ≤ ‖X n ω * Y n ω‖}
         ≤ μ ({ω | MX ≤ ‖X n ω‖} ∪ {ω | MY ≤ ‖Y n ω‖}) := measure_mono hcover
     _ ≤ μ {ω | MX ≤ ‖X n ω‖} + μ {ω | MY ≤ ‖Y n ω‖} := measure_union_le _ _
     _ ≤ δ / 2 + δ / 2 := add_le_add hnX hnY
@@ -924,6 +2259,33 @@ theorem tendstoInMeasure_wlln
     rw [heq]
     exact hscaled
   exact tendstoInMeasure_of_tendsto_ae hmeas hae
+
+/-- **Hansen Theorem 6.2, transformed WLLN.**
+
+If `X i` are pairwise-independent and identically distributed and `h (X 0)` is integrable,
+then the sample mean of the transformed variables `h (X i)` converges in probability to
+`𝔼[h (X 0)]`. This is the textbook transformed WLLN packaged as composition of the
+Banach-valued WLLN with measurable-map preservation of independence and identical distribution. -/
+theorem tendstoInMeasure_transformed_wlln
+    {E F : Type*}
+    [MeasurableSpace E]
+    [NormedAddCommGroup F] [NormedSpace ℝ F] [CompleteSpace F]
+    [MeasurableSpace F] [BorelSpace F]
+    [IsFiniteMeasure μ]
+    (X : ℕ → Ω → E) (h : E → F)
+    (hh : Measurable h)
+    (hint : Integrable (fun ω => h (X 0 ω)) μ)
+    (hindep : Pairwise ((· ⟂ᵢ[μ] ·) on X))
+    (hident : ∀ i, IdentDistrib (X i) (X 0) μ μ) :
+    TendstoInMeasure μ
+      (fun (n : ℕ) ω => (n : ℝ)⁻¹ • ∑ i ∈ Finset.range n, h (X i ω))
+      atTop
+      (fun _ => μ[fun ω => h (X 0 ω)]) :=
+  tendstoInMeasure_wlln
+    (fun i ω => h (X i ω))
+    hint
+    (fun _ _ hij => IndepFun.comp (hindep hij) hh hh)
+    (fun i => (hident i).comp hh)
 
 end WLLN
 

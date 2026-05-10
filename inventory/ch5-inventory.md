@@ -79,6 +79,7 @@ Deferred for now unless needed:
 - The key reusable distribution results are:
   - standard-normal finite-moment, mean, and variance wrappers;
   - multivariate-normal affine-image, marginal, and covariance wrappers;
+  - fixed-design finite-moment wrapper for the OLS coefficient vector under Gaussian errors;
   - residual variance chi-square law and independence from OLS coefficients;
   - exact Student-t law for the classical OLS t-statistic;
   - coefficient confidence-interval coverage, including the two-standard-error lower bound;
@@ -113,8 +114,8 @@ Conventions:
 | Theorem 5.1 standard normal moments | If $Z \sim N(0,1)$, then all integer moments are finite, odd moments vanish, $\mathbb{E}[Z^{2m}] = (2m-1)!!$, and for $r > 0$, $\mathbb{E}[|Z|^r] = 2^{r/2} \pi^{-1/2} \Gamma\!\left(\frac{r+1}{2}\right)$ | [standardNormal_memLp](../../HansenEconometrics/MultivariateNormal.lean#L23), [standardNormal_mean](../../HansenEconometrics/MultivariateNormal.lean#L28), and [standardNormal_variance](../../HansenEconometrics/MultivariateNormal.lean#L33)<br><code>MemLp id p (gaussianReal 0 1)</code>; Mathlib-backed finite-moment/mean/variance face of the theorem |
 | Theorem 5.2 affine image of a multivariate normal | If $X \sim N(\mu,\Sigma)$ and $Y = a + B X$, then $Y \sim N(a + B\mu, B \Sigma B')$ | [map_affine_multivariateGaussian](../../HansenEconometrics/MultivariateNormal.lean#L111) and [hasLaw_affine_multivariateGaussian](../../HansenEconometrics/MultivariateNormal.lean#L129)<br><code>HasLaw (fun ω => a + matrixContinuousLinearMap B (X ω)) (multivariateGaussian (a + matrixContinuousLinearMap B μ) (B * S * Bᴴ)) P</code> |
 | Theorem 5.3 properties of the multivariate normal | For $X \sim N(\mu,\Sigma)$: $\mathbb{E}[X] = \mu$, $\operatorname{Var}(X) = \Sigma$, uncorrelated subvectors are independent, affine images are normal, and the standard quadratic-form laws give $\chi^2$, non-central $\chi^2$, and $t/F$ consequences | [multivariateGaussian_mean](../../HansenEconometrics/MultivariateNormal.lean#L151), [multivariateGaussian_covarianceBilin](../../HansenEconometrics/MultivariateNormal.lean#L158), [multivariateGaussian_eval_hasLaw](../../HansenEconometrics/MultivariateNormal.lean#L182), [multivariateGaussian_restrict₂_hasLaw](../../HansenEconometrics/MultivariateNormal.lean#L192), and [jointGaussian_indepFun_iff_cov_eq_zero](../../HansenEconometrics/MultivariateNormal.lean#L204) |
-| Theorem 5.4 conditional law of the OLS coefficient vector | $\hat{\beta} \mid X \sim N\!\left(\beta, \sigma^2 (X'X)^{-1}\right)$ | [olsBeta_hasGaussianLaw_of_error](../../HansenEconometrics/Chapter5NormalRegression.lean#L37)<br><code>HasGaussianLaw (fun ω => olsBeta X (X *ᵥ β + e ω)) μ</code> |
-| Theorem 5.5 Kinal (1980) moment existence | If $(Y,X)$ are jointly normal, then $\mathbb{E}\|\hat{\beta}\|^r < \infty$ if and only if $r < n-k+1$ | Deferred: downstream-blocking only if a later finite-sample inference or multivariate-regression chapter needs the Kinal moment-existence threshold. No speculative Lean theorem yet. |
+| Theorem 5.4 conditional law of the OLS coefficient vector | $\hat{\beta} \mid X \sim N\!\left(\beta, \sigma^2 (X'X)^{-1}\right)$ | [olsBeta_hasGaussianLaw_of_error](../../HansenEconometrics/Chapter5NormalRegression.lean#L37)<br><code>HasGaussianLaw (fun ω => olsBeta X (X *ᵥ β + e ω)) μ</code><br>Fixed-design finite moments of every finite order: [olsBeta_memLp_of_error_gaussian](../../HansenEconometrics/Chapter5NormalRegression.lean#L68)<br><code>MemLp (fun ω => olsBeta X (X *ᵥ β + e ω)) p μ</code> for `p ≠ ∞`. |
+| Theorem 5.5 Kinal (1980) moment existence | If $(Y,X)$ are jointly normal, then $\mathbb{E}\|\hat{\beta}\|^r < \infty$ if and only if $r < n-k+1$ | The fixed-design Gaussian finite-moment face is now available as `olsBeta_memLp_of_error_gaussian`. The exact random-design Kinal inverse-Gram tail threshold remains deferred until a downstream theorem needs it. |
 | Theorem 5.6 conditional law of the OLS residual vector | $\hat{e} \mid X \sim N(0,\sigma^2 M)$ and $\hat{e}$ is independent of $\hat{\beta}$ | [residual_hasGaussianLaw_of_error](../../HansenEconometrics/Chapter5NormalRegression.lean#L65)<br><code>HasGaussianLaw (fun ω => residual X (X *ᵥ β + e ω)) μ</code> |
 | Residual variance estimator | $s^2 = \hat{e}' \hat{e} / (n-k)$ | [olsResidualVarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L175)<br><code>olsResidualVarianceEstimator X y := dotProduct (annihilatorMatrix X *ᵥ y) (annihilatorMatrix X *ᵥ y) / (Fintype.card n - Fintype.card k : ℝ)</code> |
 | Residual variance under the linear model | $s^2 = (M e)' (M e) / (n-k)$ | [olsResidualVarianceEstimator_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L188)<br><code>olsResidualVarianceEstimator X (X *ᵥ β + e) = dotProduct (annihilatorMatrix X *ᵥ e) (annihilatorMatrix X *ᵥ e) / (Fintype.card n - Fintype.card k : ℝ)</code> |
@@ -133,7 +134,8 @@ Conventions:
   Hansen-facing wrappers in `HansenEconometrics/MultivariateNormal.lean`. Theorem 5.1 currently
   records the finite-moment/mean/variance face rather than restating every closed-form moment
   formula.
-- The Kinal theorem 5.5 remains intentionally deferred until a downstream chapter needs the exact
-  moment-existence threshold.
+- The exact random-design Kinal theorem 5.5 remains intentionally deferred until a downstream
+  chapter needs the exact inverse-Gram moment-existence threshold; the fixed-design Gaussian
+  coefficient-vector finite-moment face is available as `olsBeta_memLp_of_error_gaussian`.
 - The second-half exact regression-inference results are now present and should be reused by
   Chapter 7 rather than re-identifying Student-t, chi-square, or F laws from scratch.

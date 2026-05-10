@@ -1,5 +1,6 @@
 import Mathlib.Probability.CentralLimitTheorem
 import HansenEconometrics.AsymptoticUtils
+import HansenEconometrics.AsymptoticUtils.StochasticOrder
 import HansenEconometrics.ProbabilityUtils
 import HansenEconometrics.ChiSquared
 import HansenEconometrics.Chapter7Asymptotics.Consistency
@@ -401,6 +402,198 @@ theorem olsBetaStar_vector_tendstoInDistribution_multivariateGaussian
     (scoreVector_sampleCrossMoment_tendstoInDistribution_multivariateGaussian
       (μ := μ) (X := X) (e := e) h)
 
+/-- **Hansen Theorem 7.16/7.3 bridge, totalized estimator.**
+
+The vector OLS CLT implies the scaled coefficient error
+`√n(β̂*ₙ - β)` is bounded in probability. This is the coefficient-error factor
+needed by the max-residual product-rate proof. -/
+theorem sqrt_smul_olsBetaStar_sub_boundedInProbabilityNorm
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : ScoreCLTConditions μ X e) (β : k → ℝ)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω) :
+    BoundedInProbabilityNorm μ
+      (fun (n : ℕ) ω =>
+        Real.sqrt (n : ℝ) •
+          (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β)) := by
+  exact BoundedInProbabilityNorm.of_tendstoInDistribution
+    (olsBetaStar_vector_tendstoInDistribution_multivariateGaussian
+      (μ := μ) (X := X) (e := e) (y := y) h β hmodel)
+
+/-- **Hansen Theorem 7.16, residual uniformity rate.**
+
+Under the score CLT conditions, a correctly specified linear model, and uniform
+integrability of squared regressor row norms, the maximum totalized residual
+error is `oₚ(1)`.  The proof combines the Chapter 6 root row-norm rate with the
+OLS CLT's `√n(β̂*ₙ - β)=Oₚ(1)` factor and the deterministic residual bound. -/
+theorem maxResidualErrorStar_tendstoInMeasure_zero_of_uniformIntegrable_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : ScoreCLTConditions μ X e) (β : k → ℝ)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    (hUI : UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ) :
+    TendstoInMeasure μ
+      (fun n ω => maxResidualErrorStar (stackRegressors X n ω) β (stackErrors e n ω))
+      atTop (fun _ => 0) := by
+  let rootRow : ℕ → Ω → ℝ := fun n ω =>
+    Real.sqrt
+      ((Fintype.card (Fin n) : ℝ)⁻¹ *
+        maxRowNorm (stackRegressors X n ω) ^ 2)
+  let betaScaledNorm : ℕ → Ω → ℝ := fun n ω =>
+    ‖Real.sqrt (n : ℝ) •
+      (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β)‖
+  have hRoot : TendstoInMeasure μ rootRow atTop (fun _ => 0) := by
+    simpa [rootRow] using
+      (sqrt_scaledMaxRowNorm_sq_tendstoInMeasure_zero_of_uniformIntegrable_norm_sq
+        (μ := μ) (X := X) hUI)
+  have hBetaNorm :=
+    sqrt_smul_olsBetaStar_sub_boundedInProbabilityNorm
+      (μ := μ) (X := X) (e := e) (y := y) h β hmodel
+  have hBeta : BoundedInProbability μ betaScaledNorm := by
+    intro δ hδ
+    obtain ⟨M, hMpos, hMev⟩ := hBetaNorm δ hδ
+    refine ⟨M, hMpos, ?_⟩
+    filter_upwards [hMev] with n hn
+    refine (measure_mono ?_).trans hn
+    intro ω hω
+    simpa [betaScaledNorm, Real.norm_eq_abs, abs_of_nonneg (norm_nonneg _)] using hω
+  have hprod : TendstoInMeasure μ
+      (fun n ω => rootRow n ω * betaScaledNorm n ω) atTop (fun _ => 0) :=
+    TendstoInMeasure.mul_boundedInProbability hRoot hBeta
+  have hboundProduct : TendstoInMeasure μ
+      (fun n ω => (Fintype.card k : ℝ) * (rootRow n ω * betaScaledNorm n ω))
+      atTop (fun _ => 0) :=
+    TendstoInMeasure.const_mul_zero_real (μ := μ) (Fintype.card k : ℝ) hprod
+  have hProduct : TendstoInMeasure μ
+      (fun n ω =>
+        (Fintype.card k : ℝ) * maxRowNorm (stackRegressors X n ω) *
+          ‖olsBetaStar
+            (stackRegressors X n ω)
+            (stackRegressors X n ω *ᵥ β + stackErrors e n ω) - β‖)
+      atTop (fun _ => 0) := by
+    refine TendstoInMeasure.of_abs_le_zero_real hboundProduct ?_
+    intro n ω
+    let Xn : Matrix (Fin n) k ℝ := stackRegressors X n ω
+    let en : Fin n → ℝ := stackErrors e n ω
+    let berr : k → ℝ := olsBetaStar Xn (stackOutcomes y n ω) - β
+    have hstack : stackOutcomes y n ω = Xn *ᵥ β + en :=
+      stack_linear_model X e y β hmodel n ω
+    have hbeta_eq :
+        ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖ = ‖berr‖ := by
+      simp [berr, Xn, en, ← hstack]
+    have hleft_nonneg :
+        0 ≤ (Fintype.card k : ℝ) * maxRowNorm Xn *
+          ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖ := by
+      exact mul_nonneg
+        (mul_nonneg (Nat.cast_nonneg _) (norm_nonneg _))
+        (norm_nonneg _)
+    have hright_nonneg :
+        0 ≤ (Fintype.card k : ℝ) * (rootRow n ω * betaScaledNorm n ω) := by
+      exact mul_nonneg (Nat.cast_nonneg _)
+        (mul_nonneg (Real.sqrt_nonneg _) (norm_nonneg _))
+    have hscaled :
+        (Fintype.card k : ℝ) * maxRowNorm Xn *
+            ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖ ≤
+          (Fintype.card k : ℝ) * (rootRow n ω * betaScaledNorm n ω) := by
+      by_cases hnzero : n = 0
+      · have hrow0 : maxRowNorm Xn = 0 := by
+          unfold maxRowNorm
+          rw [show (fun i : Fin n => ‖Xn i‖) = (0 : Fin n → ℝ) by
+            ext i
+            subst hnzero
+            exact Fin.elim0 i]
+          exact norm_zero
+        have hleft_zero :
+            (Fintype.card k : ℝ) * maxRowNorm Xn *
+              ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖ = 0 := by
+          simp [hrow0]
+        rw [hleft_zero]
+        exact hright_nonneg
+      · have hrow_eq :
+            rootRow n ω * Real.sqrt (n : ℝ) = maxRowNorm (stackRegressors X n ω) := by
+          simpa [rootRow] using
+            sqrt_scaledMaxRowNorm_sq_mul_sqrt_eq_maxRowNorm (X := X) hnzero ω
+        have hrow_eq' :
+            maxRowNorm (stackRegressors X n ω) =
+              rootRow n ω * Real.sqrt (n : ℝ) :=
+          hrow_eq.symm
+        have hscaled_beta :
+            betaScaledNorm n ω =
+              Real.sqrt (n : ℝ) * ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖ := by
+          calc
+            betaScaledNorm n ω = Real.sqrt (n : ℝ) * ‖berr‖ := by
+              change ‖Real.sqrt (n : ℝ) • berr‖ =
+                Real.sqrt (n : ℝ) * ‖berr‖
+              rw [norm_smul, Real.norm_eq_abs, abs_of_nonneg (Real.sqrt_nonneg _)]
+            _ = Real.sqrt (n : ℝ) * ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖ := by
+              rw [← hbeta_eq]
+        have hcore :
+            maxRowNorm Xn * ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖ ≤
+              rootRow n ω * betaScaledNorm n ω := by
+          calc
+            maxRowNorm Xn * ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖
+                = (rootRow n ω * Real.sqrt (n : ℝ)) *
+                    ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖ := by
+                    rw [show maxRowNorm Xn = rootRow n ω * Real.sqrt (n : ℝ) by
+                      simpa [Xn] using hrow_eq']
+            _ = rootRow n ω *
+                  (Real.sqrt (n : ℝ) * ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖) := by
+                    ring
+            _ = rootRow n ω * betaScaledNorm n ω := by rw [← hscaled_beta]
+          exact le_rfl
+        have hk : 0 ≤ (Fintype.card k : ℝ) := Nat.cast_nonneg _
+        calc
+          (Fintype.card k : ℝ) * maxRowNorm Xn *
+              ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖
+              = (Fintype.card k : ℝ) *
+                  (maxRowNorm Xn * ‖olsBetaStar Xn (Xn *ᵥ β + en) - β‖) := by
+                    ring
+          _ ≤ (Fintype.card k : ℝ) * (rootRow n ω * betaScaledNorm n ω) :=
+            mul_le_mul_of_nonneg_left hcore hk
+    simpa [Xn, en, abs_of_nonneg hleft_nonneg, abs_of_nonneg hright_nonneg] using hscaled
+  simpa using
+    (scaledMaxResidualErrorStar_tendstoInMeasure_zero_of_scaled_product
+      (μ := μ) (X := X) (e := e) β (fun _ => (1 : ℝ))
+      (by intro n; norm_num) (by simpa using hProduct))
+
+/-- **Hansen Theorem 7.16, iid finite-row-moment residual uniformity rate.**
+
+If the squared regressor row norms are identically distributed and the first row
+has finite second moment, then the Chapter 6 iid UI bridge discharges the row
+uniform-integrability assumption in the max-residual rate theorem. -/
+theorem maxResidualErrorStar_tendstoInMeasure_zero_of_identDistrib_memLp_rowNorm_sq
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : ScoreCLTConditions μ X e) (β : k → ℝ)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    (hRowMem : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ)
+    (hRowIdent : ∀ i,
+      IdentDistrib (fun ω => ‖X i ω‖ ^ 2) (fun ω => ‖X 0 ω‖ ^ 2) μ μ) :
+    TendstoInMeasure μ
+      (fun n ω => maxResidualErrorStar (stackRegressors X n ω) β (stackErrors e n ω))
+      atTop (fun _ => 0) := by
+  exact maxResidualErrorStar_tendstoInMeasure_zero_of_uniformIntegrable_rowNorm_sq
+    (μ := μ) (X := X) (e := e) (y := y) h β hmodel
+    (uniformIntegrable_one_of_identDistrib_memLp
+      (μ := μ) (Z := fun i ω => ‖X i ω‖ ^ 2) hRowMem hRowIdent)
+
+/-- **Hansen Theorem 7.16, iid feasible-HC package endpoint.**
+
+The unified iid robust feasible-HC package directly discharges residual
+uniformity through its score-CLT, model, fourth-row-moment, and row-norm
+identical-distribution fields. -/
+theorem maxResidualErrorStar_tendstoInMeasure_zero_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    TendstoInMeasure μ
+      (fun n ω => maxResidualErrorStar (stackRegressors X n ω) β (stackErrors e n ω))
+      atTop (fun _ => 0) :=
+  maxResidualErrorStar_tendstoInMeasure_zero_of_identDistrib_memLp_rowNorm_sq
+    (μ := μ) (X := X) (e := e) (y := y)
+    h.toScoreCLTConditions β h.model
+    (IidRobustFeasibleHCMomentConditions.rowNorm_sq_memLp h) h.rowNorm_sq_identDistrib
+
 /-- **Hansen Theorem 7.3, ordinary-wrapper vector asymptotic normality.**
 
 The same non-conditional vector CLT for the textbook-facing `olsBetaOrZero`
@@ -425,6 +618,185 @@ theorem olsBetaOrZero_vector_tendstoInDistribution_multivariateGaussian
     h.toSampleMomentAssumption71 β hmodel
     (scoreVector_sampleCrossMoment_tendstoInDistribution_multivariateGaussian
       (μ := μ) (X := X) (e := e) h)
+
+/-- **Hansen Theorem 7.3 for literal ordinary OLS under sample-Gram invertibility.**
+
+When every realized stacked sample Gram is invertible, the textbook `olsBeta`
+estimator is available pointwise and agrees with `olsBetaOrZero`, so the
+ordinary-wrapper vector asymptotic-normality theorem transfers to the dependent
+ordinary-OLS surface. -/
+theorem olsBeta_vector_tendstoInDistribution_multivariateGaussian_of_invertible
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : ScoreCLTConditions μ X e) (β : k → ℝ)
+    (hInv : ∀ n ω,
+      Invertible ((stackRegressors X n ω)ᵀ * stackRegressors X n ω))
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        Real.sqrt (n : ℝ) •
+          ((letI : Invertible
+              ((stackRegressors X n ω)ᵀ * stackRegressors X n ω) := hInv n ω
+            olsBeta (stackRegressors X n ω) (stackOutcomes y n ω)) - β))
+      atTop
+      (fun z : EuclideanSpace ℝ k => (popGram μ X)⁻¹ *ᵥ z.ofLp)
+      (fun _ => μ)
+      (multivariateGaussian 0 (scoreCovMat μ X e)) := by
+  have hOrZero := olsBetaOrZero_vector_tendstoInDistribution_multivariateGaussian
+    (μ := μ) (X := X) (e := e) (y := y) h β hmodel
+  refine TendstoInDistribution.congr ?_ EventuallyEq.rfl hOrZero
+  intro n
+  exact ae_of_all μ (fun ω => by
+    letI : Invertible ((stackRegressors X n ω)ᵀ * stackRegressors X n ω) :=
+      hInv n ω
+    change
+      Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β) =
+        Real.sqrt (n : ℝ) •
+          (olsBeta (stackRegressors X n ω) (stackOutcomes y n ω) - β)
+    rw [olsBetaOrZero_eq_olsBeta])
+
+/-- **Hansen Theorem 7.16/7.3 bridge, ordinary-wrapper estimator.**
+
+The ordinary-on-nonsingular wrapper has the same bounded scaled coefficient
+error as `olsBetaStar`. -/
+theorem sqrt_smul_olsBetaOrZero_sub_boundedInProbabilityNorm
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    (h : ScoreCLTConditions μ X e) (β : k → ℝ)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω) :
+    BoundedInProbabilityNorm μ
+      (fun (n : ℕ) ω =>
+        Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)) := by
+  exact BoundedInProbabilityNorm.of_tendstoInDistribution
+    (olsBetaOrZero_vector_tendstoInDistribution_multivariateGaussian
+      (μ := μ) (X := X) (e := e) (y := y) h β hmodel)
+
+/-- **Hansen Theorem 7.9, nonlinear Delta-method wrapper for totalized OLS.**
+
+This is the Chapter 7-facing nonlinear packaging now that the Chapter 6
+Delta-method/law-relabeling layer is available.  If `Yₙ` is the scaled nonlinear
+statistic and it differs from the derivative image of
+`√n(β̂*ₙ - β)` by `oₚ(1)`, then `Yₙ` has the named Gaussian law of that derivative
+image.  Concrete transforms `r(β̂ₙ)` discharge `hrem` from the usual
+Fréchet-derivative remainder. -/
+theorem nonlinearFunction_olsBetaStar_delta_tendstoInDistribution_gaussian
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q] [DecidableEq q]
+    (h : ScoreCLTConditions μ X e) (β : k → ℝ)
+    (R : Matrix q k ℝ)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    {Y : ℕ → Ω → EuclideanSpace ℝ q}
+    (hY_meas : ∀ n, AEMeasurable (Y n) μ)
+    (hrem :
+      TendstoInMeasure μ
+        (fun n ω =>
+          Y n ω -
+            matrixContinuousLinearMap R
+              (WithLp.toLp 2
+                (Real.sqrt (n : ℝ) •
+                  (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))))
+        atTop (fun _ => 0))
+    (hLimitLaw :
+      HasLaw
+        (fun z : EuclideanSpace ℝ k =>
+          matrixContinuousLinearMap R
+            (WithLp.toLp 2 ((popGram μ X)⁻¹ *ᵥ z.ofLp)))
+        (multivariateGaussian 0 (R * heteroAsymCov μ X e * Rᵀ))
+        (multivariateGaussian 0 (scoreCovMat μ X e))) :
+    TendstoInDistribution Y atTop
+      (fun z : EuclideanSpace ℝ q => z)
+      (fun _ => μ)
+      (multivariateGaussian 0 (R * heteroAsymCov μ X e * Rᵀ)) := by
+  let T : ℕ → Ω → EuclideanSpace ℝ k := fun n ω =>
+    WithLp.toLp 2
+      (Real.sqrt (n : ℝ) •
+        (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))
+  have hbeta_raw := olsBetaStar_vector_tendstoInDistribution_multivariateGaussian
+    (μ := μ) (X := X) (e := e) (y := y) h β hmodel
+  have hbeta_euclid :
+      TendstoInDistribution T atTop
+        (fun z : EuclideanSpace ℝ k =>
+          WithLp.toLp 2 ((popGram μ X)⁻¹ *ᵥ z.ofLp))
+        (fun _ => μ)
+        (multivariateGaussian 0 (scoreCovMat μ X e)) := by
+    have hmap := hbeta_raw.continuous_comp
+      (PiLp.continuous_toLp 2 (fun _ : k => ℝ))
+    simpa [T, Function.comp_def] using hmap
+  have hlin :
+      TendstoInDistribution
+        (fun n => matrixContinuousLinearMap R ∘ T n)
+        atTop
+        (matrixContinuousLinearMap R ∘
+          fun z : EuclideanSpace ℝ k =>
+            WithLp.toLp 2 ((popGram μ X)⁻¹ *ᵥ z.ofLp))
+        (fun _ => μ)
+        (multivariateGaussian 0 (scoreCovMat μ X e)) :=
+    hbeta_euclid.continuous_comp (matrixContinuousLinearMap R).continuous
+  have htarget :
+      TendstoInDistribution
+        (fun n ω => matrixContinuousLinearMap R (T n ω))
+        atTop
+        (fun z : EuclideanSpace ℝ q => z)
+        (fun _ => μ)
+        (multivariateGaussian 0 (R * heteroAsymCov μ X e * Rᵀ)) := by
+    simpa [Function.comp_def] using
+      tendstoInDistribution_id_of_hasLaw_limit
+        (E := EuclideanSpace ℝ q) hlin hLimitLaw
+  exact tendstoInDistribution_of_tendstoInMeasure_sub
+    (X := fun n ω => matrixContinuousLinearMap R (T n ω))
+    (Y := Y)
+    (Z := fun z : EuclideanSpace ℝ q => z)
+    htarget hrem hY_meas
+
+/-- **Hansen Theorem 7.9, nonlinear Delta-method wrapper for ordinary OLS.**
+
+Ordinary-wrapper version of
+`nonlinearFunction_olsBetaStar_delta_tendstoInDistribution_gaussian`. -/
+theorem nonlinearFunction_olsBetaOrZero_delta_tendstoInDistribution_gaussian
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {q : Type*} [Fintype q] [DecidableEq q]
+    (h : ScoreCLTConditions μ X e) (β : k → ℝ)
+    (R : Matrix q k ℝ)
+    (hmodel : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω)
+    {Y : ℕ → Ω → EuclideanSpace ℝ q}
+    (hY_meas : ∀ n, AEMeasurable (Y n) μ)
+    (hrem :
+      TendstoInMeasure μ
+        (fun n ω =>
+          Y n ω -
+            matrixContinuousLinearMap R
+              (WithLp.toLp 2
+                (Real.sqrt (n : ℝ) •
+                  (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β))))
+        atTop (fun _ => 0))
+    (hLimitLaw :
+      HasLaw
+        (fun z : EuclideanSpace ℝ k =>
+          matrixContinuousLinearMap R
+            (WithLp.toLp 2 ((popGram μ X)⁻¹ *ᵥ z.ofLp)))
+        (multivariateGaussian 0 (R * heteroAsymCov μ X e * Rᵀ))
+        (multivariateGaussian 0 (scoreCovMat μ X e))) :
+    TendstoInDistribution Y atTop
+      (fun z : EuclideanSpace ℝ q => z)
+      (fun _ => μ)
+      (multivariateGaussian 0 (R * heteroAsymCov μ X e * Rᵀ)) := by
+  have hrem_star :
+      TendstoInMeasure μ
+        (fun n ω =>
+          Y n ω -
+            matrixContinuousLinearMap R
+              (WithLp.toLp 2
+                (Real.sqrt (n : ℝ) •
+                  (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))))
+        atTop (fun _ => 0) := by
+    simpa using hrem
+  exact nonlinearFunction_olsBetaStar_delta_tendstoInDistribution_gaussian
+    (μ := μ) (X := X) (e := e) (y := y) h β R hmodel
+    hY_meas hrem_star hLimitLaw
 
 /-- **Scaled-score coordinate boundedness from Theorem 7.2.**
 
@@ -1661,6 +2033,31 @@ theorem linMap_olsHomoWaldStatOrZero_tendstoInDistribution_chiSquared_homo
     (μ := μ) (X := X) (e := e) (y := y) (r := r)
     hclt hvar β R hmodel hX_meas he_meas hΩ hV_posDef
 
+/-- IID joint-observation multivariate homoskedastic Wald statistic from homoskedasticity. -/
+theorem linMap_olsHomoWaldStatOrZero_tendstoInDistribution_chiSquared_of_iidRobustFeasibleHC
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (β : k → ℝ) (R : Matrix (Fin r) k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hX0 : Measurable (X 0))
+    [SigmaFinite (μ.trim (conditioningSpace_le hX0))]
+    (hhomo : HomoskedasticErrorVariance μ X e)
+    (hV_posDef : (R * homoAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHomoCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHomoWaldStatOrZero_tendstoInDistribution_chiSquared_homo
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    hm.toScoreCLTConditions hm.toErrorVarianceConsistencyConditions β R hm.model
+    hm.x_aestronglyMeasurable hm.e_aestronglyMeasurable hX0 hhomo hV_posDef
+
 /-- Multivariate HC0 Wald statistic for totalized OLS. -/
 theorem linMap_olsHC0WaldStatStar_tendstoInDistribution_chiSquared
     {μ : Measure Ω} [IsProbabilityMeasure μ]
@@ -1978,6 +2375,555 @@ theorem linMap_olsHC3WaldStatOrZero_tendstoInDistribution_chiSquared
       (μ := μ) (X := X) (e := e) (y := y) (r := r)
       h β R hmodel hX_meas he_meas hCrossWeight hQuadWeight
       hMax hV_posDef
+
+/-- Packaged HC0 multivariate Wald statistic for totalized OLS.
+
+This is the 7.13 robust-Wald wrapper with the feasible HC residual-remainder
+conditions bundled in `FeasibleHCRemainderConditions`. -/
+theorem linMap_olsHC0WaldStatStar_tendstoInDistribution_chiSquared_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix (Fin r) k ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC0WaldStatStar_tendstoInDistribution_chiSquared
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    h β R hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hV_posDef
+
+set_option linter.style.longLine false in
+/-- Packaged HC0 multivariate Wald statistic for ordinary OLS. -/
+theorem linMap_olsHC0WaldStatOrZero_tendstoInDistribution_chiSquared_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix (Fin r) k ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC0WaldStatOrZero_tendstoInDistribution_chiSquared
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    h β R hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hV_posDef
+
+/-- Packaged HC1 multivariate Wald statistic for totalized OLS. -/
+theorem linMap_olsHC1WaldStatStar_tendstoInDistribution_chiSquared_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix (Fin r) k ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC1Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC1WaldStatStar_tendstoInDistribution_chiSquared
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    h β R hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hV_posDef
+
+set_option linter.style.longLine false in
+/-- Packaged HC1 multivariate Wald statistic for ordinary OLS. -/
+theorem linMap_olsHC1WaldStatOrZero_tendstoInDistribution_chiSquared_of_feasibleHCRemainderConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix (Fin r) k ℝ)
+    (hc : FeasibleHCRemainderConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC1Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC1WaldStatOrZero_tendstoInDistribution_chiSquared
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    h β R hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hV_posDef
+
+/-- Packaged HC2 multivariate Wald statistic for totalized OLS. -/
+theorem linMap_olsHC2WaldStatStar_tendstoInDistribution_chiSquared_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix (Fin r) k ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC2Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC2WaldStatStar_tendstoInDistribution_chiSquared
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    h β R hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hc.maxLeverage_tendsto hV_posDef
+
+/-- Packaged HC2 multivariate Wald statistic for ordinary OLS. -/
+theorem linMap_olsHC2WaldStatOrZero_tendstoInDistribution_chiSquared_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix (Fin r) k ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC2Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC2WaldStatOrZero_tendstoInDistribution_chiSquared
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    h β R hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hc.maxLeverage_tendsto hV_posDef
+
+/-- Packaged HC3 multivariate Wald statistic for totalized OLS. -/
+theorem linMap_olsHC3WaldStatStar_tendstoInDistribution_chiSquared_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix (Fin r) k ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC3Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC3WaldStatStar_tendstoInDistribution_chiSquared
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    h β R hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hc.maxLeverage_tendsto hV_posDef
+
+/-- Packaged HC3 multivariate Wald statistic for ordinary OLS. -/
+theorem linMap_olsHC3WaldStatOrZero_tendstoInDistribution_chiSquared_of_feasibleHCLeverageConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (h : RobustCovarianceConsistencyConditions μ X e) (β : k → ℝ)
+    (R : Matrix (Fin r) k ℝ)
+    (hc : FeasibleHCLeverageConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC3Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC3WaldStatOrZero_tendstoInDistribution_chiSquared
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    h β R hc.model hc.x_aestronglyMeasurable hc.e_aestronglyMeasurable
+    hc.crossWeight_bounded hc.quadWeight_bounded hc.maxLeverage_tendsto hV_posDef
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment HC0 multivariate Wald statistic for totalized OLS. -/
+theorem linMap_olsHC0WaldStatStar_tendstoInDistribution_chiSquared_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (β : k → ℝ) (R : Matrix (Fin r) k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC0WaldStatStar_tendstoInDistribution_chiSquared_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    hm.toRobustCovarianceConsistencyConditions β R
+    hm.toFeasibleHCRemainderConditions hV_posDef
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment HC0 multivariate Wald statistic for ordinary OLS. -/
+theorem linMap_olsHC0WaldStatOrZero_tendstoInDistribution_chiSquared_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (β : k → ℝ) (R : Matrix (Fin r) k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC0WaldStatOrZero_tendstoInDistribution_chiSquared_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    hm.toRobustCovarianceConsistencyConditions β R
+    hm.toFeasibleHCRemainderConditions hV_posDef
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment HC1 multivariate Wald statistic for totalized OLS. -/
+theorem linMap_olsHC1WaldStatStar_tendstoInDistribution_chiSquared_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (β : k → ℝ) (R : Matrix (Fin r) k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC1Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC1WaldStatStar_tendstoInDistribution_chiSquared_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    hm.toRobustCovarianceConsistencyConditions β R
+    hm.toFeasibleHCRemainderConditions hV_posDef
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment HC1 multivariate Wald statistic for ordinary OLS. -/
+theorem linMap_olsHC1WaldStatOrZero_tendstoInDistribution_chiSquared_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (β : k → ℝ) (R : Matrix (Fin r) k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC1Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC1WaldStatOrZero_tendstoInDistribution_chiSquared_of_feasibleHCRemainderConditions
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    hm.toRobustCovarianceConsistencyConditions β R
+    hm.toFeasibleHCRemainderConditions hV_posDef
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment HC2 multivariate Wald statistic for totalized OLS. -/
+theorem linMap_olsHC2WaldStatStar_tendstoInDistribution_chiSquared_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (β : k → ℝ) (R : Matrix (Fin r) k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC2Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC2WaldStatStar_tendstoInDistribution_chiSquared_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    hm.toRobustCovarianceConsistencyConditions β R
+    hm.toFeasibleHCLeverageConditions hV_posDef
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment HC2 multivariate Wald statistic for ordinary OLS. -/
+theorem linMap_olsHC2WaldStatOrZero_tendstoInDistribution_chiSquared_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (β : k → ℝ) (R : Matrix (Fin r) k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC2Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC2WaldStatOrZero_tendstoInDistribution_chiSquared_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    hm.toRobustCovarianceConsistencyConditions β R
+    hm.toFeasibleHCLeverageConditions hV_posDef
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment HC3 multivariate Wald statistic for totalized OLS. -/
+theorem linMap_olsHC3WaldStatStar_tendstoInDistribution_chiSquared_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (β : k → ℝ) (R : Matrix (Fin r) k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC3Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC3WaldStatStar_tendstoInDistribution_chiSquared_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    hm.toRobustCovarianceConsistencyConditions β R
+    hm.toFeasibleHCLeverageConditions hV_posDef
+
+set_option linter.style.longLine false in
+/-- Compact robust-moment HC3 multivariate Wald statistic for ordinary OLS. -/
+theorem linMap_olsHC3WaldStatOrZero_tendstoInDistribution_chiSquared_of_robustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (β : k → ℝ) (R : Matrix (Fin r) k ℝ)
+    (hm : RobustFeasibleHCMomentConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC3Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC3WaldStatOrZero_tendstoInDistribution_chiSquared_of_feasibleHCLeverageConditions
+    (μ := μ) (X := X) (e := e) (y := y) (r := r)
+    hm.toRobustCovarianceConsistencyConditions β R
+    hm.toFeasibleHCLeverageConditions hV_posDef
+
+set_option linter.style.longLine false in
+/-- IID joint-observation HC0 multivariate Wald statistic for totalized OLS. -/
+theorem linMap_olsHC0WaldStatStar_tendstoInDistribution_chiSquared_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (β : k → ℝ) (R : Matrix (Fin r) k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC0WaldStatStar_tendstoInDistribution_chiSquared_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) (r := r) β R
+    hm.toRobustFeasibleHCMomentConditions hV_posDef
+
+set_option linter.style.longLine false in
+/-- IID joint-observation HC0 multivariate Wald statistic for ordinary OLS. -/
+theorem linMap_olsHC0WaldStatOrZero_tendstoInDistribution_chiSquared_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (β : k → ℝ) (R : Matrix (Fin r) k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovStar
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC0WaldStatOrZero_tendstoInDistribution_chiSquared_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) (r := r) β R
+    hm.toRobustFeasibleHCMomentConditions hV_posDef
+
+set_option linter.style.longLine false in
+/-- IID joint-observation HC1 multivariate Wald statistic for totalized OLS. -/
+theorem linMap_olsHC1WaldStatStar_tendstoInDistribution_chiSquared_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (β : k → ℝ) (R : Matrix (Fin r) k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC1Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC1WaldStatStar_tendstoInDistribution_chiSquared_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) (r := r) β R
+    hm.toRobustFeasibleHCMomentConditions hV_posDef
+
+set_option linter.style.longLine false in
+/-- IID joint-observation HC1 multivariate Wald statistic for ordinary OLS. -/
+theorem linMap_olsHC1WaldStatOrZero_tendstoInDistribution_chiSquared_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (β : k → ℝ) (R : Matrix (Fin r) k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC1Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC1WaldStatOrZero_tendstoInDistribution_chiSquared_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) (r := r) β R
+    hm.toRobustFeasibleHCMomentConditions hV_posDef
+
+set_option linter.style.longLine false in
+/-- IID joint-observation HC2 multivariate Wald statistic for totalized OLS. -/
+theorem linMap_olsHC2WaldStatStar_tendstoInDistribution_chiSquared_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (β : k → ℝ) (R : Matrix (Fin r) k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC2Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC2WaldStatStar_tendstoInDistribution_chiSquared_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) (r := r) β R
+    hm.toRobustFeasibleHCMomentConditions hV_posDef
+
+set_option linter.style.longLine false in
+/-- IID joint-observation HC2 multivariate Wald statistic for ordinary OLS. -/
+theorem linMap_olsHC2WaldStatOrZero_tendstoInDistribution_chiSquared_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (β : k → ℝ) (R : Matrix (Fin r) k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC2Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC2WaldStatOrZero_tendstoInDistribution_chiSquared_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) (r := r) β R
+    hm.toRobustFeasibleHCMomentConditions hV_posDef
+
+set_option linter.style.longLine false in
+/-- IID joint-observation HC3 multivariate Wald statistic for totalized OLS. -/
+theorem linMap_olsHC3WaldStatStar_tendstoInDistribution_chiSquared_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (β : k → ℝ) (R : Matrix (Fin r) k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC3Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaStar (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC3WaldStatStar_tendstoInDistribution_chiSquared_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) (r := r) β R
+    hm.toRobustFeasibleHCMomentConditions hV_posDef
+
+set_option linter.style.longLine false in
+/-- IID joint-observation HC3 multivariate Wald statistic for ordinary OLS. -/
+theorem linMap_olsHC3WaldStatOrZero_tendstoInDistribution_chiSquared_of_iidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e : ℕ → Ω → ℝ} {y : ℕ → Ω → ℝ}
+    {r : ℕ} [Fact (0 < r)]
+    (β : k → ℝ) (R : Matrix (Fin r) k ℝ)
+    (hm : IidRobustFeasibleHCMomentConditions μ X e y β)
+    (hV_posDef : (R * heteroAsymCov μ X e * Rᵀ).PosDef) :
+    TendstoInDistribution
+      (fun (n : ℕ) ω =>
+        (R *ᵥ (Real.sqrt (n : ℝ) •
+          (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β))) ⬝ᵥ
+          (((R * olsHetCovHC3Star
+            (stackRegressors X n ω) (stackOutcomes y n ω) * Rᵀ)⁻¹) *ᵥ
+            (R *ᵥ (Real.sqrt (n : ℝ) •
+              (olsBetaOrZero (stackRegressors X n ω) (stackOutcomes y n ω) - β)))))
+      atTop (fun x : ℝ => x) (fun _ => μ) (chiSquared r) :=
+  linMap_olsHC3WaldStatOrZero_tendstoInDistribution_chiSquared_of_robustFeasibleHCMomentConditions
+    (μ := μ) (X := X) (e := e) (y := y) (r := r) β R
+    hm.toRobustFeasibleHCMomentConditions hV_posDef
 
 end Assumption72
 

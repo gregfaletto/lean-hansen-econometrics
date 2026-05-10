@@ -31,18 +31,21 @@ Status:
 12. prove `P X = X` and `M X = 0`
 
 Status: landed in `HansenEconometrics/Chapter3Projections.lean`.
-This covers the finite-dimensional parts of Theorem 3.3.1-3, equation (3.22), and Section 3.12:
+This covers the finite-dimensional parts of Theorem 3.3.1-5, equation (3.22), and Section 3.12:
 `P`/`M` symmetry, idempotence, `P X = X`, `M X = 0`, `tr(P) = k`, `tr(M) = n-k`,
-range-fixing/killing lemmas, and the `M P = P M = 0` Exercise 3.7 identities.
-Eigenvalue and rank statements from Theorem 3.3.4-5 are still pending.
+the `0`/`1` eigenvalue and rank consequences for `P` and `M`, range-fixing/killing lemmas,
+the `M P = P M = 0` Exercise 3.7 identities, and the nonsingular leverage-value API for
+Theorem 3.6, the reduced-Gram leave-one-out algebra for Theorem 3.7, and the Section 3.21
+influence identities and max diagnostic. The literal row-deleted design/response API now bridges
+the textbook deleted-sample notation to the reduced-Gram coefficient.
 
 ### Layer 3: orthogonal decomposition / variance algebra
 13. prove `Y = Ŷ + ê`
 14. prove `⟪Ŷ, ê⟫ = 0`
 15. derive finite-sample Pythagorean / sum-of-squares decomposition
 
-Status: vector decomposition, fitted/residual orthogonality, and dot-product Pythagorean identity landed.
-The centered analysis-of-variance formula and `R²` identities are still pending.
+Status: vector decomposition, fitted/residual orthogonality, dot-product Pythagorean identity,
+centered analysis-of-variance, and `R²` identity landed.
 
 ### Layer 4: partitioned regression / FWL
 16. partition regressors as `[X₁ X₂]`
@@ -51,14 +54,12 @@ The centered analysis-of-variance formula and `R²` identities are still pending
 19. prove FWL residual equivalence
 
 Status: partitioned normal-equation projections, residualized regressors `M₁ X₂`, FWL residualized
-normal equations, and the sequential residual-maker result
+normal equations, Theorem 3.4 partitioned coefficient formulae, and the sequential residual-maker result
 `M_{M₁X₂} M₁ [X₁ X₂] = 0` landed in `HansenEconometrics/Chapter3FWL.lean`.
-Theorem 3.5 coefficient and residual equivalence now landed. Theorem 3.4 partitioned
-coefficient formulae are still pending.
+Theorem 3.5 coefficient and residual equivalence now landed.
 
 ## Immediate target
-Backfill Theorem 3.4 partitioned coefficient formulae, then continue forward to leverage and
-leave-one-out results.
+No immediate Chapter 3 blocker; continue to the remaining Chapter 4, Chapter 6, and Chapter 7 gaps.
 
 ## Source text
 - `textbook/ch03/ch3_excerpt.txt` is a text extract of `chapters/03-the-algebra-of-least-squares.pdf`,
@@ -101,16 +102,26 @@ Conventions:
 | Equation (3.17) residuals sum to zero with an intercept | $\iota \in \operatorname{col}(X) \Longrightarrow \sum_i \hat{e}_i = 0$ | [residual_sum_zero_of_one_mem_colspan](../../HansenEconometrics/Chapter3LeastSquaresAlgebra.lean#L84)<br><code>∑ i, residual X y i = 0</code> |
 | Section 3.11 hat matrix | $P = X (X'X)^{-1} X'$ | [hatMatrix](../../HansenEconometrics/Chapter3Projections.lean#L24)<br><code>hatMatrix X := X * ⅟ (Xᵀ * X) * Xᵀ</code> |
 | Section 3.12 annihilator matrix | $M = I - P$ | [annihilatorMatrix](../../HansenEconometrics/Chapter3Projections.lean#L28)<br><code>annihilatorMatrix X := 1 - hatMatrix X</code> |
-| Theorem 3.3.1 hat-matrix symmetry | $P' = P$ | [hatMatrix_transpose](../../HansenEconometrics/Chapter3Projections.lean#L40)<br><code>(hatMatrix X)ᵀ = hatMatrix X</code> |
-| Theorem 3.3.2 hat-matrix idempotence | $P^2 = P$ | [hatMatrix_idempotent](../../HansenEconometrics/Chapter3Projections.lean#L104)<br><code>hatMatrix X * hatMatrix X = hatMatrix X</code> |
-| Equation (3.21) annihilator kills the regressors | $M X = 0$ | [annihilator_mul_X](../../HansenEconometrics/Chapter3Projections.lean#L90)<br><code>annihilatorMatrix X * X = 0</code> |
-| Equation (3.22) trace of the annihilator | $\operatorname{tr}(M) = n - k$ | [annihilatorMatrix_trace](../../HansenEconometrics/Chapter3Projections.lean#L145)<br><code>Matrix.trace (annihilatorMatrix X) = (Fintype.card n : ℝ) - Fintype.card k</code> |
-| Equation (3.23) residual representation | $\hat{e} = M Y$ | [residual_eq_annihilator_mul_y](../../HansenEconometrics/Chapter3Projections.lean#L242)<br><code>residual X y = annihilatorMatrix X *ᵥ y</code> |
-| Section 3.14 fitted values and residuals are orthogonal | $\hat{Y}' \hat{e} = 0$ | [fitted_dot_residual](../../HansenEconometrics/Chapter3Projections.lean#L249)<br><code>fitted X y ⬝ᵥ residual X y = 0</code> |
-| Section 3.14 Pythagorean decomposition | $Y'Y = \hat{Y}'\hat{Y} + \hat{e}'\hat{e}$ | [fitted_residual_pythagorean](../../HansenEconometrics/Chapter3Projections.lean#L259)<br><code>y ⬝ᵥ y = fitted X y ⬝ᵥ fitted X y + residual X y ⬝ᵥ residual X y</code> |
-| Theorem 3.4 partitioned coefficient formulae | $\hat{\beta}_1,\hat{\beta}_2$ as functions of partitioned moments |  |
-| Theorem 3.5 coefficient equivalence | $\hat{\beta}_2 = (X_2' M_1 X_2)^{-1} X_2' M_1 Y$ | [fromColsRightBeta_eq_fwlBeta](../../HansenEconometrics/Chapter3FWL.lean#L147)<br><code>fromColsRightBeta X₁ X₂ y = fwlBeta X₁ X₂ y</code> |
-| Theorem 3.5 residual equivalence | $\hat{e}_{\text{full}} = M_{M_1 X_2} M_1 Y$ | [fwl_residual_eq_full_residual](../../HansenEconometrics/Chapter3FWL.lean#L163)<br><code>residual (residualizedRegressors X₁ X₂) (annihilatorMatrix X₁ *ᵥ y) = residual (Matrix.fromCols X₁ X₂) y</code> |
+| Theorem 3.3.1 hat-matrix symmetry | $P' = P$ | [hatMatrix_transpose](../../HansenEconometrics/Chapter3Projections.lean#L25)<br><code>(hatMatrix X)ᵀ = hatMatrix X</code> |
+| Theorem 3.3.2 hat-matrix idempotence | $P^2 = P$ | [hatMatrix_idempotent](../../HansenEconometrics/Chapter3Projections.lean#L89)<br><code>hatMatrix X * hatMatrix X = hatMatrix X</code> |
+| Theorem 3.3.3 trace of the hat matrix | $\operatorname{tr}(P) = k$ | [hatMatrix_trace](../../HansenEconometrics/Chapter3Projections.lean#L98)<br><code>Matrix.trace (hatMatrix X) = Fintype.card k</code> |
+| Theorem 3.6 leverage values | $h_{ii}=X_i'(X'X)^{-1}X_i$, $0\le h_{ii}\le 1$, $h_{ii}\ge 1/n$ with an intercept, and $\sum_i h_{ii}=k$ | [leverageValue](../../HansenEconometrics/Chapter3Projections.lean#L113), [leverageValue_eq_row_invGram_row](../../HansenEconometrics/Chapter3Projections.lean#L119), [leverageValue_nonneg](../../HansenEconometrics/Chapter3Projections.lean#L127), [leverageValue_le_one](../../HansenEconometrics/Chapter3Projections.lean#L201), [inv_card_le_leverageValue_of_intercept](../../HansenEconometrics/Chapter3Projections.lean#L176), and [sum_leverageValue_eq_card](../../HansenEconometrics/Chapter3Projections.lean#L135). |
+| Theorem 3.7 leave-one-out regression | $\hat{\beta}_{(-i)}=\hat{\beta}-(X'X)^{-1}X_i\tilde e_i$ and $\tilde e_i=(1-h_{ii})^{-1}\hat e_i$ | [leaveOneOutGram](../../HansenEconometrics/Chapter3Projections.lean#L216), [leaveOneOutDesign](../../HansenEconometrics/Chapter3Projections.lean#L228), [leaveOneOutDesign_transpose_mul](../../HansenEconometrics/Chapter3Projections.lean#L237), [leaveOneOutDesign_transpose_mulVec](../../HansenEconometrics/Chapter3Projections.lean#L250), [leaveOneOutBeta](../../HansenEconometrics/Chapter3Projections.lean#L263), [leaveOneOutBetaDeleted_eq_leaveOneOutBeta](../../HansenEconometrics/Chapter3Projections.lean#L279), [leaveOneOutBeta_eq_olsBeta_sub_invGram_mulVec](../../HansenEconometrics/Chapter3Projections.lean#L306), [one_sub_leverage_mul_leaveOneOutResidual_eq_residual](../../HansenEconometrics/Chapter3Projections.lean#L338), and [leaveOneOutResidual_eq_inv_one_sub_leverage_mul_residual](../../HansenEconometrics/Chapter3Projections.lean#L362). |
+| Section 3.21 influential observations | $\hat{\beta}-\hat{\beta}_{(-i)}=(X'X)^{-1}X_i\tilde e_i$, $\hat Y_i-\tilde Y_i=h_{ii}\tilde e_i$, and $\max_i|\hat Y_i-\tilde Y_i|=\max_i|h_{ii}\tilde e_i|$ | [olsBeta_sub_leaveOneOutBeta_eq_invGram_mulVec](../../HansenEconometrics/Chapter3Projections.lean#L373), [fitted_sub_leaveOneOutPrediction_eq_leverage_mul_residual](../../HansenEconometrics/Chapter3Projections.lean#L386), [predictionInfluence_eq_abs_leverage_mul_leaveOneOutResidual](../../HansenEconometrics/Chapter3Projections.lean#L415), and [maxPredictionInfluence_eq_maxLeveragePredictionErrorInfluence](../../HansenEconometrics/Chapter3Projections.lean#L442). |
+| Theorem 3.3.4 hat-matrix eigenvalues | $\lambda_i(P) \in \{0,1\}$, with $k$ eigenvalues equal to $1$ | [hatMatrix_eigenvalues_zero_or_one](../../HansenEconometrics/Chapter3Projections.lean#L510)<br><code>∀ i, eigenvalues i = 0 ∨ eigenvalues i = 1</code><br>[hatMatrix_card_eigenvalues_eq_one](../../HansenEconometrics/Chapter3Projections.lean#L519)<br><code>Fintype.card {i // eigenvalues i = 1} = Fintype.card k</code> |
+| Theorem 3.3.5 rank of the hat matrix | $\operatorname{rank}(P) = k$ | [rank_hatMatrix](../../HansenEconometrics/Chapter3Projections.lean#L501)<br><code>(hatMatrix X).rank = Fintype.card k</code> |
+| Equation (3.21) annihilator kills the regressors | $M X = 0$ | [annihilator_mul_X](../../HansenEconometrics/Chapter3Projections.lean#L75)<br><code>annihilatorMatrix X * X = 0</code> |
+| Equation (3.22) trace of the annihilator | $\operatorname{tr}(M) = n - k$ | [annihilatorMatrix_trace](../../HansenEconometrics/Chapter3Projections.lean#L466)<br><code>Matrix.trace (annihilatorMatrix X) = (Fintype.card n : ℝ) - Fintype.card k</code> |
+| Section 3.12 annihilator eigenvalues and rank | $\lambda_i(M) \in \{0,1\}$, $\operatorname{rank}(M)=n-k$ | [annihilatorMatrix_eigenvalues_zero_or_one](../../HansenEconometrics/Chapter3Projections.lean#L529)<br><code>∀ i, eigenvalues i = 0 ∨ eigenvalues i = 1</code><br>[rank_annihilatorMatrix](../../HansenEconometrics/Chapter3Projections.lean#L495)<br><code>(annihilatorMatrix X).rank = Fintype.card n - Fintype.card k</code> |
+| Equation (3.23) residual representation | $\hat{e} = M Y$ | [residual_eq_annihilator_mul_y](../../HansenEconometrics/Chapter3Projections.lean#L575)<br><code>residual X y = annihilatorMatrix X *ᵥ y</code> |
+| Section 3.14 fitted values and residuals are orthogonal | $\hat{Y}' \hat{e} = 0$ | [fitted_dot_residual](../../HansenEconometrics/Chapter3Projections.lean#L582)<br><code>fitted X y ⬝ᵥ residual X y = 0</code> |
+| Section 3.14 Pythagorean decomposition | $Y'Y = \hat{Y}'\hat{Y} + \hat{e}'\hat{e}$ | [fitted_residual_pythagorean](../../HansenEconometrics/Chapter3Projections.lean#L592)<br><code>y ⬝ᵥ y = fitted X y ⬝ᵥ fitted X y + residual X y ⬝ᵥ residual X y</code> |
+| Section 3.14 centered fitted/residual orthogonality | $(\hat{Y}-\bar{Y}\iota)'\hat{e}=0$ when `X` contains an intercept | [centered_fitted_dot_residual](../../HansenEconometrics/Chapter3Projections.lean#L640)<br><code>centeredAtSampleMean y (fitted X y) ⬝ᵥ residual X y = 0</code> |
+| Section 3.14 analysis-of-variance formula | $\sum_i(Y_i-\bar{Y})^2=\sum_i(\hat{Y}_i-\bar{Y})^2+\sum_i\hat{e}_i^2$ | [centered_anova_decomposition](../../HansenEconometrics/Chapter3Projections.lean#L666)<br><code>totalSumSquares y = explainedSumSquares X y + residualSumSquares X y</code> |
+| Section 3.14 coefficient of determination | $R^2=\mathrm{ESS}/\mathrm{TSS}=1-\mathrm{RSS}/\mathrm{TSS}$ | [rSquared](../../HansenEconometrics/Chapter3Projections.lean#L627)<br>[rSquared_eq_one_sub_residualSumSquares_div_totalSumSquares](../../HansenEconometrics/Chapter3Projections.lean#L677)<br><code>rSquared X y = 1 - residualSumSquares X y / totalSumSquares y</code> |
+| Theorem 3.4 partitioned coefficient formulae | $\hat{\beta}_1=(X_1' M_2 X_1)^{-1} X_1' M_2Y$, $\hat{\beta}_2=(X_2' M_1 X_2)^{-1} X_2' M_1Y$ | [partitionedLeftBetaFormula](../../HansenEconometrics/Chapter3FWL.lean#L83)<br>[partitionedRightBetaFormula](../../HansenEconometrics/Chapter3FWL.lean#L75)<br>[fromColsBeta_eq_partitionedBetaFormulas](../../HansenEconometrics/Chapter3FWL.lean#L328)<br><code>fromColsLeftBeta X₁ X₂ y = partitionedLeftBetaFormula X₁ X₂ y ∧ fromColsRightBeta X₁ X₂ y = partitionedRightBetaFormula X₁ X₂ y</code> |
+| Theorem 3.5 coefficient equivalence | $\hat{\beta}_2 = (X_2' M_1 X_2)^{-1} X_2' M_1 Y$ | [fromColsRightBeta_eq_fwlBeta](../../HansenEconometrics/Chapter3FWL.lean#L209)<br><code>fromColsRightBeta X₁ X₂ y = fwlBeta X₁ X₂ y</code> |
+| Theorem 3.5 residual equivalence | $\hat{e}_{\text{full}} = M_{M_1 X_2} M_1 Y$ | [fwl_residual_eq_full_residual](../../HansenEconometrics/Chapter3FWL.lean#L342)<br><code>residual (residualizedRegressors X₁ X₂) (annihilatorMatrix X₁ *ᵥ y) = residual (Matrix.fromCols X₁ X₂) y</code> |
 
 ## Lean-only bridge results
 
@@ -127,12 +138,7 @@ not surfaced here.
 
 ## Notes
 
-- Theorem 3.4 is still intentionally blank: it is one of the main remaining Chapter 3
-  theorem labels not yet wrapped in the current Lean layer. Theorem 3.1 is fully landed
-  (existence half via `sumSquaredErrors_olsBeta_le` / `olsBeta_isMinOn`; uniqueness via
-  `olsBeta_eq_of_minimizer`).
+- Theorem 3.1 is fully landed (existence half via `sumSquaredErrors_olsBeta_le` /
+  `olsBeta_isMinOn`; uniqueness via `olsBeta_eq_of_minimizer`).
 - Several Lean helper results in the projection file are stronger than the textbook labels because
-  they package reusable matrix facts such as rank and Hermitian structure.
-- The projection-rank helper [rank_hatMatrix](../../HansenEconometrics/Chapter3Projections.lean#L174)
-  now carries `[DecidableEq n]`, matching the decidability needed by the reusable
-  rank-equals-trace argument for finite matrix indices.
+  they package reusable matrix facts such as rank, Hermitian structure, and eigenvalue counts.

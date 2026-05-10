@@ -447,8 +447,9 @@ theorem sampleScoreCovResAbsWtStar_nonneg
 theorem sampleScoreCovStar_apply_self_nonneg
     (X : Matrix n k ℝ) (y : n → ℝ) (a : k) :
     0 ≤ sampleScoreCovStar X y a a := by
-  simp [sampleScoreCovStar, Matrix.smul_apply, Matrix.sum_apply,
-    Matrix.vecMulVec_apply, smul_eq_mul]
+  unfold sampleScoreCovStar
+  simp only [Matrix.smul_apply, Matrix.sum_apply, Matrix.vecMulVec_apply, Pi.smul_apply,
+    smul_eq_mul]
   refine mul_nonneg (inv_nonneg.mpr (show 0 ≤ (Fintype.card n : ℝ) by positivity)) ?_
   refine Finset.sum_nonneg ?_
   intro i _
@@ -493,30 +494,36 @@ theorem sampleScoreCovResAbsWtStar_le_diag_add
                   (olsResidualStar X y i) ^ 2 * X i b * X i b := by
                   ring
     _ = sampleScoreCovStar X y a a + sampleScoreCovStar X y b b := by
-      simp [sampleScoreCovStar, Matrix.smul_apply, Matrix.sum_apply,
-        Matrix.vecMulVec_apply, smul_eq_mul, pow_two]
+      unfold sampleScoreCovStar
+      simp only [Matrix.smul_apply, Matrix.sum_apply, Matrix.vecMulVec_apply, Pi.smul_apply,
+        smul_eq_mul, pow_two]
       rw [Finset.sum_add_distrib, mul_add]
       let c : ℝ := (Fintype.card n : ℝ)⁻¹
       have hA :
           ∑ x : n, olsResidualStar X y x * olsResidualStar X y x * X x a * X x a =
-            ∑ x : n, olsResidualStar X y x * (olsResidualStar X y x * (X x a * X x a)) := by
+            ∑ x : n, olsResidualStar X y x * X x a *
+              (olsResidualStar X y x * X x a) := by
         refine Finset.sum_congr rfl ?_
         intro x hx
         ring
       have hB :
           ∑ x : n, olsResidualStar X y x * olsResidualStar X y x * X x b * X x b =
-            ∑ x : n, olsResidualStar X y x * (olsResidualStar X y x * (X x b * X x b)) := by
+            ∑ x : n, olsResidualStar X y x * X x b *
+              (olsResidualStar X y x * X x b) := by
         refine Finset.sum_congr rfl ?_
         intro x hx
         ring
       calc
         c * ∑ x : n, olsResidualStar X y x * olsResidualStar X y x * X x a * X x a +
             c * ∑ x : n, olsResidualStar X y x * olsResidualStar X y x * X x b * X x b
-            = c * ∑ x : n, olsResidualStar X y x * (olsResidualStar X y x * (X x a * X x a)) +
+            = c * ∑ x : n, olsResidualStar X y x * X x a *
+                (olsResidualStar X y x * X x a) +
                 c * ∑ x : n, olsResidualStar X y x * olsResidualStar X y x * X x b * X x b := by
               rw [hA]
-        _ = c * ∑ x : n, olsResidualStar X y x * (olsResidualStar X y x * (X x a * X x a)) +
-              c * ∑ x : n, olsResidualStar X y x * (olsResidualStar X y x * (X x b * X x b)) := by
+        _ = c * ∑ x : n, olsResidualStar X y x * X x a *
+                (olsResidualStar X y x * X x a) +
+              c * ∑ x : n, olsResidualStar X y x * X x b *
+                (olsResidualStar X y x * X x b) := by
               rw [hB]
 
 /-- Deterministic entrywise bound for generic leverage adjustments.

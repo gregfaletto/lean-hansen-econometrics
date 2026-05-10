@@ -63,21 +63,64 @@ weighted lower bound is now formalized as
 For estimator bookkeeping, Chapter 4 now includes the finite-sample residual variance estimator,
 its deterministic linear-model/quadratic-form rewrites, conditional and unconditional
 homoskedastic unbiasedness, HC0/HC1/HC2/HC3 covariance estimators, and a minimal clustered
-sandwich definition with a linear-model rewrite.
+sandwich definition with the Hansen (4.51) finite-sample adjustment, singleton-cluster HC0/HC1
+bridges, and a linear-model rewrite. The scalar HC leverage-weight ordering
+`1 ≤ (1-h)⁻¹ ≤ ((1-h)⁻¹)^2` is also formalized on the nonsaturated range `0 ≤ h < 1`,
+and the corresponding HC0/HC2/HC3 covariance-matrix ordering is proved in positive-semidefinite
+order. HC2 and HC3 conditional-expectation identities are now lifted to the covariance-matrix
+level under both homoskedastic and diagonal heteroskedastic conditional second moments, and
+singleton clusters are proved to reduce the clustered sandwich to HC0, and the adjusted clustered
+estimator to HC1. The cluster-score outer-product middle matrix and the unadjusted/adjusted
+clustered sandwich estimators are now proved positive semidefinite, with the adjusted result requiring
+the finite-sample scale factor to be nonnegative; the standard cardinality range `k < n` and `1 < G`
+now discharges that nonnegativity condition. Chapter 4 also has a CR3-style cluster leave-out API:
+cluster row subtypes, cluster design/residual/leverage blocks, the equation (4.52) residual adjustment,
+the reduced-Gram equation (4.53) coefficient identity, the equation (4.54) covariance estimator, and a
+PSD theorem for that CR3-style estimator. It now names the CR3 cluster score
+`clusterCR3Score` and score middle `clusterCR3ScoreMiddle`, rewrites the CR3 sandwich through that
+score API, and includes both the deterministic conservativeness bridge
+`olsClusteredCR3VarianceEstimator_conservative_of_middle` and the conditional lift
+`condExp_olsClusteredCR3VarianceEstimator_conservative_of_middle`: middle-matrix PSD dominance
+implies sandwich-level PSD dominance. The block monotonicity lemmas
+`clusterCovarianceMiddle_mono_posSemidef` and
+`olsClusterConditionalVarianceMatrix_mono_posSemidef` now reduce middle/sandwich dominance to
+clusterwise block dominance, and
+`condExp_olsClusteredCR3VarianceEstimator_conservative_of_block_middle` specializes the CR3
+conditional conservativeness lift to conditional CR3 middle blocks `Γ_g` that dominate `Σ_g`.
+The CR3 layer also has linear-model rewrites
+`clusterResidual_linear_model`, `clusterCR3Residual_linear_model`,
+`clusterCR3Score_linear_model`, and `clusterCR3ScoreMiddle_linear_model`, reducing the random CR3
+blocks to deterministic transforms of the annihilator-transformed structural errors.
+The multi-observation cluster block layer now also has the
+finite partition identity `clusterIndex_sum_eq_sum`, entrywise Gram/cross-product rewrites, cluster
+Gram and cross-product decompositions back to `Xᵀ * X` and `Xᵀ *ᵥ y`, the sandwich rewrite
+`olsClusteredVarianceEstimator_eq_clusterScore`, and the residual cluster-score identities
+`sum_clusterScore_eq_transpose_mulVec_residual` and `sum_clusterScore_eq_zero`. It now also has
+the Hansen (4.46)--(4.47) cluster covariance middle/sandwich API
+`clusterCovarianceMiddle` and `olsClusterConditionalVarianceMatrix`, PSD inheritance from
+PSD cluster covariance blocks, the block outer-product/score-middle bridge
+`clusterCovarianceMiddle_outer_eq_scoreMiddle`, the true-error cluster-score decomposition
+`olsBeta_linear_decomposition_clusterScores`, the infeasible true-error block bridge
+`clusterCovarianceMiddle_errorOuter_eq_clusterErrorScoreMiddle`, coordinatewise and matrix-valued
+conditional-expectation bridges for the infeasible true-error score middle, the sandwich lift
+`condExp_clusterErrorScoreSandwich_eq_olsClusterConditionalVarianceMatrix`, and residual/CR3 block
+rewrites `olsClusteredVarianceEstimator_eq_clusterCovarianceMiddle_residualOuter` and
+`olsClusteredCR3VarianceEstimator_eq_clusterCovarianceMiddle_cr3Outer`.
 
 ## Deferred / won't do for now
 For the current pass we are intentionally not pushing Chapter 4 to applied-completeness.
 The following are explicitly deferred unless they become prerequisite later:
-- heteroskedastic formula for `E[σ̂² | X] = n⁻¹ tr(MD)`
-- HC2/HC3 unbiasedness or finite-sample ordering results
-- clustered covariance asymptotics and partition/Finpartition infrastructure
-- HC4 and other leverage-adjustment families
+- clustered covariance asymptotics beyond the finite covariance-middle/block and conditional-sandwich
+  identities now proved
+- the raw CR3 middle-moment identification needed to build the conditional covariance matrices
+  `Γ_g` for the adjusted annihilator-error blocks from primitive cluster error assumptions
 
 Reason: these are lower-priority extensions beyond the finite-sample estimator layer landed here.
 
 ## Immediate target
-Move on to Chapter 5 (Normal Regression): conditional and unconditional distribution theory for OLS,
-residuals, variance estimators, t statistics, confidence intervals, and classical tests under normality.
+If continuing Chapter 4, the next target is identifying the conditional covariance matrices `Γ_g`
+for the adjusted annihilator-error CR3 blocks under explicit cluster error assumptions, or a genuine clustered asymptotic theorem beyond the finite
+conditional covariance API; otherwise continue to the remaining Chapter 6 and Chapter 7 asymptotic gaps.
 
 ## LaTeX / Lean Crosswalk
 
@@ -101,31 +144,91 @@ Conventions:
 | Orthogonal-error specialization | $X' e = 0 \Longrightarrow \hat{\beta} = \beta$ | [olsBeta_eq_of_regressors_orthogonal_error](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L30)<br><code>olsBeta X (X *ᵥ β + e) = β</code> |
 | Fitted values in the linear model | $\hat{Y} = X \beta + P e$ | [fitted_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L38)<br><code>fitted X (X *ᵥ β + e) = X *ᵥ β + hatMatrix X *ᵥ e</code> |
 | Residuals in the linear model | $\hat{e} = M e$ | [residual_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L47)<br><code>residual X (X *ᵥ β + e) = annihilatorMatrix X *ᵥ e</code> |
-| Theorem 4.1 conditional unbiasedness | $\mathbb{E}[\hat{\beta} \mid X] = \beta$ | [ols_condExp_eq_beta](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L539)<br><code>μ[fun ω => olsBeta X (X *ᵥ β + e ω) &#124; m] =ᵐ[μ] fun _ => β</code> |
-| Theorem 4.1 unconditional unbiasedness | $\mathbb{E}[\hat{\beta}] = \beta$ | [ols_integral_eq_beta](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L584)<br><code>∫ ω, olsBeta X (X *ᵥ β + e ω) ∂μ = β</code> |
-| Theorem 4.2 conditional covariance formula | $\operatorname{Var}(\hat{\beta} \mid X) = (X'X)^{-1} X' D X (X'X)^{-1}$ | [olsConditionalVarianceMatrix](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L57)<br><code>olsConditionalVarianceMatrix X D := ⅟ (Xᵀ * X) * Xᵀ * D * X * ⅟ (Xᵀ * X)</code><br>[ols_condExp_centered_mul_eq_variance_matrix](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L843)<br><code>μ[fun ω => Matrix.of fun i j => centered β̂ ω i * centered β̂ ω j &#124; m] =ᵐ[μ] fun _ => olsConditionalVarianceMatrix X D</code> |
-| Theorem 4.2 unconditional covariance identity | $\mathbb{E}[(\hat{\beta} - \beta)(\hat{\beta} - \beta)'] = \mathbb{E}[\operatorname{Var}(\hat{\beta} \mid X)]$ | [ols_integral_centered_mul_eq_variance_matrix](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1016)<br><code>∫ ω, Matrix.of fun i j => centered β̂ ω i * centered β̂ ω j ∂μ = olsConditionalVarianceMatrix X D</code> |
-| Theorem 4.2 homoskedastic simplification | $\operatorname{Var}(\hat{\beta} \mid X) = \sigma^2 (X'X)^{-1}$ | [olsConditionalVarianceMatrix_homoskedastic](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L88)<br><code>olsConditionalVarianceMatrix X (σ2 • 1) = σ2 • ⅟ (Xᵀ * X)</code> |
-| Gauss-Markov lower bound | $\operatorname{Var}(\tilde{\beta} \mid X) - \operatorname{Var}(\hat{\beta} \mid X) \succeq 0$ | [gaussMarkov_variance_gap_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L244)<br><code>(Aᵀ * A - ⅟ (Xᵀ * X)).PosSemidef</code> |
-| GLS coefficient | $\hat{\beta}_{GLS} = (X' \Omega^{-1} X)^{-1} X' \Omega^{-1} Y$ | [glsBeta](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1081)<br><code>glsBeta X Ω y := (⅟ (Xᵀ * Ω⁻¹ * X)) *ᵥ (Xᵀ *ᵥ (Ω⁻¹ *ᵥ y))</code> |
-| GLS decomposition | $\hat{\beta}_{GLS} = \beta + (X' \Omega^{-1} X)^{-1} X' \Omega^{-1} e$ | [glsBeta_linear_decomposition](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1087)<br><code>glsBeta X Ω (X *ᵥ β + e) = β + (⅟ (Xᵀ * Ω⁻¹ * X)) *ᵥ (Xᵀ *ᵥ (Ω⁻¹ *ᵥ e))</code> |
-| Generalized Gauss-Markov lower bound | weighted variance gap is positive semidefinite | [generalizedGaussMarkov_variance_gap_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1112)<br><code>(Aᵀ * Ω * A - ⅟ (Xᵀ * Ω⁻¹ * X)).PosSemidef</code> |
+| Theorem 4.1 conditional unbiasedness | $\mathbb{E}[\hat{\beta} \mid X] = \beta$ | [ols_condExp_eq_beta](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1269)<br><code>μ[fun ω => olsBeta X (X *ᵥ β + e ω) &#124; m] =ᵐ[μ] fun _ => β</code> |
+| Theorem 4.1 unconditional unbiasedness | $\mathbb{E}[\hat{\beta}] = \beta$ | [ols_integral_eq_beta](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1314)<br><code>∫ ω, olsBeta X (X *ᵥ β + e ω) ∂μ = β</code> |
+| Theorem 4.2 conditional covariance formula | $\operatorname{Var}(\hat{\beta} \mid X) = (X'X)^{-1} X' D X (X'X)^{-1}$ | [olsConditionalVarianceMatrix](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L57)<br><code>olsConditionalVarianceMatrix X D := ⅟ (Xᵀ * X) * Xᵀ * D * X * ⅟ (Xᵀ * X)</code><br>[ols_condExp_centered_mul_eq_variance_matrix](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1573)<br><code>μ[fun ω => Matrix.of fun i j => centered β̂ ω i * centered β̂ ω j &#124; m] =ᵐ[μ] fun _ => olsConditionalVarianceMatrix X D</code> |
+| Theorem 4.2 unconditional covariance identity | $\mathbb{E}[(\hat{\beta} - \beta)(\hat{\beta} - \beta)'] = \mathbb{E}[\operatorname{Var}(\hat{\beta} \mid X)]$ | [ols_integral_centered_mul_eq_variance_matrix](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1746)<br><code>∫ ω, Matrix.of fun i j => centered β̂ ω i * centered β̂ ω j ∂μ = olsConditionalVarianceMatrix X D</code> |
+| Theorem 4.2 homoskedastic simplification | $\operatorname{Var}(\hat{\beta} \mid X) = \sigma^2 (X'X)^{-1}$ | [olsConditionalVarianceMatrix_homoskedastic](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L102)<br><code>olsConditionalVarianceMatrix X (σ2 • 1) = σ2 • ⅟ (Xᵀ * X)</code> |
+| Gauss-Markov lower bound | $\operatorname{Var}(\tilde{\beta} \mid X) - \operatorname{Var}(\hat{\beta} \mid X) \succeq 0$ | [gaussMarkov_variance_gap_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L469)<br><code>(Aᵀ * A - ⅟ (Xᵀ * X)).PosSemidef</code> |
+| GLS coefficient | $\hat{\beta}_{GLS} = (X' \Omega^{-1} X)^{-1} X' \Omega^{-1} Y$ | [glsBeta](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1811)<br><code>glsBeta X Ω y := (⅟ (Xᵀ * Ω⁻¹ * X)) *ᵥ (Xᵀ *ᵥ (Ω⁻¹ *ᵥ y))</code> |
+| GLS decomposition | $\hat{\beta}_{GLS} = \beta + (X' \Omega^{-1} X)^{-1} X' \Omega^{-1} e$ | [glsBeta_linear_decomposition](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1817)<br><code>glsBeta X Ω (X *ᵥ β + e) = β + (⅟ (Xᵀ * Ω⁻¹ * X)) *ᵥ (Xᵀ *ᵥ (Ω⁻¹ *ᵥ e))</code> |
+| Generalized Gauss-Markov lower bound | weighted variance gap is positive semidefinite | [generalizedGaussMarkov_variance_gap_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1842)<br><code>(Aᵀ * Ω * A - ⅟ (Xᵀ * Ω⁻¹ * X)).PosSemidef</code> |
 | White HC0 covariance estimator | $\hat{V}_{HC0} = (X'X)^{-1} X' \operatorname{diag}(\hat{e}_i^2) X (X'X)^{-1}$ | [olsHuberWhiteVarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L68)<br><code>olsHuberWhiteVarianceEstimator X y := olsConditionalVarianceMatrix X (Matrix.diagonal fun i => residual X y i ^ 2)</code> |
 | HC1 covariance estimator | $\hat{V}_{HC1} = \frac{n}{n-k} \hat{V}_{HC0}$ | [olsHuberWhiteHC1VarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L73)<br><code>olsHuberWhiteHC1VarianceEstimator X y := ((n : ℝ) / (n - k : ℝ)) • olsHuberWhiteVarianceEstimator X y</code> |
-| Residual variance estimator `s²` | $s^2 = (n-k)^{-1}\sum_i \hat e_i^2$ | [olsResidualVarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L175), [olsResidualSumSquares](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L182), [olsResidualVarianceEstimator_linear_model_quadratic_form](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L233) |
-| `s²` conditional and unconditional unbiasedness | $\mathbb{E}[s^2 \mid X] = \sigma^2$ and $\mathbb{E}[s^2] = \sigma^2$ under homoskedastic conditional second moments | [ols_condExp_residualVarianceEstimator_eq_sigmaSq](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L374), [ols_integral_residualVarianceEstimator_eq_sigmaSq](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L424) |
-| HC2 covariance estimator | $\hat V_{HC2} = (X'X)^{-1} X'\operatorname{diag}((1-h_{ii})^{-1}\hat e_i^2)X(X'X)^{-1}$ | [olsHuberWhiteHC2VarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L116), [olsHuberWhiteHC2VarianceEstimator_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L142) |
-| HC3 covariance estimator | $\hat V_{HC3} = (X'X)^{-1} X'\operatorname{diag}((1-h_{ii})^{-2}\hat e_i^2)X(X'X)^{-1}$ | [olsHuberWhiteHC3VarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L124), [olsHuberWhiteHC3VarianceEstimator_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L152) |
-| Clustered covariance estimator | cluster-level score sandwich | [olsClusteredVarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L131), [olsClusteredVarianceEstimator_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L162) |
+| Method-of-moments residual variance `σ̂²` | $\hat{\sigma}^2 = n^{-1}\sum_i \hat e_i^2$ and, under diagonal heteroskedastic conditional second moments, $\mathbb{E}[\hat{\sigma}^2 \mid X] = n^{-1}\operatorname{tr}(MD)$ | [olsSigmaSqHat](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L382), [olsSigmaSqHat_linear_model_quadratic_form](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L446), and [ols_condExp_sigmaSqHat_eq_inv_card_trace_diagonal](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1070) |
+| Residual variance estimator `s²` | $s^2 = (n-k)^{-1}\sum_i \hat e_i^2$ | [olsResidualVarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L388), [olsResidualSumSquares](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L395), [olsResidualVarianceEstimator_linear_model_quadratic_form](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L458) |
+| `s²` conditional and unconditional unbiasedness | $\mathbb{E}[s^2 \mid X] = \sigma^2$ and $\mathbb{E}[s^2] = \sigma^2$ under homoskedastic conditional second moments | [ols_condExp_residualVarianceEstimator_eq_sigmaSq](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1104), [ols_integral_residualVarianceEstimator_eq_sigmaSq](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1154) |
+| HC2 covariance estimator | $\hat V_{HC2} = (X'X)^{-1} X'\operatorname{diag}((1-h_{ii})^{-1}\hat e_i^2)X(X'X)^{-1}$ | [olsHuberWhiteHC2VarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L130), [olsHuberWhiteHC2VarianceEstimator_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L326), homoskedastic matrix conditional expectation [condExp_olsHuberWhiteHC2VarianceEstimator_eq_homoskedastic](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L905), and diagonal heteroskedastic expectation [condExp_olsHuberWhiteHC2VarianceEstimator_eq_diagonal](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L970) |
+| HC3 covariance estimator | $\hat V_{HC3} = (X'X)^{-1} X'\operatorname{diag}((1-h_{ii})^{-2}\hat e_i^2)X(X'X)^{-1}$ | [olsHuberWhiteHC3VarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L138), [olsHuberWhiteHC3VarianceEstimator_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L336), homoskedastic inflated-expectation bridge [condExp_olsHuberWhiteHC3VarianceEstimator_eq_homoskedastic_inflated](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L938), and diagonal heteroskedastic expectation [condExp_olsHuberWhiteHC3VarianceEstimator_eq_diagonal](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1004) |
+| Clustered covariance estimator | cluster-level score sandwich, Hansen finite-sample adjustment, singleton-cluster simplifications, finite block decompositions, cluster covariance middle/sandwich formulas, and CR3-style leave-cluster-out estimator | [olsClusteredVarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L251), [clusterFiniteSampleAdjustment](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L263), adjustment nonnegativity [clusterFiniteSampleAdjustment_nonneg](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L271), [olsClusteredVarianceEstimatorAdjusted](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L299), cluster-score middle PSD [olsClusteredScoreMiddle_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L307), unadjusted sandwich PSD [olsClusteredVarianceEstimator_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L320), adjusted sandwich PSD [olsClusteredVarianceEstimatorAdjusted_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L338), cardinality-discharge adjusted PSD [olsClusteredVarianceEstimatorAdjusted_posSemidef_of_card](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L349), true cluster middle [clusterCovarianceMiddle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L403), true cluster sandwich [olsClusterConditionalVarianceMatrix](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L412), block outer-product bridge [clusterCovarianceMiddle_outer_eq_scoreMiddle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L492), true-error cluster score [clusterErrorScore](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L581), clustered OLS decomposition [olsBeta_linear_decomposition_clusterScores](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L672), true-error block bridge [clusterCovarianceMiddle_errorOuter_eq_clusterErrorScoreMiddle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L684), finite cluster partition [clusterIndex_sum_eq_sum](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L389), cluster Gram decomposition [sum_clusterGramContribution_eq_gram](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L478), cluster cross-product decomposition [sum_clusterCrossContribution_eq_cross](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L499), named score sandwich rewrite [olsClusteredVarianceEstimator_eq_clusterScore](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L564), residual block sandwich rewrite [olsClusteredVarianceEstimator_eq_clusterCovarianceMiddle_residualOuter](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L737), residual score zero identity [sum_clusterScore_eq_zero](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L594), CR3 cluster residual [clusterCR3Residual](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L421), CR3 residual adjustment equation [clusterLeaveOutAdjustmentMatrix_mulVec_clusterCR3Residual](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L431), reduced-Gram leave-out coefficient [clusterLeaveOutBeta](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L617), equation (4.53) [clusterLeaveOutBeta_eq_olsBeta_sub_invGram_mulVec_cr3Residual](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L685), CR3 score [clusterCR3Score](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L742), CR3 score middle `clusterCR3ScoreMiddle`, CR3 covariance estimator [olsClusteredCR3VarianceEstimator](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L761), named CR3 score sandwich rewrites [olsClusteredCR3VarianceEstimator_eq_clusterCR3Score](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L775) and `olsClusteredCR3VarianceEstimator_eq_clusterCR3ScoreMiddle`, CR3 block sandwich rewrite [olsClusteredCR3VarianceEstimator_eq_clusterCovarianceMiddle_cr3Outer](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L973), CR3 deterministic conservativeness bridge [olsClusteredCR3VarianceEstimator_conservative_of_middle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L803), CR3 conditional conservativeness lift `condExp_olsClusteredCR3VarianceEstimator_conservative_of_middle`, CR3 PSD [olsClusteredCR3VarianceEstimator_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L827), singleton-cluster HC0 identity [olsClusteredVarianceEstimator_singleton](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L861), singleton adjusted-HC1 identity [olsClusteredVarianceEstimatorAdjusted_singleton](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L899), and [olsClusteredVarianceEstimator_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L952) |
 
 ## Lean-only bridge results
 
 - [olsHetCovHC2Star_eq_smul_olsHuberWhiteHC2VarianceEstimator](../../HansenEconometrics/Chapter7Asymptotics/SandwichAssembly.lean#L1271): Chapter 7 totalized HC2 equals `(Fintype.card n : ℝ) •` the Chapter 4 base HC2 estimator on nonsingular designs.
 - [olsHetCovHC3Star_eq_smul_olsHuberWhiteHC3VarianceEstimator](../../HansenEconometrics/Chapter7Asymptotics/SandwichAssembly.lean#L1284): analogous HC3 bridge.
+- [olsConditionalVarianceMatrix_diagonal_apply](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L88): entrywise form of a deterministic diagonal covariance sandwich.
+- [hc_leverage_weight_ordering](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L150): on `0 ≤ h < 1`, the HC2 scalar leverage weight dominates HC0 and the HC3 scalar leverage weight dominates HC2.
+- [olsConditionalVarianceMatrix_diagonal_mono_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L164): monotone diagonal covariance weights induce a positive-semidefinite sandwich difference.
+- [olsSandwichMiddle_mono_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L195): middle-matrix PSD dominance is preserved by the OLS sandwich.
+- [clusterCovarianceMiddle_mono_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): clusterwise block PSD dominance is preserved by Hansen's clustered covariance middle matrix.
+- [olsClusterConditionalVarianceMatrix_mono_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): clusterwise block PSD dominance is preserved by the clustered OLS covariance sandwich.
+- [condExp_deterministic_sandwich_eq](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): entrywise conditional expectations for a random middle matrix lift through a deterministic sandwich.
+- [olsHuberWhiteVarianceEstimator_le_HC2_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L219): finite-sample HC2 dominates HC0 in PSD order on the nonsaturated leverage range.
+- [olsHuberWhiteHC2VarianceEstimator_le_HC3_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L240): finite-sample HC3 dominates HC2 in PSD order on the nonsaturated leverage range.
+- [sum_vecMulVec_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L259): reusable finite-sum outer-product PSD lemma for score-middle matrices.
+- [olsClusteredVarianceEstimator_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L320): unadjusted clustered sandwich covariance estimator is PSD.
+- [clusterFiniteSampleAdjustment_nonneg](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L271): the finite-sample clustered adjustment is nonnegative when `k < n` and `1 < G`.
+- [olsClusteredVarianceEstimatorAdjusted_posSemidef_of_card](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L349): adjusted clustered sandwich covariance estimator is PSD on that standard cardinality range.
+- [clusterCovarianceMiddle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L403): Hansen equation (4.46), `∑_g X_gᵀ Σ_g X_g`, with cluster-specific covariance blocks.
+- [olsClusterConditionalVarianceMatrix](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L412): Hansen equation (4.47), the clustered OLS covariance sandwich.
+- [clusterCovarianceMiddle_outer_eq_scoreMiddle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L492): block outer products rewrite to cluster-score outer products, matching Hansen equation (4.49).
+- [clusterErrorScore](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L581): true-error cluster score `X_gᵀ *ᵥ e_g`.
+- [sum_clusterErrorScore_eq_transpose_mulVec_error](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L654): true-error cluster scores add to `Xᵀ *ᵥ e`.
+- [olsBeta_linear_decomposition_clusterScores](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L672): clustered form of the OLS decomposition `β̂ - β = (XᵀX)⁻¹∑_g X_gᵀe_g`.
+- [clusterCovarianceMiddle_errorOuter_eq_clusterErrorScoreMiddle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L684): infeasible true-error block outer products rewrite to true-error cluster-score outer products.
+- [condExp_clusterErrorScoreMiddle_entry_eq_clusterCovarianceMiddle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1751): coordinatewise conditional expectation of the infeasible true-error score middle equals Hansen's clustered covariance middle.
+- [condExp_clusterErrorScoreMiddle_eq_clusterCovarianceMiddle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1871): matrix-valued conditional expectation of the infeasible true-error score middle equals Hansen's clustered covariance middle.
+- [condExp_clusterErrorScoreSandwich_eq_olsClusterConditionalVarianceMatrix](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1933): matrix-valued conditional expectation of the infeasible true-error cluster-score sandwich equals Hansen's clustered OLS covariance sandwich.
+- [clusterCR3Residual](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L421): equation (4.52) CR3-style cluster prediction-error adjustment.
+- [clusterLeaveOutBeta_eq_olsBeta_sub_invGram_mulVec_cr3Residual](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L685): equation (4.53) reduced-Gram cluster leave-out coefficient identity.
+- [clusterCR3Score](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L742): named `X_gᵀ *ᵥ \tilde e_g` CR3 cluster score.
+- [clusterCR3ScoreMiddle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): named CR3 score outer-product middle matrix.
+- [clusterResidual_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): cluster residual blocks reduce to annihilator-transformed structural errors in the linear model.
+- [clusterCR3Residual_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): CR3 residual blocks reduce to leave-cluster-out adjustments applied to annihilator-transformed structural errors.
+- [clusterCR3Score_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): CR3 cluster scores are deterministic linear transforms of annihilator-transformed structural errors.
+- [clusterCR3ScoreMiddle_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): CR3 score middle rewrites as clusterwise outer products of those adjusted annihilator-error scores.
+- [olsClusteredCR3VarianceEstimator_eq_clusterCR3Score](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L775): CR3 sandwich estimator rewritten with the named CR3 score API.
+- [olsClusteredCR3VarianceEstimator_conservative_of_middle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L803): middle-matrix dominance implies CR3 sandwich conservativeness.
+- [condExp_olsClusteredCR3VarianceEstimator_eq_sandwich_of_middle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): conditional expected CR3 sandwich from a conditional expected CR3 middle matrix.
+- [condExp_olsClusteredCR3VarianceEstimator_conservative_of_middle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): conditional expected CR3 sandwich conservativeness from conditional expected CR3 middle dominance over Hansen's clustered covariance middle.
+- [condExp_olsClusteredCR3VarianceEstimator_conservative_of_block_middle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): conditional CR3 conservativeness from blockwise dominance of conditional CR3 middle blocks `Γ_g` over target blocks `Σ_g`.
+- [olsClusteredCR3VarianceEstimator_posSemidef](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L827): CR3-style clustered covariance estimator is PSD.
+- [clusterIndex_sum_eq_sum](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L389): finite cluster partition identity for sums over observations.
+- [sum_clusterGramContribution_eq_gram](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L478): cluster Gram blocks add to `Xᵀ * X`.
+- [sum_clusterCrossContribution_eq_cross](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L499): cluster cross-product blocks add to `Xᵀ *ᵥ y`.
+- [olsClusteredVarianceEstimator_eq_clusterScore](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L564): clustered sandwich estimator rewritten with the named `clusterScore` API.
+- [olsClusteredVarianceEstimator_eq_clusterCovarianceMiddle_residualOuter](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L737): Arellano estimator rewritten using the residual block outer-product middle matrix.
+- [olsClusteredCR3VarianceEstimator_eq_clusterCovarianceMiddle_cr3Outer](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L973): CR3 estimator rewritten using the CR3 residual block outer-product middle matrix.
+- [sum_clusterScore_eq_zero](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L594): full-sample residual cluster scores sum to zero by the normal equations.
+- [condExp_annihilator_row_sq_eq_homoskedastic](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1196): row-level homoskedastic residual-shrinkage identity `E[(Me)_i^2 | X] = σ²(1-h_{ii})`.
+- [condExp_annihilator_row_sq_eq_diagonal](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1242): row-level diagonal heteroskedastic residual expectation.
+- [condExp_HC2_adjusted_annihilator_row_sq_eq_sigmaSq](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1279): HC2's scalar leverage adjustment is conditionally unbiased for `σ²`.
+- [condExp_HC2_adjusted_annihilator_row_sq_eq_diagonal](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1309): exact HC2 row expectation under diagonal heteroskedasticity.
+- [condExp_HC3_adjusted_annihilator_row_sq_eq_sigmaSq_mul_inv](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1340): HC3 leaves one inverse-leverage factor in the homoskedastic row expectation.
+- [condExp_HC3_adjusted_annihilator_row_sq_eq_diagonal](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1371): exact HC3 row expectation under diagonal heteroskedasticity.
+- [condExp_olsConditionalVarianceMatrix_diagonal_eq](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1405): diagonal-entry conditional expectations lift to the deterministic covariance sandwich.
 
 ## Notes
 
 - Chapter 4 has strong deterministic and conditional-expectation coverage already, so this file is
   mostly a map from Hansen's notation into the matrix-valued Lean API.
-- The remaining covariance-estimator gaps are heteroskedastic `s²` expectation formulae, HC ordering,
-  and clustered/asymptotic refinements.
+- The remaining covariance-estimator gaps are clustered asymptotics beyond these finite block
+  identities and the raw CR3 middle-moment identification needed to construct the conditional
+  covariance matrices `Γ_g` for adjusted annihilator-error blocks from primitive cluster error
+  assumptions.
+- Hansen's CR3 conservativeness sentence in Section 4.23 appears to be a finite-sample
+  conditional-on-`X` claim, by analogy with the preceding HC3 proof. The deferred Lean target is
+  therefore not an asymptotic statement: it should identify
+  `E[\tilde e_g \tilde e_gᵀ | X] = Σ_g + X_g E[(β̂_(-g)-β)(β̂_(-g)-β)ᵀ | X] X_gᵀ`
+  from leave-cluster independence and then feed the resulting blockwise PSD dominance into the
+  existing CR3 sandwich bridge.

@@ -60,6 +60,20 @@ theorem olsBeta_hasGaussianLaw_of_error
   filter_upwards with ω
   simp [L]
 
+omit [DecidableEq n] in
+/-- Fixed-design normal-regression coefficient vectors have finite moments of
+every finite order.  This is the fixed-`X` finite-moment face behind the normal
+coefficient law; the random-design Kinal threshold is a separate tail statement
+about the inverse random Gram matrix. -/
+theorem olsBeta_memLp_of_error_gaussian
+    {Ω : Type*} [MeasurableSpace Ω] {μ : Measure Ω}
+    (X : Matrix n k ℝ) (β : k → ℝ) (e : Ω → n → ℝ)
+    [Invertible (Xᵀ * X)] (p : ℝ≥0∞) (hp : p ≠ ∞)
+    (he : HasGaussianLaw e μ) :
+    MemLp (fun ω => olsBeta X (X *ᵥ β + e ω)) p μ := by
+  classical
+  exact (olsBeta_hasGaussianLaw_of_error X β e he).memLp hp
+
 /-- If the error vector has a Gaussian law, then the OLS residual vector is Gaussian
 as a linear image of the error vector. -/
 theorem residual_hasGaussianLaw_of_error

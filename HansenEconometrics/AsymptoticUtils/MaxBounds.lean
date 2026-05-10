@@ -1,5 +1,6 @@
 import Mathlib.MeasureTheory.Function.UniformIntegrable
 import Mathlib.MeasureTheory.Integral.Lebesgue.Markov
+import Mathlib.Probability.IdentDistrib
 
 /-!
 # Uniform-integrability tail controls for Chapter 6 maximum bounds
@@ -41,6 +42,32 @@ theorem uniformIntegrable_tail_eLpNorm_one
   simpa using
     (UniformIntegrable.spec (μ := μ) (f := Z)
       (p := (1 : ℝ≥0∞)) (by simp) (by simp) hZ hε)
+
+/-- Tail `L¹` control gives Mathlib's probability-theory uniform integrability.
+
+This is the converse of `uniformIntegrable_tail_eLpNorm_one`, stated as a
+chapter-facing Definition 6.4 bridge. -/
+theorem uniformIntegrable_one_of_tail_eLpNorm
+    [IsFiniteMeasure μ] {Z : ℕ → Ω → ℝ}
+    (hZ : ∀ i, AEStronglyMeasurable (Z i) μ)
+    (hTail : ∀ ε : ℝ, 0 < ε → ∃ C : ℝ≥0,
+      ∀ i : ℕ,
+        eLpNorm ({ω | C ≤ ‖Z i ω‖₊}.indicator (Z i)) 1 μ ≤ ENNReal.ofReal ε) :
+    UniformIntegrable Z 1 μ := by
+  exact uniformIntegrable_of (μ := μ) (f := Z) (p := (1 : ℝ≥0∞))
+    (by simp) (by simp) hZ hTail
+
+/-- Two-sided tail characterization of `L¹` uniform integrability for real
+sequences, with measurability supplied explicitly for the converse direction. -/
+theorem uniformIntegrable_one_iff_tail_eLpNorm
+    [IsFiniteMeasure μ] {Z : ℕ → Ω → ℝ}
+    (hZ : ∀ i, AEStronglyMeasurable (Z i) μ) :
+    UniformIntegrable Z 1 μ ↔
+      ∀ ε : ℝ, 0 < ε → ∃ C : ℝ≥0,
+        ∀ i : ℕ,
+          eLpNorm ({ω | C ≤ ‖Z i ω‖₊}.indicator (Z i)) 1 μ ≤ ENNReal.ofReal ε :=
+  ⟨fun hUI ε hε => uniformIntegrable_tail_eLpNorm_one (ε := ε) hUI hε,
+    fun hTail => uniformIntegrable_one_of_tail_eLpNorm hZ hTail⟩
 
 omit [MeasurableSpace Ω] in
 private theorem max_norm_scaled_event_subset_tailUnion
@@ -217,5 +244,128 @@ theorem max_norm_scaled_tendstoInMeasure_zero_of_uniformIntegrable_norm_r
     have hdiv : (C : ℝ) / ε ≤ (n : ℝ) := hN.trans (by exact_mod_cast hNn)
     exact (div_le_iff₀ hε).1 hdiv
   exact max_norm_scaled_measure_event_le hZ hε hCtail hδtop hnpos hC rfl
+
+/-- **Hansen Theorem 6.14, identically distributed `L¹` UI wrapper.**
+
+An identically distributed real sequence with a finite first moment is uniformly
+integrable in `L¹`.  This is the primitive moment-to-UI bridge used to feed
+Hansen's maximum theorem when the power variables are iid. -/
+theorem uniformIntegrable_one_of_identDistrib_memLp
+    [IsFiniteMeasure μ] {Z : ℕ → Ω → ℝ}
+    (hZ0 : MemLp (Z 0) 1 μ)
+    (hident : ∀ i, IdentDistrib (Z i) (Z 0) μ μ) :
+    UniformIntegrable Z 1 μ := by
+  exact MemLp.uniformIntegrable_of_identDistrib
+    (μ := μ) (f := Z) (j := 0) (p := 1)
+    (by simp) (by simp) hZ0 hident
+
+/-- **Hansen Theorem 6.14, uniform higher-moment UI wrapper.**
+
+If the sequence is uniformly bounded in `Lᵖ` for some finite exponent `p > 1`,
+then it is uniformly integrable in `L¹`. This is the broader textbook
+sufficient condition behind the iid finite-first-moment face above. -/
+theorem uniformIntegrable_one_of_eLpNorm_bdd_gt_one
+    [IsFiniteMeasure μ] {Z : ℕ → Ω → ℝ} {p : ℝ≥0∞}
+    (hp : 1 < p) (hp_top : p ≠ ∞)
+    (hZ : ∀ i, AEStronglyMeasurable (Z i) μ)
+    (hbound : ∃ B : ℝ≥0, ∀ i, eLpNorm (Z i) p μ ≤ B) :
+    UniformIntegrable Z 1 μ := by
+  obtain ⟨B, hB⟩ := hbound
+  have hp_ge_one : 1 ≤ p := hp.le
+  have hp_zero : p ≠ 0 := by
+    exact ne_of_gt (lt_trans (by norm_num : (0 : ℝ≥0∞) < 1) hp)
+  have hp_real_gt_one : 1 < p.toReal := by
+    rw [← ENNReal.toReal_one]
+    exact (ENNReal.toReal_lt_toReal ENNReal.one_ne_top hp_top).2 hp
+  have htheta_pos : 0 < 1 / (1 : ℝ≥0∞).toReal - 1 / p.toReal := by
+    simp only [ENNReal.toReal_one, one_div]
+    rw [sub_pos]
+    simpa using inv_lt_one_of_one_lt₀ hp_real_gt_one
+  let Bstar : ℝ≥0∞ := max (B : ℝ≥0∞) 1
+  have hBstar_ne_top : Bstar ≠ ∞ := by
+    dsimp [Bstar]
+    finiteness
+  refine ⟨hZ, ?_, ?_⟩
+  · intro ε hε
+    have htend := ENNReal.tendsto_const_mul_rpow_nhds_zero_of_pos
+      (c := Bstar) hBstar_ne_top htheta_pos
+    have hevent :
+        ∀ᶠ x in 𝓝 (0 : ℝ≥0∞),
+          Bstar * x ^ (1 / (1 : ℝ≥0∞).toReal - 1 / p.toReal) ≤
+            ENNReal.ofReal ε :=
+      (ENNReal.tendsto_nhds_zero.1 htend
+        (ENNReal.ofReal ε) (ENNReal.ofReal_pos.mpr hε))
+    obtain ⟨a, ha_pos, ha_sub⟩ := ENNReal.nhds_zero_basis_Iic.mem_iff.1 hevent
+    obtain ⟨δnn, hδnn_pos, hδnn_lt⟩ :=
+      ENNReal.lt_iff_exists_nnreal_btwn.1 ha_pos
+    refine ⟨(δnn : ℝ), by exact_mod_cast (ENNReal.coe_pos.mp hδnn_pos),
+      fun i s hs hμs => ?_⟩
+    have hZi_restrict : AEStronglyMeasurable (Z i) (μ.restrict s) :=
+      (hZ i).mono_measure Measure.restrict_le_self
+    have hcomp := eLpNorm_le_eLpNorm_mul_rpow_measure_univ
+      (μ := μ.restrict s) (f := Z i)
+      (p := (1 : ℝ≥0∞)) (q := p) hp_ge_one hZi_restrict
+    have hμs_nn : μ s ≤ (δnn : ℝ≥0∞) := by
+      simpa [ENNReal.ofReal_coe_nnreal] using hμs
+    have hpow :
+        (μ.restrict s Set.univ) ^
+            (1 / (1 : ℝ≥0∞).toReal - 1 / p.toReal) ≤
+          (δnn : ℝ≥0∞) ^ (1 / (1 : ℝ≥0∞).toReal - 1 / p.toReal) := by
+      rw [Measure.restrict_apply_univ]
+      exact ENNReal.rpow_le_rpow hμs_nn htheta_pos.le
+    have hB_i : eLpNorm (Z i) p (μ.restrict s) ≤ Bstar := by
+      exact (eLpNorm_mono_measure (Z i) Measure.restrict_le_self).trans
+        ((hB i).trans (le_max_left _ _))
+    have hsmall :
+        Bstar * (δnn : ℝ≥0∞) ^
+            (1 / (1 : ℝ≥0∞).toReal - 1 / p.toReal) ≤
+          ENNReal.ofReal ε :=
+      ha_sub (le_of_lt hδnn_lt)
+    calc
+      eLpNorm (s.indicator (Z i)) 1 μ
+          = eLpNorm (Z i) 1 (μ.restrict s) :=
+            eLpNorm_indicator_eq_eLpNorm_restrict hs
+      _ ≤ eLpNorm (Z i) p (μ.restrict s) *
+          (μ.restrict s Set.univ) ^
+            (1 / (1 : ℝ≥0∞).toReal - 1 / p.toReal) :=
+        hcomp
+      _ ≤ Bstar * (δnn : ℝ≥0∞) ^
+            (1 / (1 : ℝ≥0∞).toReal - 1 / p.toReal) := by
+        gcongr
+      _ ≤ ENNReal.ofReal ε := hsmall
+  · let A : ℝ≥0∞ :=
+      Bstar * μ Set.univ ^ (1 / (1 : ℝ≥0∞).toReal - 1 / p.toReal)
+    have hA_ne_top : A ≠ ∞ := by
+      dsimp [A]
+      finiteness
+    refine ⟨A.toNNReal, fun i => ?_⟩
+    rw [ENNReal.coe_toNNReal hA_ne_top]
+    have hcomp := eLpNorm_le_eLpNorm_mul_rpow_measure_univ
+      (μ := μ) (f := Z i) (p := (1 : ℝ≥0∞)) (q := p) hp_ge_one (hZ i)
+    have hB_i : eLpNorm (Z i) p μ ≤ Bstar :=
+      (hB i).trans (le_max_left _ _)
+    calc
+      eLpNorm (Z i) 1 μ
+          ≤ eLpNorm (Z i) p μ *
+              μ Set.univ ^ (1 / (1 : ℝ≥0∞).toReal - 1 / p.toReal) :=
+        hcomp
+      _ ≤ Bstar * μ Set.univ ^
+              (1 / (1 : ℝ≥0∞).toReal - 1 / p.toReal) := by
+        gcongr
+
+/-- **Hansen Theorem 6.16, iid finite-power-moment maximum wrapper.**
+
+If the power variables `Z_i` are identically distributed and `Z_0` is in `L¹`,
+then `n⁻¹ max_{i<n} |Z_i|` on the nonnegative-power scale is `oₚ(1)`.
+For Hansen's textbook statement, use `Z_i = |Y_i|^r`. -/
+theorem max_norm_scaled_tendstoInMeasure_zero_of_identDistrib_memLp
+    [IsFiniteMeasure μ] {Z : ℕ → Ω → ℝ}
+    (hZ0 : MemLp (Z 0) 1 μ)
+    (hident : ∀ i, IdentDistrib (Z i) (Z 0) μ μ) :
+    TendstoInMeasure μ (scaledMaxNNNorm Z) atTop (fun _ => 0) := by
+  exact max_norm_scaled_tendstoInMeasure_zero_of_uniformIntegrable_norm_r
+    (μ := μ) (Z := Z)
+    (uniformIntegrable_one_of_identDistrib_memLp
+      (μ := μ) (Z := Z) hZ0 hident)
 
 end HansenEconometrics

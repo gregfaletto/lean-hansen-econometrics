@@ -53,12 +53,12 @@ Legend:
 | ch | title | status | notes |
 |---:|---|---|---|
 | 01 | Introduction | not started | text extracted and inventoried; mostly exposition |
-| 02 | Conditional Expectation and Projection | partial | conditional expectation, variance, and linear projection algebra completed |
-| 03 | The Algebra of Least Squares | partial | OLS algebra + projection/annihilator (incl. rank) / FWL coefficient and residual core landed |
-| 04 | Least Squares Regression | partial | OLS/GLS algebra, unbiasedness, covariance identities, Gauss-Markov lower bounds, `s²` unbiasedness, HC2/HC3, and clustered base covariance definitions landed |
+| 02 | Conditional Expectation and Projection | partial | conditional expectation, variance, linear projection algebra, and variable-facing potential-outcomes/CIA CATE plus observed-regression wrappers completed |
+| 03 | The Algebra of Least Squares | partial | OLS algebra + projection/annihilator (incl. rank), leverage identities/bounds, reduced-Gram and literal row-deleted leave-one-out formulas, influence diagnostics, and FWL coefficient/residual core landed |
+| 04 | Least Squares Regression | partial | OLS/GLS algebra, unbiasedness, covariance identities, Gauss-Markov lower bounds, `s²` unbiasedness, HC2/HC3, and clustered covariance definitions/finite-sample adjustment landed |
 | 05 | Normal Regression | partial | multivariate-normal wrappers, normal-model scaffolding, finite-sample Gaussian/chi-square/Student-t/F laws, confidence intervals, and classical test results landed; Kinal moment threshold deferred |
-| 06 | A Review of Large Sample Asymptotics | partial | WLLN, CLT (via Cramér–Wold), CMT in probability, O_p/o_p, Slutsky, Delta-method wrappers, smooth-function asymptotic wrappers, and the UI maximum bound for 6.16 backed by Mathlib + AsymptoticUtils; remaining textbook-shaped gaps documented in the Ch 6 inventory |
-| 07 | Asymptotic Theory for Least Squares | partial | Theorem 7.1 totalized/ordinary-on-nonsingular consistency landed; Theorem 7.2 projection-family score CLT plus score-covariance `Ω` wrappers landed; Theorem 7.3 projection-family CLT covers totalized and ordinary-on-nonsingular OLS; Theorems 7.4 and 7.5 totalized variance/covariance consistency landed; vector/Cramér-Wold packaging pending |
+| 06 | A Review of Large Sample Asymptotics | partial | WLLN, iid scalar/vector CLT via Cramér-Wold, projection-level multivariate Lindeberg/heterogeneous-array CLT endpoints for 6.4/6.5, CMT in probability, O_p/o_p, Slutsky, Delta-method wrappers, smooth-function asymptotic wrappers, UI maximum bounds for 6.16, iid finite-power-moment and uniform higher-moment UI discharge for 6.14, convergence-in-measure faces of 6.13/6.15, weak-convergence bounded first-moment transfer for 6.13, and bounded/clipped/tail-assembly weak-moment bridges for 6.15 backed by Mathlib + AsymptoticUtils/Chapter6Asymptotics; remaining textbook-shaped gaps documented in the Ch 6 inventory |
+| 07 | Asymptotic Theory for Least Squares | partial | Theorems 7.1-7.5 have totalized/ordinary OLS consistency, score CLT, vector CLT, and variance/covariance consistency wrappers; 7.6-7.14 have robust covariance, nonlinear Delta, t/CI/Wald wrappers at the current assumption layer, with packaged feasible HC0/HC1/HC2/HC3 remainder/leverage conditions; 7.16 and 7.17 have max-residual/max-leverage rate packaging with iid finite-squared-row-moment UI discharge and direct iid package endpoints; feasible HC bounded-weight hypotheses now have scalar WLLN primitive constructors, scalar/joint/compact moment condition bundles, a combined robust feasible-HC moment package, an iid joint-observation package deriving residual-variance, homoskedastic covariance/Wald, and direct HC0/HC1/HC2/HC3 covariance, standard-error, scalar t/CI/Wald, and totalized/ordinary multivariate Wald endpoints; Edgeworth has generic first-order and uniform second-order CDF-expansion interfaces, with the concrete expansion proof still pending |
 | 08 | Restricted Estimation | inventoried | constrained estimation / minimum distance |
 | 09 | Hypothesis Testing | inventoried | Wald / LM / LR style results |
 | 10 | Resampling Methods | inventoried | bootstrap / jackknife |
@@ -87,7 +87,8 @@ Legend:
 Completed in `HansenEconometrics/Chapter2CondExp.lean`,
 `HansenEconometrics/Chapter2Variance.lean`,
 `HansenEconometrics/ProbabilityUtils.lean`,
-and `HansenEconometrics/Chapter2LinearProjection.lean`:
+`HansenEconometrics/Chapter2LinearProjection.lean`,
+and `HansenEconometrics/Chapter2PotentialOutcomes.lean`:
 - reusable helper definitions `conditioningSpace`, `XMeasurable`, `condExpOn`, `cefErrorOn`,
   `condVarOn`, and `residualVarOn`
 - coordinatewise conditional-expectation / integral bridge lemmas for finite-dimensional random
@@ -110,6 +111,9 @@ and `HansenEconometrics/Chapter2LinearProjection.lean`:
 - population normal equations and orthogonality for the best linear projection
 - uniqueness from the population normal equations
 - quadratic projection criterion simplification at the projection coefficient
+- potential-outcomes definitions for observed outcome, treatment effect, ATE, and CATE
+- CIA package via Mathlib conditional independence and conditional distributions
+- branchwise observed-regression bridge for `E[Y | D, X]` under mean independence / CIA
 
 Planned next within Chapter 2:
 - additional best-linear-predictor corollaries beyond the current conditional-mean result
@@ -130,12 +134,14 @@ Completed in `HansenEconometrics/Chapter3LeastSquaresAlgebra.lean`,
 - Theorem 3.3 rank parts: `rank(P) = k` and `rank(M) = n - k`
 - range projection facts and `M P = P M = 0`
 - fitted/residual orthogonality and the dot-product Pythagorean decomposition
+- centered analysis-of-variance and `R²` identities
+- leverage identities/bounds, reduced-Gram and literal row-deleted leave-one-out formulas, and
+  Section 3.21 influence diagnostics
 - FWL: partitioned normal equations, residualized regressors `M₁ X₂`, the sequential residual-maker
   identity, the coefficient identity, and residual equivalence
 
 Planned next within Chapter 3:
-- Theorem 3.4 partitioned coefficient formulae
-- centered analysis-of-variance / `R²` identities
+- no immediate Chapter 3 blocker; remaining issue #42 work is concentrated in Chapters 4, 6, and 7
 
 See also:
 - `inventory/ch2-inventory.md`
@@ -186,12 +192,12 @@ Completed in `HansenEconometrics/Chapter4LeastSquaresRegression.lean`:
 - classical Gauss-Markov lower bound
 - GLS algebra and the generalized Gauss-Markov weighted lower bound
 - HC0 / White, HC1, HC2, and HC3 covariance estimators
-- clustered base covariance estimator and linear-model rewrite
+- clustered covariance estimator, finite-sample adjustment, singleton HC0/HC1 identities, and
+  linear-model rewrite
+- method-of-moments `σ̂²`, including the diagonal heteroskedastic `E[σ̂² | X] = n⁻¹ tr(MD)` trace formula
 - residual variance estimator `s²`, deterministic rewrites, and homoskedastic conditional/unconditional unbiasedness
 
 Explicitly deferred for now within Chapter 4:
-- heteroskedastic `E[σ̂² | X] = n⁻¹ tr(MD)` formula
-- HC2/HC3 ordering and unbiasedness refinements
 - clustered covariance asymptotics and richer partition infrastructure
 - HC4 and other leverage-adjustment families
 

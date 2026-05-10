@@ -62,6 +62,31 @@ noncomputable def fwlBeta
     k₂ → ℝ :=
   olsBeta (residualizedRegressors X₁ X₂) (annihilatorMatrix X₁ *ᵥ y)
 
+/-- Hansen Theorem 3.4: the left-block coefficient from regressing `M₂ y` on `M₂ X₁`. -/
+noncomputable def fwlLeftBeta
+    (X₁ : Matrix n k₁ ℝ) (X₂ : Matrix n k₂ ℝ) (y : n → ℝ)
+    [DecidableEq n] [Fintype k₁] [DecidableEq k₁] [Fintype k₂] [DecidableEq k₂]
+    [Invertible (X₂ᵀ * X₂)]
+    [Invertible ((residualizedRegressors X₂ X₁)ᵀ * residualizedRegressors X₂ X₁)] :
+    k₁ → ℝ :=
+  olsBeta (residualizedRegressors X₂ X₁) (annihilatorMatrix X₂ *ᵥ y)
+
+/-- Hansen equation (3.38): the right-block partitioned-regression formula. -/
+noncomputable def partitionedRightBetaFormula
+    (X₁ : Matrix n k₁ ℝ) (X₂ : Matrix n k₂ ℝ) (y : n → ℝ)
+    [DecidableEq n] [Fintype k₁] [DecidableEq k₁] [Fintype k₂] [DecidableEq k₂]
+    [Invertible (X₁ᵀ * X₁)] :
+    k₂ → ℝ :=
+  (X₂ᵀ * annihilatorMatrix X₁ * X₂)⁻¹ *ᵥ (X₂ᵀ *ᵥ (annihilatorMatrix X₁ *ᵥ y))
+
+/-- Hansen equation (3.37): the left-block partitioned-regression formula. -/
+noncomputable def partitionedLeftBetaFormula
+    (X₁ : Matrix n k₁ ℝ) (X₂ : Matrix n k₂ ℝ) (y : n → ℝ)
+    [DecidableEq n] [Fintype k₁] [DecidableEq k₁] [Fintype k₂] [DecidableEq k₂]
+    [Invertible (X₂ᵀ * X₂)] :
+    k₁ → ℝ :=
+  (X₁ᵀ * annihilatorMatrix X₂ * X₁)⁻¹ *ᵥ (X₁ᵀ *ᵥ (annihilatorMatrix X₂ *ᵥ y))
+
 /-- The first block of the full-regression coefficient on `[X₁ X₂]`. -/
 noncomputable def fromColsLeftBeta
     (X₁ : Matrix n k₁ ℝ) (X₂ : Matrix n k₂ ℝ) (y : n → ℝ)
@@ -97,6 +122,44 @@ theorem residualizedRegressors_orthogonal_left
     X₁ᵀ * residualizedRegressors X₁ X₂ = 0 := by
   unfold residualizedRegressors
   rw [← Matrix.mul_assoc, regressors_transpose_mul_annihilator, Matrix.zero_mul]
+
+/-- Gram matrix of residualized regressors in Hansen's partitioned-regression notation. -/
+theorem residualizedRegressors_gram_eq
+    (X₁ : Matrix n k₁ ℝ) (X₂ : Matrix n k₂ ℝ)
+    [DecidableEq n] [Fintype k₁] [DecidableEq k₁]
+    [Invertible (X₁ᵀ * X₁)] :
+    (residualizedRegressors X₁ X₂)ᵀ * residualizedRegressors X₁ X₂ =
+      X₂ᵀ * annihilatorMatrix X₁ * X₂ := by
+  unfold residualizedRegressors
+  rw [Matrix.transpose_mul, annihilatorMatrix_transpose]
+  calc
+    (X₂ᵀ * annihilatorMatrix X₁) * (annihilatorMatrix X₁ * X₂)
+        = X₂ᵀ * ((annihilatorMatrix X₁ * annihilatorMatrix X₁) * X₂) := by
+          simp [Matrix.mul_assoc]
+    _ = X₂ᵀ * (annihilatorMatrix X₁ * X₂) := by
+          rw [annihilatorMatrix_idempotent]
+    _ = X₂ᵀ * annihilatorMatrix X₁ * X₂ := by
+          rw [Matrix.mul_assoc]
+
+/-- Cross moment of residualized regressors and residualized outcomes. -/
+theorem residualizedRegressors_cross_y_eq
+    (X₁ : Matrix n k₁ ℝ) (X₂ : Matrix n k₂ ℝ) (y : n → ℝ)
+    [DecidableEq n] [Fintype k₁] [DecidableEq k₁]
+    [Invertible (X₁ᵀ * X₁)] :
+    (residualizedRegressors X₁ X₂)ᵀ *ᵥ (annihilatorMatrix X₁ *ᵥ y) =
+      X₂ᵀ *ᵥ (annihilatorMatrix X₁ *ᵥ y) := by
+  unfold residualizedRegressors
+  rw [Matrix.transpose_mul, annihilatorMatrix_transpose]
+  calc
+    (X₂ᵀ * annihilatorMatrix X₁) *ᵥ (annihilatorMatrix X₁ *ᵥ y)
+        = ((X₂ᵀ * annihilatorMatrix X₁) * annihilatorMatrix X₁) *ᵥ y := by
+          rw [Matrix.mulVec_mulVec]
+    _ = (X₂ᵀ * (annihilatorMatrix X₁ * annihilatorMatrix X₁)) *ᵥ y := by
+          rw [Matrix.mul_assoc]
+    _ = (X₂ᵀ * annihilatorMatrix X₁) *ᵥ y := by
+          rw [annihilatorMatrix_idempotent]
+    _ = X₂ᵀ *ᵥ (annihilatorMatrix X₁ *ᵥ y) := by
+          rw [← Matrix.mulVec_mulVec]
 
 /--
 The residual in the auxiliary FWL regression, evaluated at the second block of the full-regression
@@ -157,6 +220,122 @@ theorem fromColsRightBeta_eq_fwlBeta
     (annihilatorMatrix X₁ *ᵥ y)
     (fromColsRightBeta X₁ X₂ y)
     (fwl_fromColsRightBeta_normal_equations X₁ X₂ y)
+
+/--
+The residual in the left-block auxiliary regression, evaluated at the first block of the
+full-regression coefficient, is the full-regression residual after applying `M₂`.
+-/
+theorem fwl_left_auxiliary_residual_eq_annihilator_full_residual
+    (X₁ : Matrix n k₁ ℝ) (X₂ : Matrix n k₂ ℝ) (y : n → ℝ)
+    [DecidableEq n] [Fintype k₁] [DecidableEq k₁] [Fintype k₂] [DecidableEq k₂]
+    [Invertible (X₂ᵀ * X₂)]
+    [Invertible ((Matrix.fromCols X₁ X₂)ᵀ * Matrix.fromCols X₁ X₂)] :
+    annihilatorMatrix X₂ *ᵥ y -
+        residualizedRegressors X₂ X₁ *ᵥ fromColsLeftBeta X₁ X₂ y =
+      annihilatorMatrix X₂ *ᵥ residual (Matrix.fromCols X₁ X₂) y := by
+  unfold residual fitted residualizedRegressors
+  rw [fromCols_full_fitted_eq]
+  rw [Matrix.mulVec_sub, Matrix.mulVec_add]
+  rw [Matrix.mulVec_mulVec]
+  rw [Matrix.mulVec_mulVec (fromColsRightBeta X₁ X₂ y) (annihilatorMatrix X₂) X₂]
+  rw [annihilator_mul_X]
+  ext i
+  simp [sub_eq_add_neg]
+
+/-- The full-regression left block satisfies the left auxiliary normal equations. -/
+theorem fwl_fromColsLeftBeta_normal_equations
+    (X₁ : Matrix n k₁ ℝ) (X₂ : Matrix n k₂ ℝ) (y : n → ℝ)
+    [DecidableEq n] [Fintype k₁] [DecidableEq k₁] [Fintype k₂] [DecidableEq k₂]
+    [Invertible (X₂ᵀ * X₂)]
+    [Invertible ((Matrix.fromCols X₁ X₂)ᵀ * Matrix.fromCols X₁ X₂)] :
+    (residualizedRegressors X₂ X₁)ᵀ *ᵥ
+        (annihilatorMatrix X₂ *ᵥ y -
+          residualizedRegressors X₂ X₁ *ᵥ fromColsLeftBeta X₁ X₂ y) = 0 := by
+  rw [fwl_left_auxiliary_residual_eq_annihilator_full_residual]
+  have hM :
+      annihilatorMatrix X₂ *ᵥ residual (Matrix.fromCols X₁ X₂) y =
+        residual (Matrix.fromCols X₁ X₂) y :=
+    annihilator_mulVec_eq_self_of_regressors_orthogonal X₂
+      (residual (Matrix.fromCols X₁ X₂) y)
+      (normal_equations_fromCols_right X₁ X₂ y)
+  rw [hM]
+  unfold residualizedRegressors
+  rw [Matrix.transpose_mul, annihilatorMatrix_transpose]
+  rw [← Matrix.mulVec_mulVec (residual (Matrix.fromCols X₁ X₂) y) X₁ᵀ
+    (annihilatorMatrix X₂)]
+  rw [hM]
+  exact normal_equations_fromCols_left X₁ X₂ y
+
+/-- Hansen Theorem 3.4, left coefficient part: the first full-regression block equals FWL. -/
+theorem fromColsLeftBeta_eq_fwlLeftBeta
+    (X₁ : Matrix n k₁ ℝ) (X₂ : Matrix n k₂ ℝ) (y : n → ℝ)
+    [DecidableEq n] [Fintype k₁] [DecidableEq k₁] [Fintype k₂] [DecidableEq k₂]
+    [Invertible (X₂ᵀ * X₂)]
+    [Invertible ((Matrix.fromCols X₁ X₂)ᵀ * Matrix.fromCols X₁ X₂)]
+    [Invertible ((residualizedRegressors X₂ X₁)ᵀ * residualizedRegressors X₂ X₁)] :
+    fromColsLeftBeta X₁ X₂ y = fwlLeftBeta X₁ X₂ y := by
+  symm
+  unfold fwlLeftBeta
+  exact olsBeta_eq_of_normal_equations
+    (residualizedRegressors X₂ X₁)
+    (annihilatorMatrix X₂ *ᵥ y)
+    (fromColsLeftBeta X₁ X₂ y)
+    (fwl_fromColsLeftBeta_normal_equations X₁ X₂ y)
+
+/-- Hansen equation (3.38): `fwlBeta` is the explicit `X₂ᵀ M₁ X₂` formula. -/
+theorem fwlBeta_eq_partitionedRightBetaFormula
+    (X₁ : Matrix n k₁ ℝ) (X₂ : Matrix n k₂ ℝ) (y : n → ℝ)
+    [DecidableEq n] [Fintype k₁] [DecidableEq k₁] [Fintype k₂] [DecidableEq k₂]
+    [Invertible (X₁ᵀ * X₁)]
+    [Invertible ((residualizedRegressors X₁ X₂)ᵀ * residualizedRegressors X₁ X₂)] :
+    fwlBeta X₁ X₂ y = partitionedRightBetaFormula X₁ X₂ y := by
+  unfold fwlBeta partitionedRightBetaFormula olsBeta
+  rw [Matrix.invOf_eq_nonsing_inv]
+  rw [residualizedRegressors_gram_eq, residualizedRegressors_cross_y_eq]
+
+/-- Hansen equation (3.37): `fwlLeftBeta` is the explicit `X₁ᵀ M₂ X₁` formula. -/
+theorem fwlLeftBeta_eq_partitionedLeftBetaFormula
+    (X₁ : Matrix n k₁ ℝ) (X₂ : Matrix n k₂ ℝ) (y : n → ℝ)
+    [DecidableEq n] [Fintype k₁] [DecidableEq k₁] [Fintype k₂] [DecidableEq k₂]
+    [Invertible (X₂ᵀ * X₂)]
+    [Invertible ((residualizedRegressors X₂ X₁)ᵀ * residualizedRegressors X₂ X₁)] :
+    fwlLeftBeta X₁ X₂ y = partitionedLeftBetaFormula X₁ X₂ y := by
+  unfold fwlLeftBeta partitionedLeftBetaFormula olsBeta
+  rw [Matrix.invOf_eq_nonsing_inv]
+  rw [residualizedRegressors_gram_eq, residualizedRegressors_cross_y_eq]
+
+/-- Hansen Theorem 3.4, equation (3.38): the second block equals the explicit formula. -/
+theorem fromColsRightBeta_eq_partitionedRightBetaFormula
+    (X₁ : Matrix n k₁ ℝ) (X₂ : Matrix n k₂ ℝ) (y : n → ℝ)
+    [DecidableEq n] [Fintype k₁] [DecidableEq k₁] [Fintype k₂] [DecidableEq k₂]
+    [Invertible (X₁ᵀ * X₁)]
+    [Invertible ((Matrix.fromCols X₁ X₂)ᵀ * Matrix.fromCols X₁ X₂)]
+    [Invertible ((residualizedRegressors X₁ X₂)ᵀ * residualizedRegressors X₁ X₂)] :
+    fromColsRightBeta X₁ X₂ y = partitionedRightBetaFormula X₁ X₂ y := by
+  rw [fromColsRightBeta_eq_fwlBeta, fwlBeta_eq_partitionedRightBetaFormula]
+
+/-- Hansen Theorem 3.4, equation (3.37): the first block equals the explicit formula. -/
+theorem fromColsLeftBeta_eq_partitionedLeftBetaFormula
+    (X₁ : Matrix n k₁ ℝ) (X₂ : Matrix n k₂ ℝ) (y : n → ℝ)
+    [DecidableEq n] [Fintype k₁] [DecidableEq k₁] [Fintype k₂] [DecidableEq k₂]
+    [Invertible (X₂ᵀ * X₂)]
+    [Invertible ((Matrix.fromCols X₁ X₂)ᵀ * Matrix.fromCols X₁ X₂)]
+    [Invertible ((residualizedRegressors X₂ X₁)ᵀ * residualizedRegressors X₂ X₁)] :
+    fromColsLeftBeta X₁ X₂ y = partitionedLeftBetaFormula X₁ X₂ y := by
+  rw [fromColsLeftBeta_eq_fwlLeftBeta, fwlLeftBeta_eq_partitionedLeftBetaFormula]
+
+/-- Hansen Theorem 3.4: both partitioned-regression coefficients in formula form. -/
+theorem fromColsBeta_eq_partitionedBetaFormulas
+    (X₁ : Matrix n k₁ ℝ) (X₂ : Matrix n k₂ ℝ) (y : n → ℝ)
+    [DecidableEq n] [Fintype k₁] [DecidableEq k₁] [Fintype k₂] [DecidableEq k₂]
+    [Invertible (X₁ᵀ * X₁)] [Invertible (X₂ᵀ * X₂)]
+    [Invertible ((Matrix.fromCols X₁ X₂)ᵀ * Matrix.fromCols X₁ X₂)]
+    [Invertible ((residualizedRegressors X₁ X₂)ᵀ * residualizedRegressors X₁ X₂)]
+    [Invertible ((residualizedRegressors X₂ X₁)ᵀ * residualizedRegressors X₂ X₁)] :
+    fromColsLeftBeta X₁ X₂ y = partitionedLeftBetaFormula X₁ X₂ y ∧
+      fromColsRightBeta X₁ X₂ y = partitionedRightBetaFormula X₁ X₂ y :=
+  ⟨fromColsLeftBeta_eq_partitionedLeftBetaFormula X₁ X₂ y,
+    fromColsRightBeta_eq_partitionedRightBetaFormula X₁ X₂ y⟩
 
 /-- Hansen Theorem 3.5, residual part: FWL and full OLS produce the same residual. -/
 theorem fwl_residual_eq_full_residual
