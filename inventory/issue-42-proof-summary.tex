@@ -537,7 +537,11 @@ these wrappers from its fourth-row-moment assumption. The branch also adds
 \lean{IidAssumption72FourthMomentConditions}, which derives the squared-error
 moment and true-error score outer-product moment from structural-error and
 regressor fourth moments, then converts to
-\lean{IidRobustFeasibleHCMomentConditions}. The combined robust feasible-HC
+\lean{IidRobustFeasibleHCMomentConditions}. It further adds
+\lean{IidAssumption72ResponseMomentConditions}, which derives the structural-error
+fourth moment from the response fourth moment, the linear-model identity, and the
+regressor fourth-row moment before reusing the fourth-moment package. The
+combined robust feasible-HC
 package and the iid package now also derive the feasible-HC third absolute
 row-weight moment $\mathbb{E}\{|e_0|\|X_0\|^3\}<\infty$ from the score
 outer-product moment and the fourth-row moment, rather than carrying it as a
@@ -583,9 +587,9 @@ Chapter 6 & Scalar triangular-array Lindeberg/Lyapunov sufficient-condition
 probability-engine discharge for Theorems 6.4 and 6.5 beyond the deterministic
 and expected finite-row even-moment tail inequalities; arbitrary-unbiased-estimator
 lower bound for Theorem 6.11. \\
-Chapter 7 & Further tightening of the remaining public condition packages to the
-literal textbook response fourth-moment assumption; concrete high-moment
-cumulant expansion for Theorem 7.15. \\
+Chapter 7 & Further tightening of the remaining score-CLT public package toward
+literal textbook iid assumptions; concrete high-moment cumulant expansion for
+Theorem 7.15. \\
 \bottomrule
 \end{longtable}
 

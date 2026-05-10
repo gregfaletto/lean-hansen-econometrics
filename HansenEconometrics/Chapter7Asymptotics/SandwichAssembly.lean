@@ -509,6 +509,137 @@ theorem toIidRobustFeasibleHCMomentConditions
 
 end IidAssumption72FourthMomentConditions
 
+/-- IID response/regressor fourth-moment package for Hansen Assumption 7.2.
+
+This packages the textbook-style response moment `E[Y^4] < ∞` together with
+the linear-model decomposition.  The conversion theorem derives the structural
+error fourth moment and then reuses `IidAssumption72FourthMomentConditions`. -/
+structure IidAssumption72ResponseMomentConditions (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (X : ℕ → Ω → (k → ℝ)) (e y : ℕ → Ω → ℝ) (β : k → ℝ) where
+  /-- Linear-model decomposition of the observed outcome. -/
+  model : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω
+  /-- Component measurability of the regressor sequence. -/
+  x_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (X i) μ
+  /-- Component measurability of the structural-error sequence. -/
+  e_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (e i) μ
+  /-- Component measurability of the response sequence. -/
+  y_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (y i) μ
+  /-- Full independence of the joint observations `(Xᵢ, eᵢ)`. -/
+  joint_iIndep : iIndepFun (fun i ω => (X i ω, e i ω)) μ
+  /-- Identical distribution of the joint observations against the baseline row. -/
+  joint_identDistrib : ∀ i,
+    IdentDistrib (fun ω => (X i ω, e i ω))
+      (fun ω => (X 0 ω, e 0 ω)) μ μ
+  /-- Integrability of the one-row fourth response moment. -/
+  int_response_fourth : Integrable (fun ω => y 0 ω ^ 4) μ
+  /-- Population Gram matrix `Q := E[X₀X₀ᵀ]` is nonsingular. -/
+  Q_nonsing : IsUnit (μ[fun ω => Matrix.vecMulVec (X 0 ω) (X 0 ω)]).det
+  /-- Population orthogonality `E[e₀X₀] = 0`. -/
+  orthogonality : μ[fun ω => e 0 ω • X 0 ω] = 0
+  /-- Fourth-row-moment domination for feasible-HC quadratic weights. -/
+  rowNorm_fourth_integrable : Integrable (fun ω => ‖X 0 ω‖ ^ 4) μ
+
+namespace IidAssumption72ResponseMomentConditions
+
+omit [Fintype k] [DecidableEq k] in
+private theorem memLp_four_of_integrable_fourth
+    {μ : Measure Ω} [IsProbabilityMeasure μ] {f : Ω → ℝ}
+    (hf_meas : AEStronglyMeasurable f μ)
+    (hf_four : Integrable (fun ω => f ω ^ 4) μ) :
+    MemLp f 4 μ := by
+  rw [← integrable_norm_rpow_iff (μ := μ) hf_meas (by norm_num) (by norm_num)]
+  convert hf_four using 1
+  ext ω
+  simpa [Real.norm_eq_abs] using (show Even (4 : ℕ) by decide).pow_abs (f ω)
+
+/-- A fourth row-norm moment supplies fourth moments for every regressor
+coordinate. -/
+theorem regressorCoordinate_memLp_four
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidAssumption72ResponseMomentConditions μ X e y β) (j : k) :
+    MemLp (fun ω => X 0 ω j) 4 μ := by
+  have hXj : AEStronglyMeasurable (fun ω => X 0 ω j) μ :=
+    (continuous_apply j).comp_aestronglyMeasurable (h.x_aestronglyMeasurable 0)
+  refine memLp_four_of_integrable_fourth hXj ?_
+  refine h.rowNorm_fourth_integrable.mono' (hXj.aemeasurable.pow_const 4).aestronglyMeasurable
+    (ae_of_all μ fun ω => ?_)
+  have hxj : |X 0 ω j| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) j
+  calc
+    ‖X 0 ω j ^ 4‖ = |X 0 ω j| ^ 4 := by
+      simp [Real.norm_eq_abs]
+    _ ≤ ‖X 0 ω‖ ^ 4 := by
+      gcongr
+
+/-- The fitted linear index has a finite fourth moment under the regressor
+fourth-row moment. -/
+theorem fittedIndex_memLp_four
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidAssumption72ResponseMomentConditions μ X e y β) :
+    MemLp (fun ω => (X 0 ω) ⬝ᵥ β) 4 μ := by
+  classical
+  convert (memLp_finset_sum' (s := Finset.univ)
+    (f := fun j ω => X 0 ω j * β j)
+    (fun j _ =>
+      (IidAssumption72ResponseMomentConditions.regressorCoordinate_memLp_four h j).mul_const
+        (β j))) using 1
+  ext ω
+  simp [dotProduct]
+
+/-- The response fourth moment and regressor fourth-row moment imply the
+structural-error fourth moment through the linear-model decomposition. -/
+theorem int_error_fourth
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidAssumption72ResponseMomentConditions μ X e y β) :
+    Integrable (fun ω => e 0 ω ^ 4) μ := by
+  have hy_mem : MemLp (fun ω => y 0 ω) 4 μ :=
+    memLp_four_of_integrable_fourth (h.y_aestronglyMeasurable 0) h.int_response_fourth
+  have hfit_mem : MemLp (fun ω => (X 0 ω) ⬝ᵥ β) 4 μ :=
+    IidAssumption72ResponseMomentConditions.fittedIndex_memLp_four h
+  have hdiff_mem : MemLp (fun ω => y 0 ω - (X 0 ω) ⬝ᵥ β) 4 μ :=
+    hy_mem.sub hfit_mem
+  have hnorm_int : Integrable (fun ω => ‖y 0 ω - (X 0 ω) ⬝ᵥ β‖ ^ 4) μ :=
+    hdiff_mem.integrable_norm_pow' (p := 4)
+  convert hnorm_int using 1
+  ext ω
+  have heq : y 0 ω - (X 0 ω) ⬝ᵥ β = e 0 ω := by
+    rw [h.model 0 ω]
+    ring
+  rw [heq]
+  exact ((show Even (4 : ℕ) by decide).pow_abs (e 0 ω)).symm
+
+/-- The response-fourth-moment package discharges the structural-error
+fourth-moment iid package. -/
+theorem toIidAssumption72FourthMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidAssumption72ResponseMomentConditions μ X e y β) :
+    IidAssumption72FourthMomentConditions μ X e y β where
+  model := h.model
+  x_aestronglyMeasurable := h.x_aestronglyMeasurable
+  e_aestronglyMeasurable := h.e_aestronglyMeasurable
+  joint_iIndep := h.joint_iIndep
+  joint_identDistrib := h.joint_identDistrib
+  int_error_fourth := IidAssumption72ResponseMomentConditions.int_error_fourth h
+  Q_nonsing := h.Q_nonsing
+  orthogonality := h.orthogonality
+  rowNorm_fourth_integrable := h.rowNorm_fourth_integrable
+
+/-- The response-fourth-moment package discharges the existing robust feasible-HC
+joint-observation package. -/
+theorem toIidRobustFeasibleHCMomentConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidAssumption72ResponseMomentConditions μ X e y β) :
+    IidRobustFeasibleHCMomentConditions μ X e y β :=
+  IidAssumption72FourthMomentConditions.toIidRobustFeasibleHCMomentConditions
+    h.toIidAssumption72FourthMomentConditions
+
+end IidAssumption72ResponseMomentConditions
+
 omit [Fintype k] [DecidableEq k] in
 private lemma measurable_hcCrossWeightScalar (a b l : k) :
     Measurable (fun z : (k → ℝ) × ℝ =>
