@@ -170,18 +170,46 @@ structure FeasibleHCMomentWLLNConditions (μ : Measure Ω) [IsProbabilityMeasure
   /-- Compact fourth-row-moment domination for feasible-HC quadratic weights. -/
   rowNorm_fourth_integrable : Integrable (fun ω => ‖X 0 ω‖ ^ 4) μ
 
+namespace FeasibleHCMomentWLLNConditions
+
+omit [DecidableEq k] in
+/-- Fourth-row-moment integrability implies the finite first moment for squared row norms used by
+max-leverage and residual-uniformity discharges. -/
+theorem rowNorm_sq_memLp
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : FeasibleHCMomentWLLNConditions μ X e y β) :
+    MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ := by
+  exact memLp_one_iff_integrable.mpr
+    (integrable_norm_pow_of_le (f := X 0) (μ := μ) (h.x_aestronglyMeasurable 0)
+      (show (2 : ℕ) ≤ 4 by norm_num) h.rowNorm_fourth_integrable)
+
+end FeasibleHCMomentWLLNConditions
+
 /-- Single public sufficient-condition package for robust feasible HC0--HC3 inference.
 
 This combines the robust covariance WLLN/CLT package with the compact feasible-HC
-moment package and the finite squared-row moment used to discharge maximal leverage.
-It is still a sufficient condition layer, not a literal minimal encoding of Hansen's
-Assumption 7.2. -/
+moment package. The squared-row `L¹` moment used to discharge maximal leverage is
+derived from the fourth-row-moment field rather than carried as a separate
+assumption. It is still a sufficient condition layer, not a literal minimal encoding
+of Hansen's Assumption 7.2. -/
 structure RobustFeasibleHCMomentConditions (μ : Measure Ω) [IsProbabilityMeasure μ]
     (X : ℕ → Ω → (k → ℝ)) (e y : ℕ → Ω → ℝ) (β : k → ℝ)
     extends RobustCovarianceConsistencyConditions μ X e,
-      FeasibleHCMomentWLLNConditions μ X e y β where
-  /-- Finite first moment for squared row norms, used by the iid max-leverage discharge. -/
-  rowNorm_sq_memLp : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ
+      FeasibleHCMomentWLLNConditions μ X e y β
+
+namespace RobustFeasibleHCMomentConditions
+
+/-- Fourth-row-moment integrability supplies the squared-row `L¹` moment needed by the
+Chapter 6 maximum theorem. -/
+theorem rowNorm_sq_memLp
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : RobustFeasibleHCMomentConditions μ X e y β) :
+    MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ :=
+  FeasibleHCMomentWLLNConditions.rowNorm_sq_memLp h.toFeasibleHCMomentWLLNConditions
+
+end RobustFeasibleHCMomentConditions
 
 /-- IID joint-observation sufficient-condition package for robust feasible HC0--HC3 inference.
 
@@ -225,8 +253,21 @@ structure IidRobustFeasibleHCMomentConditions (μ : Measure Ω) [IsProbabilityMe
     Integrable (fun ω => |e 0 ω| * ‖X 0 ω‖ ^ 3) μ
   /-- Compact fourth-row-moment domination for feasible-HC quadratic weights. -/
   rowNorm_fourth_integrable : Integrable (fun ω => ‖X 0 ω‖ ^ 4) μ
-  /-- Finite first moment for squared row norms, used by the iid max-leverage discharge. -/
-  rowNorm_sq_memLp : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ
+
+namespace IidRobustFeasibleHCMomentConditions
+
+/-- Fourth-row-moment integrability supplies the squared-row `L¹` moment needed by the
+Chapter 6 maximum theorem. -/
+theorem rowNorm_sq_memLp
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ := by
+  exact memLp_one_iff_integrable.mpr
+    (integrable_norm_pow_of_le (f := X 0) (μ := μ) (h.x_aestronglyMeasurable 0)
+      (show (2 : ℕ) ≤ 4 by norm_num) h.rowNorm_fourth_integrable)
+
+end IidRobustFeasibleHCMomentConditions
 
 omit [Fintype k] [DecidableEq k] in
 private lemma measurable_hcCrossWeightScalar (a b l : k) :
@@ -529,13 +570,12 @@ theorem toRobustFeasibleHCMomentConditions
     IidRobustFeasibleHCMomentConditions.toRobustCovarianceConsistencyConditions h
   toFeasibleHCMomentWLLNConditions :=
     IidRobustFeasibleHCMomentConditions.toFeasibleHCMomentWLLNConditions h
-  rowNorm_sq_memLp := h.rowNorm_sq_memLp
 
 /-- **Hansen Theorem 7.17, iid feasible-HC package endpoint.**
 
 The unified iid robust feasible-HC package directly discharges the max-leverage
-rate through its finite squared-row-moment field and the row-norm
-identical-distribution bridge above. -/
+rate through its fourth-row-moment field and the row-norm identical-distribution
+bridge above. -/
 theorem maxLeverageStar_tendstoInMeasure_zero_of_iidRobustFeasibleHCMomentConditions
     {μ : Measure Ω} [IsProbabilityMeasure μ]
     {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
@@ -546,7 +586,7 @@ theorem maxLeverageStar_tendstoInMeasure_zero_of_iidRobustFeasibleHCMomentCondit
   maxLeverageStar_tendstoInMeasure_zero_of_identDistrib_memLp_rowNorm_sq
     (μ := μ) (X := X) (e := e)
     h.toLeastSquaresConsistencyConditions
-    h.rowNorm_sq_memLp h.rowNorm_sq_identDistrib
+    (IidRobustFeasibleHCMomentConditions.rowNorm_sq_memLp h) h.rowNorm_sq_identDistrib
 
 end IidRobustFeasibleHCMomentConditions
 
@@ -821,7 +861,7 @@ theorem rowNorm_sq_uniformIntegrable
     (hm : RobustFeasibleHCMomentConditions μ X e y β) :
     UniformIntegrable (fun i ω => ‖X i ω‖ ^ 2) 1 μ :=
   uniformIntegrable_one_of_identDistrib_memLp
-    hm.rowNorm_sq_memLp hm.rowNorm_sq_identDistrib
+    (RobustFeasibleHCMomentConditions.rowNorm_sq_memLp hm) hm.rowNorm_sq_identDistrib
 
 end RobustFeasibleHCMomentConditions
 
@@ -1138,7 +1178,7 @@ theorem toFeasibleHCLeverageConditions
   hm.toFeasibleHCMomentWLLNConditions
     |>.toFeasibleHCLeverageConditions_robust_identDistrib_memLp_rowNorm_sq
       hm.toRobustCovarianceConsistencyConditions
-      hm.rowNorm_sq_memLp hm.rowNorm_sq_identDistrib
+      (RobustFeasibleHCMomentConditions.rowNorm_sq_memLp hm) hm.rowNorm_sq_identDistrib
 
 end RobustFeasibleHCMomentConditions
 
