@@ -190,6 +190,28 @@ theorem olsConditionalVarianceMatrix_diagonal_mono_posSemidef
     · simp [Matrix.diagonal, hij]
   simpa [hdiff]
 
+/-- Any positive-semidefinite increase in the covariance middle matrix remains
+positive semidefinite after the OLS sandwich. -/
+theorem olsSandwichMiddle_mono_posSemidef
+    (X : Matrix n k ℝ) (M₁ M₂ : Matrix k k ℝ)
+    [Invertible (Xᵀ * X)]
+    (hmono : (M₂ - M₁).PosSemidef) :
+    (⅟ (Xᵀ * X) * M₂ * ⅟ (Xᵀ * X) -
+      ⅟ (Xᵀ * X) * M₁ * ⅟ (Xᵀ * X)).PosSemidef := by
+  let A : Matrix k k ℝ := ⅟ (Xᵀ * X)
+  have hpsd : (Aᵀ * (M₂ - M₁) * A).PosSemidef := by
+    simpa [Matrix.conjTranspose] using
+      (Matrix.PosSemidef.conjTranspose_mul_mul_same hmono A)
+  have hdiff :
+      ⅟ (Xᵀ * X) * M₂ * ⅟ (Xᵀ * X) -
+        ⅟ (Xᵀ * X) * M₁ * ⅟ (Xᵀ * X) =
+          Aᵀ * (M₂ - M₁) * A := by
+    dsimp [A]
+    rw [inv_gram_transpose]
+    rw [← Matrix.sub_mul, ← Matrix.mul_sub]
+  rw [hdiff]
+  exact hpsd
+
 /-- Matrix-level HC0/HC2 ordering on the nonsaturated leverage range.
 
 If every leverage satisfies `0 ≤ hᵢᵢ < 1`, then the HC2 covariance estimator
@@ -774,6 +796,32 @@ theorem olsClusteredCR3VarianceEstimator_eq_clusterCR3Score
     ext a
     exact (clusterCR3Score_apply X y cluster g a).symm
   simp [hscore]
+
+/-- CR3 conservativeness bridge. If the CR3 cluster-score middle matrix
+dominates a target middle matrix in positive-semidefinite order, then the full
+CR3 sandwich dominates the corresponding target sandwich. -/
+theorem olsClusteredCR3VarianceEstimator_conservative_of_middle
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    (hInv : ∀ g, Invertible (clusterLeaveOutAdjustmentMatrix X cluster g))
+    (M : Matrix k k ℝ)
+    (hmiddle :
+      ((∑ g,
+          letI : Invertible (clusterLeaveOutAdjustmentMatrix X cluster g) := hInv g
+          Matrix.vecMulVec (clusterCR3Score X y cluster g)
+            (clusterCR3Score X y cluster g)) - M).PosSemidef) :
+    (olsClusteredCR3VarianceEstimator X y cluster hInv -
+      ⅟ (Xᵀ * X) * M * ⅟ (Xᵀ * X)).PosSemidef := by
+  rw [olsClusteredCR3VarianceEstimator_eq_clusterCR3Score]
+  exact olsSandwichMiddle_mono_posSemidef
+    (X := X)
+    (M₁ := M)
+    (M₂ := ∑ g,
+      letI : Invertible (clusterLeaveOutAdjustmentMatrix X cluster g) := hInv g
+      Matrix.vecMulVec (clusterCR3Score X y cluster g)
+        (clusterCR3Score X y cluster g))
+    hmiddle
 
 /-- The CR3-style clustered covariance estimator is positive semidefinite. -/
 theorem olsClusteredCR3VarianceEstimator_posSemidef
