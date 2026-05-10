@@ -252,6 +252,38 @@ theorem pointwise_scaled_remainder_tendsto_zero
   simpa using h.uniform_scaled_remainder_tendsto_zero.tendsto_at x
 
 omit [Fintype k] [DecidableEq k] in
+/-- The unscaled second-order Edgeworth approximation error vanishes at each cutoff. -/
+theorem pointwise_remainder_tendsto_zero
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {T : ℕ → Ω → ℝ} {baseCDF density p1 p2 : ℝ → ℝ}
+    (h : SecondOrderEdgeworthExpansion μ T baseCDF density p1 p2) (x : ℝ) :
+    Tendsto
+      (fun n : ℕ =>
+        statisticCDFReal μ T n x - baseCDF x -
+          (Real.sqrt (n : ℝ))⁻¹ * (p1 x * density x) -
+          (n : ℝ)⁻¹ * (p2 x * density x))
+      atTop (𝓝 0) := by
+  let R : ℕ → ℝ := fun n =>
+    statisticCDFReal μ T n x - baseCDF x -
+      (Real.sqrt (n : ℝ))⁻¹ * (p1 x * density x) -
+      (n : ℝ)⁻¹ * (p2 x * density x)
+  have hscaled : Tendsto (fun n : ℕ => (n : ℝ) * R n) atTop (𝓝 0) := by
+    simpa [R] using h.pointwise_scaled_remainder_tendsto_zero x
+  have hinv : Tendsto (fun n : ℕ => (n : ℝ)⁻¹) atTop (𝓝 (0 : ℝ)) :=
+    tendsto_inv_atTop_zero.comp tendsto_natCast_atTop_atTop
+  have hprod : Tendsto (fun n : ℕ => (n : ℝ)⁻¹ * ((n : ℝ) * R n))
+      atTop (𝓝 0) := by
+    simpa using hinv.mul hscaled
+  have heq :
+      (fun n : ℕ => (n : ℝ)⁻¹ * ((n : ℝ) * R n)) =ᶠ[atTop] R := by
+    filter_upwards [eventually_ge_atTop 1] with n hn
+    have hnne : (n : ℝ) ≠ 0 := by
+      exact_mod_cast (ne_of_gt hn)
+    field_simp [hnne]
+  rw [tendsto_congr' heq] at hprod
+  simpa [R] using hprod
+
+omit [Fintype k] [DecidableEq k] in
 /-- A second-order Edgeworth expansion implies the first-order Edgeworth
 interface, with correction `p1(x) * density(x)`. -/
 theorem toFirstOrderEdgeworthExpansion
@@ -304,6 +336,15 @@ theorem toFirstOrderEdgeworthExpansion
       ring
     rw [tendsto_congr' heq]
     simpa [A] using hsum
+
+omit [Fintype k] [DecidableEq k] in
+/-- A second-order Edgeworth expansion implies ordinary CDF convergence to the base CDF. -/
+theorem cdf_tendsto_base
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {T : ℕ → Ω → ℝ} {baseCDF density p1 p2 : ℝ → ℝ}
+    (h : SecondOrderEdgeworthExpansion μ T baseCDF density p1 p2) (x : ℝ) :
+    Tendsto (fun n : ℕ => statisticCDFReal μ T n x) atTop (𝓝 (baseCDF x)) :=
+  h.toFirstOrderEdgeworthExpansion.cdf_tendsto_base x
 
 end SecondOrderEdgeworthExpansion
 
