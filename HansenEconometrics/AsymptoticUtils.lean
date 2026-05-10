@@ -24,6 +24,8 @@ Mathlib does not currently provide as named lemmas:
   WLLN wrapper over `tendstoInMeasure_wlln`.
 * `tendstoInDistribution_continuous_comp` — Hansen Theorem 6.7 in the global
   continuous-map case, wrapping Mathlib's distributional CMT.
+* `tendstoInDistribution_ae_continuous_comp` — Hansen Theorem 6.7 in its
+  textbook a.s.-continuity form, proved from a Portmanteau closed-set argument.
 
 Both are stated for general Banach-space codomains, so they specialize
 directly to scalar, vector, and matrix random variables.
@@ -91,9 +93,9 @@ theorem tendstoInMeasure_continuousAt_const_comp
 /-- **Hansen Theorem 6.7, global continuous-mapping theorem in distribution.**
 
 If `Xₙ ⇒ Z` and `g` is globally continuous, then `g(Xₙ) ⇒ g(Z)`. This is the
-Mathlib-backed global-continuity face of Hansen's distributional CMT; the
-textbook's a.s.-continuity variant is stronger and can be added separately if a
-downstream proof needs it. -/
+Mathlib-backed global-continuity face of Hansen's distributional CMT; see
+`tendstoInDistribution_ae_continuous_comp` for the textbook a.s.-continuity
+form. -/
 theorem tendstoInDistribution_continuous_comp
     {Ω Ω' E F : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
     {P : ℕ → Measure Ω} [∀ n, IsProbabilityMeasure (P n)]
@@ -104,6 +106,111 @@ theorem tendstoInDistribution_continuous_comp
     (hX : TendstoInDistribution X atTop Z P ν) (hg : Continuous g) :
     TendstoInDistribution (fun n ω => g (X n ω)) atTop (fun ω => g (Z ω)) P ν := by
   simpa [Function.comp_def] using hX.continuous_comp hg
+
+/-- **Push-forward CMT for maps continuous outside a limit-null set.**
+
+If probability laws `νs` converge weakly to `ν`, and a measurable map `g` is
+continuous away from a `ν`-null set `D`, then the push-forward laws converge
+weakly.  This is the probability-measure core of Hansen's a.s.-continuity
+continuous-mapping theorem.
+
+The proof is the standard Portmanteau closed-set argument: for closed `C`, the
+closure of `g ⁻¹' C` is contained in `g ⁻¹' C ∪ D`; weak convergence controls
+the closed closure, and the null set removes the discontinuity contribution. -/
+theorem probabilityMeasure_tendsto_map_of_tendsto_of_ae_continuous
+    {ι E F : Type*} {L : Filter ι} [L.IsCountablyGenerated]
+    [TopologicalSpace E] [MeasurableSpace E] [OpensMeasurableSpace E]
+    [HasOuterApproxClosed E]
+    [TopologicalSpace F] [MeasurableSpace F] [BorelSpace F]
+    {νs : ι → ProbabilityMeasure E} {ν : ProbabilityMeasure E}
+    (hν : Tendsto νs L (𝓝 ν))
+    {g : E → F} (hg : Measurable g) {D : Set E}
+    (hD : (ν : Measure E) D = 0)
+    (hcont : ∀ x, x ∉ D → ContinuousAt g x) :
+    Tendsto (fun i => (νs i).map (hg.aemeasurable : AEMeasurable g (νs i)))
+      L (𝓝 (ν.map (hg.aemeasurable : AEMeasurable g ν))) := by
+  refine tendsto_of_forall_isClosed_limsup_le' ?_
+  intro C hC
+  let A : Set E := g ⁻¹' C
+  have hclosure_subset : closure A ⊆ A ∪ D := by
+    intro x hx
+    by_cases hxD : x ∈ D
+    · exact Or.inr hxD
+    · left
+      have hxC_closure : g x ∈ closure C :=
+        (hcont x hxD).continuousWithinAt.mem_closure hx (by intro y hy; exact hy)
+      exact hC.closure_subset hxC_closure
+  have hpre_le :
+      (fun i => ((νs i).map (hg.aemeasurable : AEMeasurable g (νs i)) : Measure F) C)
+        ≤ᶠ[L] fun i => (νs i : Measure E) (closure A) := by
+    refine Filter.Eventually.of_forall ?_
+    intro i
+    change ((νs i : Measure E).map g) C ≤ (νs i : Measure E) (closure A)
+    rw [Measure.map_apply_of_aemeasurable (hg.aemeasurable : AEMeasurable g (νs i))
+      hC.measurableSet]
+    exact measure_mono subset_closure
+  have hclosed_bound :
+      L.limsup (fun i => (νs i : Measure E) (closure A)) ≤
+        (ν : Measure E) (closure A) :=
+    ProbabilityMeasure.limsup_measure_closed_le_of_tendsto hν isClosed_closure
+  have hlimit_le : (ν : Measure E) (closure A) ≤ (ν : Measure E) A := by
+    calc
+      (ν : Measure E) (closure A) ≤ (ν : Measure E) (A ∪ D) :=
+        measure_mono hclosure_subset
+      _ ≤ (ν : Measure E) A + (ν : Measure E) D := measure_union_le A D
+      _ = (ν : Measure E) A := by simp [hD]
+  calc
+    L.limsup
+        (fun i => ((νs i).map (hg.aemeasurable : AEMeasurable g (νs i)) : Measure F) C)
+        ≤ L.limsup (fun i => (νs i : Measure E) (closure A)) :=
+          limsup_le_limsup hpre_le
+    _ ≤ (ν : Measure E) (closure A) := hclosed_bound
+    _ ≤ (ν : Measure E) A := hlimit_le
+    _ = ((ν.map (hg.aemeasurable : AEMeasurable g ν) : ProbabilityMeasure F) : Measure F) C := by
+      change (ν : Measure E) A = ((ν : Measure E).map g) C
+      rw [Measure.map_apply_of_aemeasurable (hg.aemeasurable : AEMeasurable g ν)
+        hC.measurableSet]
+
+/-- **Hansen Theorem 6.7, a.s.-continuity CMT in distribution.**
+
+If `Xₙ ⇒ Z` and a measurable map `g` is continuous off a set with zero
+limit-law probability, then `g(Xₙ) ⇒ g(Z)`.  This is the textbook
+a.s.-continuity face of the continuous-mapping theorem; the null set is stated
+on the law of `Z`, i.e. `(ν.map Z) D = 0`. -/
+theorem tendstoInDistribution_ae_continuous_comp
+    {Ω Ω' E F : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {P : ℕ → Measure Ω} [∀ n, IsProbabilityMeasure (P n)]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    [TopologicalSpace E] [MeasurableSpace E] [OpensMeasurableSpace E]
+    [HasOuterApproxClosed E]
+    [TopologicalSpace F] [MeasurableSpace F] [BorelSpace F]
+    {X : ℕ → Ω → E} {Z : Ω' → E} {g : E → F}
+    (hX : TendstoInDistribution X atTop Z P ν)
+    (hg : Measurable g) {D : Set E}
+    (hD : (ν.map Z) D = 0)
+    (hcont : ∀ x, x ∉ D → ContinuousAt g x) :
+    TendstoInDistribution (fun n ω => g (X n ω)) atTop (fun ω => g (Z ω)) P ν := by
+  have hcomp :
+      TendstoInDistribution (fun n => g ∘ X n) atTop (g ∘ Z) P ν := by
+    refine ⟨?_, ?_, ?_⟩
+    · intro n
+      exact hg.comp_aemeasurable (hX.forall_aemeasurable n)
+    · exact hg.comp_aemeasurable hX.aemeasurable_limit
+    let law : ℕ → ProbabilityMeasure E := fun n =>
+      ⟨(P n).map (X n), Measure.isProbabilityMeasure_map (hX.forall_aemeasurable n)⟩
+    let lawZ : ProbabilityMeasure E :=
+      ⟨ν.map Z, Measure.isProbabilityMeasure_map hX.aemeasurable_limit⟩
+    have hmap :=
+      probabilityMeasure_tendsto_map_of_tendsto_of_ae_continuous
+        (νs := law) (ν := lawZ) (L := atTop) hX.tendsto hg
+        (by simpa [lawZ] using hD) hcont
+    convert hmap with n
+    · simp only [law, ProbabilityMeasure.map, ProbabilityMeasure.coe_mk, Subtype.mk.injEq]
+      rw [AEMeasurable.map_map_of_aemeasurable hg.aemeasurable (hX.forall_aemeasurable n)]
+    · apply ProbabilityMeasure.toMeasure_injective
+      simp only [lawZ, ProbabilityMeasure.map, ProbabilityMeasure.coe_mk]
+      rw [AEMeasurable.map_map_of_aemeasurable hg.aemeasurable hX.aemeasurable_limit]
+  simpa [Function.comp_def] using hcomp
 
 /-- **Portmanteau lower-bound wrapper for bounded continuous moments.**
 

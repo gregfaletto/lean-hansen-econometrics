@@ -201,6 +201,10 @@ The core CMT and WLLN declarations are:
   constant limit.
   \item \lean{tendstoInDistribution_continuous_comp}: global CMT in
   distribution.
+  \item \lean{probabilityMeasure_tendsto_map_of_tendsto_of_ae_continuous}
+  and \lean{tendstoInDistribution_ae_continuous_comp}: the textbook
+  a.s.-continuity CMT in distribution, proved by a Portmanteau closed-set
+  push-forward argument.
   \item \lean{tendstoInMeasure_wlln}: Banach-valued iid WLLN, obtained by
   upgrading Mathlib's strong law to convergence in measure.
   \item \lean{tendstoInMeasure_transformed_wlln}: transformed WLLN for
@@ -500,9 +504,8 @@ partition infrastructure; HC4-style leverage-adjusted variants. \\
 Chapter 5 & Kinal theorem 5.5, deferred unless a downstream theorem needs the
 exact moment-existence threshold. \\
 Chapter 6 & Scalar triangular-array Lindeberg/Lyapunov sufficient-condition
-discharge for Theorems 6.4 and 6.5; a.s.-continuity version of the CMT in
-distribution for Theorem 6.7; arbitrary-unbiased-estimator lower bound for
-Theorem 6.11. \\
+discharge for Theorems 6.4 and 6.5; arbitrary-unbiased-estimator lower bound
+for Theorem 6.11. \\
 Chapter 7 & Further tightening of the remaining public condition packages to the
 literal textbook iid/moment assumptions; concrete cumulant/polynomial Edgeworth
 expansion for Theorem 7.15. \\
