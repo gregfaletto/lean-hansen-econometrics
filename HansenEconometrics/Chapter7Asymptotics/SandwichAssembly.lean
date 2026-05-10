@@ -232,8 +232,6 @@ structure IidRobustFeasibleHCMomentConditions (μ : Measure Ω) [IsProbabilityMe
   joint_identDistrib : ∀ i,
     IdentDistrib (fun ω => (X i ω, e i ω))
       (fun ω => (X 0 ω, e 0 ω)) μ μ
-  /-- Integrability of the one-row regressor outer product. -/
-  int_outer : Integrable (fun ω => Matrix.vecMulVec (X 0 ω) (X 0 ω)) μ
   /-- Integrability of the one-row squared structural error. -/
   int_error_sq : Integrable (fun ω => e 0 ω ^ 2) μ
   /-- Population Gram matrix `Q := E[X₀X₀ᵀ]` is nonsingular. -/
@@ -380,6 +378,37 @@ private theorem hcQuadWeight_integrable_of_rowNorm_fourth
     _ = ‖X 0 ω‖ ^ 4 := by ring
 
 namespace IidRobustFeasibleHCMomentConditions
+
+/-- Fourth-row-moment integrability supplies integrability of the one-row
+regressor outer product. -/
+theorem int_outer
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : IidRobustFeasibleHCMomentConditions μ X e y β) :
+    Integrable (fun ω => Matrix.vecMulVec (X 0 ω) (X 0 ω)) μ := by
+  classical
+  have hsq : Integrable (fun ω => ‖X 0 ω‖ ^ 2) μ :=
+    memLp_one_iff_integrable.mp
+      (IidRobustFeasibleHCMomentConditions.rowNorm_sq_memLp h)
+  refine Integrable.of_eval ?_
+  intro a
+  refine Integrable.of_eval ?_
+  intro b
+  have hXa : AEStronglyMeasurable (fun ω => X 0 ω a) μ :=
+    (continuous_apply a).comp_aestronglyMeasurable (h.x_aestronglyMeasurable 0)
+  have hXb : AEStronglyMeasurable (fun ω => X 0 ω b) μ :=
+    (continuous_apply b).comp_aestronglyMeasurable (h.x_aestronglyMeasurable 0)
+  refine hsq.mono' (hXa.mul hXb) (ae_of_all μ fun ω => ?_)
+  have hxa : |X 0 ω a| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) a
+  have hxb : |X 0 ω b| ≤ ‖X 0 ω‖ := by
+    simpa [Real.norm_eq_abs] using norm_le_pi_norm (X 0 ω) b
+  calc
+    ‖Matrix.vecMulVec (X 0 ω) (X 0 ω) a b‖
+        = |X 0 ω a| * |X 0 ω b| := by
+          simp [Matrix.vecMulVec_apply, Real.norm_eq_abs]
+    _ ≤ ‖X 0 ω‖ * ‖X 0 ω‖ := by gcongr
+    _ = ‖X 0 ω‖ ^ 2 := by ring
 
 /-- The baseline score vector is strongly measurable under the iid feasible-HC package. -/
 theorem score_aestronglyMeasurable
@@ -545,7 +574,7 @@ theorem toLeastSquaresConsistencyConditions
     intro i
     have hi := (h.joint_identDistrib i).comp measurable_jointCross
     simpa [Function.comp] using hi
-  int_outer := h.int_outer
+  int_outer := IidRobustFeasibleHCMomentConditions.int_outer h
   int_cross := IidRobustFeasibleHCMomentConditions.int_cross h
   Q_nonsing := h.Q_nonsing
   orthogonality := h.orthogonality
