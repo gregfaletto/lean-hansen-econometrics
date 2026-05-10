@@ -190,13 +190,28 @@ end FeasibleHCMomentWLLNConditions
 
 This combines the robust covariance WLLN/CLT package with the compact feasible-HC
 moment package. The squared-row `L¹` moment used to discharge maximal leverage is
-derived from the fourth-row-moment field rather than carried as a separate
-assumption. It is still a sufficient condition layer, not a literal minimal encoding
-of Hansen's Assumption 7.2. -/
+derived from the fourth-row-moment field, and the feasible-HC third absolute row
+moment is derived from the score outer-product moment plus the fourth-row moment
+rather than carried as a separate assumption. It is still a sufficient condition
+layer, not a literal minimal encoding of Hansen's Assumption 7.2. -/
 structure RobustFeasibleHCMomentConditions (μ : Measure Ω) [IsProbabilityMeasure μ]
     (X : ℕ → Ω → (k → ℝ)) (e y : ℕ → Ω → ℝ) (β : k → ℝ)
-    extends RobustCovarianceConsistencyConditions μ X e,
-      FeasibleHCMomentWLLNConditions μ X e y β
+    extends RobustCovarianceConsistencyConditions μ X e where
+  /-- Linear-model decomposition of the observed outcome. -/
+  model : ∀ i ω, y i ω = (X i ω) ⬝ᵥ β + e i ω
+  /-- Component measurability of the regressor sequence. -/
+  x_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (X i) μ
+  /-- Component measurability of the structural-error sequence. -/
+  e_aestronglyMeasurable : ∀ i, AEStronglyMeasurable (e i) μ
+  /-- Pairwise independence of the joint observations `(Xᵢ, eᵢ)`. -/
+  joint_pairwise_indep : Pairwise ((· ⟂ᵢ[μ] ·) on
+    (fun i ω => (X i ω, e i ω)))
+  /-- Identical distribution of the joint observations against the baseline row. -/
+  joint_identDistrib : ∀ i,
+    IdentDistrib (fun ω => (X i ω, e i ω))
+      (fun ω => (X 0 ω, e 0 ω)) μ μ
+  /-- Compact fourth-row-moment domination for feasible-HC quadratic weights. -/
+  rowNorm_fourth_integrable : Integrable (fun ω => ‖X 0 ω‖ ^ 4) μ
 
 namespace RobustFeasibleHCMomentConditions
 
@@ -206,8 +221,95 @@ theorem rowNorm_sq_memLp
     {μ : Measure Ω} [IsProbabilityMeasure μ]
     {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
     (h : RobustFeasibleHCMomentConditions μ X e y β) :
-    MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ :=
-  FeasibleHCMomentWLLNConditions.rowNorm_sq_memLp h.toFeasibleHCMomentWLLNConditions
+    MemLp (fun ω => ‖X 0 ω‖ ^ 2) 1 μ := by
+  exact memLp_one_iff_integrable.mpr
+    (integrable_norm_pow_of_le (f := X 0) (μ := μ) (h.x_aestronglyMeasurable 0)
+      (show (2 : ℕ) ≤ 4 by norm_num) h.rowNorm_fourth_integrable)
+
+/-- Fourth-row-moment integrability supplies the squared-row `L²` moment used with
+the score `L²` moment in the feasible-HC third-weight discharge. -/
+theorem rowNorm_sq_memLp_two
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : RobustFeasibleHCMomentConditions μ X e y β) :
+    MemLp (fun ω => ‖X 0 ω‖ ^ 2) 2 μ := by
+  have hmeas : AEStronglyMeasurable (fun ω => ‖X 0 ω‖ ^ 2) μ :=
+    ((h.x_aestronglyMeasurable 0).norm.aemeasurable.pow_const 2).aestronglyMeasurable
+  refine (memLp_two_iff_integrable_sq hmeas).2 ?_
+  convert h.rowNorm_fourth_integrable using 1
+  ext ω
+  ring
+
+/-- The baseline score vector is strongly measurable under the compact robust
+feasible-HC package. -/
+theorem score_aestronglyMeasurable
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : RobustFeasibleHCMomentConditions μ X e y β) :
+    AEStronglyMeasurable (fun ω => e 0 ω • X 0 ω) μ :=
+  (h.e_aestronglyMeasurable 0).smul (h.x_aestronglyMeasurable 0)
+
+/-- Integrability of the score outer product supplies coordinatewise score
+square-integrability under the compact robust feasible-HC package. -/
+theorem scoreCoordinate_memLp_two
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : RobustFeasibleHCMomentConditions μ X e y β) (j : k) :
+    MemLp (fun ω => (e 0 ω • X 0 ω) j) 2 μ := by
+  have hsq_entry :
+      Integrable
+        (fun ω => Matrix.vecMulVec (e 0 ω • X 0 ω) (e 0 ω • X 0 ω) j j) μ :=
+    Integrable.eval (Integrable.eval h.int_score_outer j) j
+  have hsq : Integrable (fun ω => ((e 0 ω • X 0 ω) j) ^ 2) μ := by
+    simpa [Matrix.vecMulVec_apply, pow_two] using hsq_entry
+  exact (memLp_two_iff_integrable_sq
+    ((continuous_apply j).comp_aestronglyMeasurable
+      (RobustFeasibleHCMomentConditions.score_aestronglyMeasurable h))).2 hsq
+
+/-- Integrability of the score outer product supplies vector-valued score
+square-integrability under the compact robust feasible-HC package. -/
+theorem score_memLp_two
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : RobustFeasibleHCMomentConditions μ X e y β) :
+    MemLp (fun ω => e 0 ω • X 0 ω) 2 μ :=
+  MemLp.of_eval
+    (fun j => RobustFeasibleHCMomentConditions.scoreCoordinate_memLp_two h j)
+
+/-- The robust score second moment and fourth row moment imply the compact third-moment
+domination used by the feasible-HC cross weights. -/
+theorem absError_rowNorm_cubed_integrable
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : RobustFeasibleHCMomentConditions μ X e y β) :
+    Integrable (fun ω => |e 0 ω| * ‖X 0 ω‖ ^ 3) μ := by
+  have hscore : MemLp (fun ω => ‖e 0 ω • X 0 ω‖) 2 μ :=
+    (RobustFeasibleHCMomentConditions.score_memLp_two h).norm
+  have hrow : MemLp (fun ω => ‖X 0 ω‖ ^ 2) 2 μ :=
+    RobustFeasibleHCMomentConditions.rowNorm_sq_memLp_two h
+  have hprod : Integrable
+      ((fun ω => ‖e 0 ω • X 0 ω‖) * (fun ω => ‖X 0 ω‖ ^ 2)) μ :=
+    hscore.integrable_mul hrow
+  convert hprod using 1
+  ext ω
+  simp [Pi.mul_apply, norm_smul, Real.norm_eq_abs]
+  ring
+
+/-- The compact robust feasible-HC package discharges the compact feasible-HC
+moment WLLN package. -/
+theorem toFeasibleHCMomentWLLNConditions
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : ℕ → Ω → (k → ℝ)} {e y : ℕ → Ω → ℝ} {β : k → ℝ}
+    (h : RobustFeasibleHCMomentConditions μ X e y β) :
+    FeasibleHCMomentWLLNConditions μ X e y β where
+  model := h.model
+  x_aestronglyMeasurable := h.x_aestronglyMeasurable
+  e_aestronglyMeasurable := h.e_aestronglyMeasurable
+  joint_pairwise_indep := h.joint_pairwise_indep
+  joint_identDistrib := h.joint_identDistrib
+  absError_rowNorm_cubed_integrable :=
+    RobustFeasibleHCMomentConditions.absError_rowNorm_cubed_integrable h
+  rowNorm_fourth_integrable := h.rowNorm_fourth_integrable
 
 end RobustFeasibleHCMomentConditions
 
@@ -685,8 +787,12 @@ theorem toRobustFeasibleHCMomentConditions
     RobustFeasibleHCMomentConditions μ X e y β where
   toRobustCovarianceConsistencyConditions :=
     IidRobustFeasibleHCMomentConditions.toRobustCovarianceConsistencyConditions h
-  toFeasibleHCMomentWLLNConditions :=
-    IidRobustFeasibleHCMomentConditions.toFeasibleHCMomentWLLNConditions h
+  model := h.model
+  x_aestronglyMeasurable := h.x_aestronglyMeasurable
+  e_aestronglyMeasurable := h.e_aestronglyMeasurable
+  joint_pairwise_indep := joint_pairwise_indep h
+  joint_identDistrib := h.joint_identDistrib
+  rowNorm_fourth_integrable := h.rowNorm_fourth_integrable
 
 /-- **Hansen Theorem 7.17, iid feasible-HC package endpoint.**
 
