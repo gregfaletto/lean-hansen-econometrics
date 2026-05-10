@@ -89,9 +89,10 @@ the Hansen (4.46)--(4.47) cluster covariance middle/sandwich API
 PSD cluster covariance blocks, the block outer-product/score-middle bridge
 `clusterCovarianceMiddle_outer_eq_scoreMiddle`, the true-error cluster-score decomposition
 `olsBeta_linear_decomposition_clusterScores`, the infeasible true-error block bridge
-`clusterCovarianceMiddle_errorOuter_eq_clusterErrorScoreMiddle`, and residual/CR3 block rewrites
-`olsClusteredVarianceEstimator_eq_clusterCovarianceMiddle_residualOuter` and
-`olsClusteredCR3VarianceEstimator_eq_clusterCovarianceMiddle_cr3Outer`.
+`clusterCovarianceMiddle_errorOuter_eq_clusterErrorScoreMiddle`, the coordinatewise conditional-
+expectation bridge `condExp_clusterErrorScoreMiddle_entry_eq_clusterCovarianceMiddle`, and
+residual/CR3 block rewrites `olsClusteredVarianceEstimator_eq_clusterCovarianceMiddle_residualOuter`
+and `olsClusteredCR3VarianceEstimator_eq_clusterCovarianceMiddle_cr3Outer`.
 
 ## Deferred / won't do for now
 For the current pass we are intentionally not pushing Chapter 4 to applied-completeness.
@@ -167,6 +168,7 @@ Conventions:
 - [sum_clusterErrorScore_eq_transpose_mulVec_error](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L654): true-error cluster scores add to `Xᵀ *ᵥ e`.
 - [olsBeta_linear_decomposition_clusterScores](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L672): clustered form of the OLS decomposition `β̂ - β = (XᵀX)⁻¹∑_g X_gᵀe_g`.
 - [clusterCovarianceMiddle_errorOuter_eq_clusterErrorScoreMiddle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L684): infeasible true-error block outer products rewrite to true-error cluster-score outer products.
+- [condExp_clusterErrorScoreMiddle_entry_eq_clusterCovarianceMiddle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1751): coordinatewise conditional expectation of the infeasible true-error score middle equals Hansen's clustered covariance middle.
 - [clusterCR3Residual](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L421): equation (4.52) CR3-style cluster prediction-error adjustment.
 - [clusterLeaveOutBeta_eq_olsBeta_sub_invGram_mulVec_cr3Residual](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L685): equation (4.53) reduced-Gram cluster leave-out coefficient identity.
 - [clusterCR3Score](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L742): named `X_gᵀ *ᵥ \tilde e_g` CR3 cluster score.

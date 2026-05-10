@@ -1739,6 +1739,133 @@ theorem condExp_olsConditionalVarianceMatrix_diagonal_eq
     funext a b
     exact hω a b
 
+set_option maxHeartbeats 800000 in
+-- The dependent cluster-index sums make the integrability and conditional-expectation
+-- rewrites expensive, so keep the higher heartbeat limit local to this theorem.
+omit [Fintype k] [DecidableEq k] in
+/-- Coordinate form of the conditional expectation of the infeasible clustered
+score middle.
+
+If each cluster block has conditional second-moment matrix `Σ_g`, then each
+entry of the infeasible score middle `∑_g (X_g'e_g)(X_g'e_g)'` has conditional
+expectation equal to the matching entry of Hansen's clustered covariance middle
+`∑_g X_g'Σ_gX_g` from equation (4.46). -/
+theorem condExp_clusterErrorScoreMiddle_entry_eq_clusterCovarianceMiddle
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (e : Ω → n → ℝ) (cluster : n → G)
+    (Sigma : ∀ g, Matrix (ClusterIndex cluster g) (ClusterIndex cluster g) ℝ)
+    [IsProbabilityMeasure μ]
+    (hm : m ≤ m₀) [SigmaFinite (μ.trim hm)]
+    (hee_int : ∀ g (i j : ClusterIndex cluster g),
+      Integrable (fun ω => e ω i.1 * e ω j.1) μ)
+    (hSigma : ∀ g (i j : ClusterIndex cluster g),
+      μ[fun ω => e ω i.1 * e ω j.1 | m] =ᵐ[μ] fun _ => Sigma g i j)
+    (a b : k)
+    (hscore_int : ∀ g,
+      Integrable
+        (fun ω =>
+          clusterErrorScore X (e ω) cluster g a *
+            clusterErrorScore X (e ω) cluster g b) μ) :
+    μ[(fun ω =>
+      (∑ g, Matrix.vecMulVec (clusterErrorScore X (e ω) cluster g)
+        (clusterErrorScore X (e ω) cluster g)) a b) | m] =ᵐ[μ]
+      fun _ => clusterCovarianceMiddle X cluster Sigma a b := by
+  let s : G → Ω → ℝ := fun g ω =>
+    clusterErrorScore X (e ω) cluster g a *
+      clusterErrorScore X (e ω) cluster g b
+  have hleft :
+      (fun ω =>
+        (∑ g, Matrix.vecMulVec (clusterErrorScore X (e ω) cluster g)
+          (clusterErrorScore X (e ω) cluster g)) a b) =
+        fun ω => ∑ g, s g ω := by
+    funext ω
+    simp [s, Matrix.sum_apply, Matrix.vecMulVec_apply]
+  have hscore_sum : ∀ g,
+      s g =
+        fun ω =>
+          ∑ i : ClusterIndex cluster g, ∑ j : ClusterIndex cluster g,
+            (X i.1 a * X j.1 b) * (e ω i.1 * e ω j.1) := by
+    intro g
+    funext ω
+    calc
+      s g ω =
+          (∑ i : ClusterIndex cluster g, X i.1 a * e ω i.1) *
+            (∑ j : ClusterIndex cluster g, X j.1 b * e ω j.1) := by
+          simp [s, clusterErrorScore_apply]
+      _ = ∑ i : ClusterIndex cluster g, ∑ j : ClusterIndex cluster g,
+            (X i.1 a * X j.1 b) * (e ω i.1 * e ω j.1) := by
+          rw [Finset.sum_mul]
+          refine Finset.sum_congr rfl ?_
+          intro i _
+          rw [Finset.mul_sum]
+          refine Finset.sum_congr rfl ?_
+          intro j _
+          ring
+  rw [hleft]
+  have hsum_g :
+      μ[(fun ω => ∑ g, s g ω) | m] =ᵐ[μ] ∑ g, μ[s g | m] := by
+    have hsum_repr :
+        (fun ω => ∑ g, s g ω) = ∑ g, s g := by
+      funext ω
+      simp
+    rw [hsum_repr]
+    simpa using MeasureTheory.condExp_finset_sum (μ := μ) (m := m)
+      (s := Finset.univ) (f := s) (fun g _ => by simpa [s] using hscore_int g)
+  have hcond_g : ∀ g,
+      μ[s g | m] =ᵐ[μ]
+        fun _ => ∑ i : ClusterIndex cluster g, ∑ j : ClusterIndex cluster g,
+          (X i.1 a * X j.1 b) * Sigma g i j := by
+    intro g
+    let M : Matrix (ClusterIndex cluster g) (ClusterIndex cluster g) ℝ :=
+      Matrix.vecMulVec (fun i => X i.1 a) (fun j => X j.1 b)
+    have hscore_quad :
+        s g =
+          fun ω => clusterError (e ω) cluster g ⬝ᵥ
+            M *ᵥ clusterError (e ω) cluster g := by
+      funext ω
+      calc
+        s g ω =
+            ∑ i : ClusterIndex cluster g, ∑ j : ClusterIndex cluster g,
+              (X i.1 a * X j.1 b) * (e ω i.1 * e ω j.1) := by
+            exact congrFun (hscore_sum g) ω
+        _ = clusterError (e ω) cluster g ⬝ᵥ
+              M *ᵥ clusterError (e ω) cluster g := by
+            simp [M, clusterError, dotProduct, Matrix.mulVec, Matrix.vecMulVec_apply,
+              Finset.mul_sum, mul_left_comm, mul_comm]
+    rw [hscore_quad]
+    have hquad := condExp_quadratic_form_eq_sum
+      (μ := μ) (m := m) (m₀ := m₀)
+      M (fun ω => clusterError (e ω) cluster g) (Sigma g) hm
+      (fun i j => by simpa [clusterError] using hee_int g i j)
+      (fun i j => by simpa [clusterError] using hSigma g i j)
+    refine hquad.trans ?_
+    filter_upwards [] with ω
+    simp [M, Matrix.vecMulVec_apply]
+  refine hsum_g.trans ?_
+  have hall : ∀ᵐ ω ∂μ, ∀ g,
+      μ[s g | m] ω =
+        ∑ i : ClusterIndex cluster g, ∑ j : ClusterIndex cluster g,
+          (X i.1 a * X j.1 b) * Sigma g i j := by
+    exact ae_all_iff.2 fun g => hcond_g g
+  filter_upwards [hall] with ω hω
+  calc
+    ((∑ g, μ[s g | m]) : Ω → ℝ) ω =
+        ∑ g, μ[s g | m] ω := by
+          simp
+    _ = ∑ g, ∑ i : ClusterIndex cluster g, ∑ j : ClusterIndex cluster g,
+          (X i.1 a * X j.1 b) * Sigma g i j := by
+          exact Finset.sum_congr rfl fun g _ => hω g
+    _ = clusterCovarianceMiddle X cluster Sigma a b := by
+          symm
+          rw [clusterCovarianceMiddle_apply]
+          refine Finset.sum_congr rfl ?_
+          intro g _
+          refine Finset.sum_congr rfl ?_
+          intro i _
+          refine Finset.sum_congr rfl ?_
+          intro j _
+          ring
+
 /-- Matrix-valued conditional expectation of HC2 under homoskedastic second moments.
 
 The rowwise leverage adjustment exactly removes the homoskedastic residual shrinkage, so the
