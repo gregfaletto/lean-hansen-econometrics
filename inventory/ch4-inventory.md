@@ -89,23 +89,25 @@ the Hansen (4.46)--(4.47) cluster covariance middle/sandwich API
 PSD cluster covariance blocks, the block outer-product/score-middle bridge
 `clusterCovarianceMiddle_outer_eq_scoreMiddle`, the true-error cluster-score decomposition
 `olsBeta_linear_decomposition_clusterScores`, the infeasible true-error block bridge
-`clusterCovarianceMiddle_errorOuter_eq_clusterErrorScoreMiddle`, the coordinatewise conditional-
-expectation bridge `condExp_clusterErrorScoreMiddle_entry_eq_clusterCovarianceMiddle`, and
-residual/CR3 block rewrites `olsClusteredVarianceEstimator_eq_clusterCovarianceMiddle_residualOuter`
-and `olsClusteredCR3VarianceEstimator_eq_clusterCovarianceMiddle_cr3Outer`.
+`clusterCovarianceMiddle_errorOuter_eq_clusterErrorScoreMiddle`, coordinatewise and matrix-valued
+conditional-expectation bridges for the infeasible true-error score middle, the sandwich lift
+`condExp_clusterErrorScoreSandwich_eq_olsClusterConditionalVarianceMatrix`, and residual/CR3 block
+rewrites `olsClusteredVarianceEstimator_eq_clusterCovarianceMiddle_residualOuter` and
+`olsClusteredCR3VarianceEstimator_eq_clusterCovarianceMiddle_cr3Outer`.
 
 ## Deferred / won't do for now
 For the current pass we are intentionally not pushing Chapter 4 to applied-completeness.
 The following are explicitly deferred unless they become prerequisite later:
-- clustered covariance asymptotics beyond the finite covariance-middle/block identities now proved
+- clustered covariance asymptotics beyond the finite covariance-middle/block and conditional-sandwich
+  identities now proved
 - full CR3 conditional conservativeness theorem beyond the middle-dominance bridge
 
 Reason: these are lower-priority extensions beyond the finite-sample estimator layer landed here.
 
 ## Immediate target
 If continuing Chapter 4, the next target is the CR3 conditional conservativeness middle-moment
-comparison or a genuine clustered asymptotic consistency theorem beyond the finite covariance-middle
-API; otherwise continue to the remaining Chapter 6 and Chapter 7 asymptotic gaps.
+comparison or a genuine clustered asymptotic consistency theorem beyond the finite conditional
+covariance API; otherwise continue to the remaining Chapter 6 and Chapter 7 asymptotic gaps.
 
 ## LaTeX / Lean Crosswalk
 
@@ -169,6 +171,8 @@ Conventions:
 - [olsBeta_linear_decomposition_clusterScores](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L672): clustered form of the OLS decomposition `β̂ - β = (XᵀX)⁻¹∑_g X_gᵀe_g`.
 - [clusterCovarianceMiddle_errorOuter_eq_clusterErrorScoreMiddle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L684): infeasible true-error block outer products rewrite to true-error cluster-score outer products.
 - [condExp_clusterErrorScoreMiddle_entry_eq_clusterCovarianceMiddle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1751): coordinatewise conditional expectation of the infeasible true-error score middle equals Hansen's clustered covariance middle.
+- [condExp_clusterErrorScoreMiddle_eq_clusterCovarianceMiddle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1871): matrix-valued conditional expectation of the infeasible true-error score middle equals Hansen's clustered covariance middle.
+- [condExp_clusterErrorScoreSandwich_eq_olsClusterConditionalVarianceMatrix](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L1933): matrix-valued conditional expectation of the infeasible true-error cluster-score sandwich equals Hansen's clustered OLS covariance sandwich.
 - [clusterCR3Residual](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L421): equation (4.52) CR3-style cluster prediction-error adjustment.
 - [clusterLeaveOutBeta_eq_olsBeta_sub_invGram_mulVec_cr3Residual](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L685): equation (4.53) reduced-Gram cluster leave-out coefficient identity.
 - [clusterCR3Score](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L742): named `X_gᵀ *ᵥ \tilde e_g` CR3 cluster score.

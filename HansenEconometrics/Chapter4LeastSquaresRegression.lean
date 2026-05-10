@@ -1866,6 +1866,271 @@ theorem condExp_clusterErrorScoreMiddle_entry_eq_clusterCovarianceMiddle
           intro j _
           ring
 
+omit [DecidableEq k] in
+/-- Matrix-valued conditional expectation of the infeasible clustered score middle. -/
+theorem condExp_clusterErrorScoreMiddle_eq_clusterCovarianceMiddle
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (e : Ω → n → ℝ) (cluster : n → G)
+    (Sigma : ∀ g, Matrix (ClusterIndex cluster g) (ClusterIndex cluster g) ℝ)
+    [IsProbabilityMeasure μ]
+    (hm : m ≤ m₀) [SigmaFinite (μ.trim hm)]
+    (hee_int : ∀ g (i j : ClusterIndex cluster g),
+      Integrable (fun ω => e ω i.1 * e ω j.1) μ)
+    (hSigma : ∀ g (i j : ClusterIndex cluster g),
+      μ[fun ω => e ω i.1 * e ω j.1 | m] =ᵐ[μ] fun _ => Sigma g i j)
+    (hscore_int : ∀ g a b,
+      Integrable
+        (fun ω =>
+          clusterErrorScore X (e ω) cluster g a *
+            clusterErrorScore X (e ω) cluster g b) μ) :
+    μ[(fun ω => fun a b =>
+      (∑ g, Matrix.vecMulVec (clusterErrorScore X (e ω) cluster g)
+        (clusterErrorScore X (e ω) cluster g)) a b) | m] =ᵐ[μ]
+      fun _ a b => clusterCovarianceMiddle X cluster Sigma a b := by
+  let f : Ω → k → k → ℝ := fun ω a b =>
+    (∑ g, Matrix.vecMulVec (clusterErrorScore X (e ω) cluster g)
+      (clusterErrorScore X (e ω) cluster g)) a b
+  have hf_int : Integrable f μ := by
+    refine Integrable.of_eval ?_
+    intro a
+    refine Integrable.of_eval ?_
+    intro b
+    have hrepr :
+        (fun ω => f ω a b) =
+          fun ω => ∑ g,
+            clusterErrorScore X (e ω) cluster g a *
+              clusterErrorScore X (e ω) cluster g b := by
+      funext ω
+      simp [f, Matrix.sum_apply, Matrix.vecMulVec_apply]
+    rw [hrepr]
+    exact MeasureTheory.integrable_finset_sum (s := Finset.univ)
+      (f := fun g ω =>
+        clusterErrorScore X (e ω) cluster g a *
+          clusterErrorScore X (e ω) cluster g b)
+      (fun g _ => hscore_int g a b)
+  rw [Filter.EventuallyEq]
+  change ∀ᵐ ω ∂μ, μ[f | m] ω = fun a b => clusterCovarianceMiddle X cluster Sigma a b
+  have hcoord : ∀ a b : k, ∀ᵐ ω ∂μ,
+      μ[f | m] ω a b = clusterCovarianceMiddle X cluster Sigma a b := by
+    intro a b
+    have hentry :
+        μ[(fun ω => f ω a b) | m] =ᵐ[μ]
+          fun _ => clusterCovarianceMiddle X cluster Sigma a b := by
+      simpa [f] using
+        condExp_clusterErrorScoreMiddle_entry_eq_clusterCovarianceMiddle
+          (μ := μ) (m := m) (m₀ := m₀) X e cluster Sigma hm hee_int hSigma a b
+          (fun g => hscore_int g a b)
+    exact (condExp_apply_apply (m := m) (μ := μ) (f := f) hf_int a b).trans hentry
+  have hall : ∀ᵐ ω ∂μ, ∀ a b : k,
+      μ[f | m] ω a b = clusterCovarianceMiddle X cluster Sigma a b := by
+    exact ae_all_iff.2 fun a => ae_all_iff.2 fun b => hcoord a b
+  exact hall.mono fun ω hω => by
+    funext a b
+    exact hω a b
+
+/-- Matrix-valued conditional expectation of the infeasible clustered score
+sandwich. This is Hansen equation (4.47) for the true-error cluster scores. -/
+theorem condExp_clusterErrorScoreSandwich_eq_olsClusterConditionalVarianceMatrix
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (e : Ω → n → ℝ) (cluster : n → G)
+    (Sigma : ∀ g, Matrix (ClusterIndex cluster g) (ClusterIndex cluster g) ℝ)
+    [Invertible (Xᵀ * X)] [IsProbabilityMeasure μ]
+    (hm : m ≤ m₀) [SigmaFinite (μ.trim hm)]
+    (hee_int : ∀ g (i j : ClusterIndex cluster g),
+      Integrable (fun ω => e ω i.1 * e ω j.1) μ)
+    (hSigma : ∀ g (i j : ClusterIndex cluster g),
+      μ[fun ω => e ω i.1 * e ω j.1 | m] =ᵐ[μ] fun _ => Sigma g i j)
+    (hscore_int : ∀ g a b,
+      Integrable
+        (fun ω =>
+          clusterErrorScore X (e ω) cluster g a *
+            clusterErrorScore X (e ω) cluster g b) μ) :
+    μ[(fun ω => fun a b =>
+      (⅟ (Xᵀ * X) *
+        (∑ g, Matrix.vecMulVec (clusterErrorScore X (e ω) cluster g)
+          (clusterErrorScore X (e ω) cluster g)) *
+        ⅟ (Xᵀ * X)) a b) | m] =ᵐ[μ]
+      fun _ a b => olsClusterConditionalVarianceMatrix X cluster Sigma a b := by
+  let A : Matrix k k ℝ := ⅟ (Xᵀ * X)
+  let middle : Ω → Matrix k k ℝ := fun ω =>
+    ∑ g, Matrix.vecMulVec (clusterErrorScore X (e ω) cluster g)
+      (clusterErrorScore X (e ω) cluster g)
+  let f : Ω → k → k → ℝ := fun ω a b => (A * middle ω * A) a b
+  have hmiddle_int : ∀ c d : k, Integrable (fun ω => middle ω c d) μ := by
+    intro c d
+    have hrepr :
+        (fun ω => middle ω c d) =
+          fun ω => ∑ g,
+            clusterErrorScore X (e ω) cluster g c *
+              clusterErrorScore X (e ω) cluster g d := by
+      funext ω
+      simp [middle, Matrix.sum_apply, Matrix.vecMulVec_apply]
+    rw [hrepr]
+    exact MeasureTheory.integrable_finset_sum (s := Finset.univ)
+      (f := fun g ω =>
+        clusterErrorScore X (e ω) cluster g c *
+          clusterErrorScore X (e ω) cluster g d)
+      (fun g _ => hscore_int g c d)
+  have hmiddle_cond : ∀ c d : k,
+      μ[(fun ω => middle ω c d) | m] =ᵐ[μ]
+        fun _ => clusterCovarianceMiddle X cluster Sigma c d := by
+    intro c d
+    simpa [middle] using
+      condExp_clusterErrorScoreMiddle_entry_eq_clusterCovarianceMiddle
+        (μ := μ) (m := m) (m₀ := m₀) X e cluster Sigma hm hee_int hSigma c d
+        (fun g => hscore_int g c d)
+  have hentry : ∀ (ω : Ω) (a b : k),
+      f ω a b =
+        ∑ c, ∑ d, (A a c * A d b) * middle ω c d := by
+    intro ω a b
+    calc
+      f ω a b =
+          ∑ d, (∑ c, A a c * middle ω c d) * A d b := by
+            simp [f, Matrix.mul_apply]
+      _ = ∑ d, ∑ c, (A a c * middle ω c d) * A d b := by
+            refine Finset.sum_congr rfl ?_
+            intro d _
+            rw [Finset.sum_mul]
+      _ = ∑ c, ∑ d, (A a c * middle ω c d) * A d b := by
+            rw [Finset.sum_comm]
+      _ = ∑ c, ∑ d, (A a c * A d b) * middle ω c d := by
+            refine Finset.sum_congr rfl ?_
+            intro c _
+            refine Finset.sum_congr rfl ?_
+            intro d _
+            ring
+  have htarget_entry : ∀ a b : k,
+      olsClusterConditionalVarianceMatrix X cluster Sigma a b =
+        ∑ c, ∑ d, (A a c * A d b) * clusterCovarianceMiddle X cluster Sigma c d := by
+    intro a b
+    calc
+      olsClusterConditionalVarianceMatrix X cluster Sigma a b =
+          ∑ d, (∑ c, A a c * clusterCovarianceMiddle X cluster Sigma c d) * A d b := by
+            simp [olsClusterConditionalVarianceMatrix, A, Matrix.mul_apply]
+      _ = ∑ d, ∑ c, (A a c * clusterCovarianceMiddle X cluster Sigma c d) * A d b := by
+            refine Finset.sum_congr rfl ?_
+            intro d _
+            rw [Finset.sum_mul]
+      _ = ∑ c, ∑ d, (A a c * clusterCovarianceMiddle X cluster Sigma c d) * A d b := by
+            rw [Finset.sum_comm]
+      _ = ∑ c, ∑ d, (A a c * A d b) * clusterCovarianceMiddle X cluster Sigma c d := by
+            refine Finset.sum_congr rfl ?_
+            intro c _
+            refine Finset.sum_congr rfl ?_
+            intro d _
+            ring
+  have hf_int : Integrable f μ := by
+    refine Integrable.of_eval ?_
+    intro a
+    refine Integrable.of_eval ?_
+    intro b
+    have hrepr :
+        (fun ω => f ω a b) =
+          fun ω => ∑ c, ∑ d, (A a c * A d b) * middle ω c d := by
+      funext ω
+      exact hentry ω a b
+    rw [hrepr]
+    exact MeasureTheory.integrable_finset_sum (s := Finset.univ)
+      (f := fun c ω => ∑ d, (A a c * A d b) * middle ω c d)
+      (fun c _ =>
+        MeasureTheory.integrable_finset_sum (s := Finset.univ)
+          (f := fun d ω => (A a c * A d b) * middle ω c d)
+          (fun d _ => (hmiddle_int c d).const_mul (A a c * A d b)))
+  rw [Filter.EventuallyEq]
+  change ∀ᵐ ω ∂μ, μ[f | m] ω =
+    fun a b => olsClusterConditionalVarianceMatrix X cluster Sigma a b
+  have hcoord : ∀ a b : k, ∀ᵐ ω ∂μ,
+      μ[f | m] ω a b = olsClusterConditionalVarianceMatrix X cluster Sigma a b := by
+    intro a b
+    have hrepr :
+        (fun ω => f ω a b) =
+          fun ω => ∑ c, ∑ d, (A a c * A d b) * middle ω c d := by
+      funext ω
+      exact hentry ω a b
+    have hsum :
+        μ[(fun ω => f ω a b) | m] =ᵐ[μ]
+          fun _ => olsClusterConditionalVarianceMatrix X cluster Sigma a b := by
+      rw [hrepr]
+      have houter :
+          μ[(fun ω => ∑ c, ∑ d, (A a c * A d b) * middle ω c d) | m] =ᵐ[μ]
+            ∑ c, μ[(fun ω => ∑ d, (A a c * A d b) * middle ω c d) | m] := by
+        have hsum_repr :
+            (fun ω => ∑ c, ∑ d, (A a c * A d b) * middle ω c d) =
+              ∑ c, fun ω => ∑ d, (A a c * A d b) * middle ω c d := by
+          funext ω
+          simp
+        rw [hsum_repr]
+        simpa using MeasureTheory.condExp_finset_sum (μ := μ) (m := m)
+          (s := Finset.univ)
+          (f := fun c ω => ∑ d, (A a c * A d b) * middle ω c d)
+          (fun c _ =>
+            MeasureTheory.integrable_finset_sum (s := Finset.univ)
+              (f := fun d ω => (A a c * A d b) * middle ω c d)
+              (fun d _ => (hmiddle_int c d).const_mul (A a c * A d b)))
+      have hinner : ∀ c,
+          μ[(fun ω => ∑ d, (A a c * A d b) * middle ω c d) | m] =ᵐ[μ]
+            fun _ => ∑ d, (A a c * A d b) *
+              clusterCovarianceMiddle X cluster Sigma c d := by
+        intro c
+        have hinner_sum :
+            μ[(fun ω => ∑ d, (A a c * A d b) * middle ω c d) | m] =ᵐ[μ]
+              ∑ d, μ[(fun ω => (A a c * A d b) * middle ω c d) | m] := by
+          have hsum_repr :
+              (fun ω => ∑ d, (A a c * A d b) * middle ω c d) =
+                ∑ d, fun ω => (A a c * A d b) * middle ω c d := by
+            funext ω
+            simp
+          rw [hsum_repr]
+          simpa using MeasureTheory.condExp_finset_sum (μ := μ) (m := m)
+            (s := Finset.univ)
+            (f := fun d ω => (A a c * A d b) * middle ω c d)
+            (fun d _ => (hmiddle_int c d).const_mul (A a c * A d b))
+        have hcoord_smul : ∀ d,
+            μ[(fun ω => (A a c * A d b) * middle ω c d) | m] =ᵐ[μ]
+              fun _ => (A a c * A d b) *
+                clusterCovarianceMiddle X cluster Sigma c d := by
+          intro d
+          refine (MeasureTheory.condExp_smul (μ := μ) (m := m)
+            (A a c * A d b) (fun ω => middle ω c d)).trans ?_
+          filter_upwards [hmiddle_cond c d] with ω hω
+          simp [Pi.smul_apply, smul_eq_mul, hω]
+        refine hinner_sum.trans ?_
+        have hall : ∀ᵐ ω ∂μ, ∀ d,
+            μ[(fun ω => (A a c * A d b) * middle ω c d) | m] ω =
+              (A a c * A d b) * clusterCovarianceMiddle X cluster Sigma c d := by
+          exact ae_all_iff.2 fun d => hcoord_smul d
+        filter_upwards [hall] with ω hω
+        calc
+          ((∑ d, μ[(fun ω => (A a c * A d b) * middle ω c d) | m]) : Ω → ℝ) ω =
+              ∑ d, μ[(fun ω => (A a c * A d b) * middle ω c d) | m] ω := by
+                simp
+          _ = ∑ d, (A a c * A d b) *
+                clusterCovarianceMiddle X cluster Sigma c d := by
+                exact Finset.sum_congr rfl fun d _ => hω d
+      refine houter.trans ?_
+      have hall : ∀ᵐ ω ∂μ, ∀ c,
+          μ[(fun ω => ∑ d, (A a c * A d b) * middle ω c d) | m] ω =
+            ∑ d, (A a c * A d b) * clusterCovarianceMiddle X cluster Sigma c d := by
+        exact ae_all_iff.2 fun c => hinner c
+      filter_upwards [hall] with ω hω
+      calc
+        ((∑ c, μ[(fun ω => ∑ d, (A a c * A d b) * middle ω c d) | m]) :
+            Ω → ℝ) ω =
+            ∑ c, μ[(fun ω => ∑ d, (A a c * A d b) * middle ω c d) | m] ω := by
+              simp
+        _ = ∑ c, ∑ d, (A a c * A d b) *
+              clusterCovarianceMiddle X cluster Sigma c d := by
+              exact Finset.sum_congr rfl fun c _ => hω c
+        _ = olsClusterConditionalVarianceMatrix X cluster Sigma a b := by
+              exact (htarget_entry a b).symm
+    exact (condExp_apply_apply (m := m) (μ := μ) (f := f) hf_int a b).trans hsum
+  have hall : ∀ᵐ ω ∂μ, ∀ a b : k,
+      μ[f | m] ω a b = olsClusterConditionalVarianceMatrix X cluster Sigma a b := by
+    exact ae_all_iff.2 fun a => ae_all_iff.2 fun b => hcoord a b
+  filter_upwards [hall] with ω hω
+  funext a b
+  exact hω a b
+
 /-- Matrix-valued conditional expectation of HC2 under homoskedastic second moments.
 
 The rowwise leverage adjustment exactly removes the homoskedastic residual shrinkage, so the
