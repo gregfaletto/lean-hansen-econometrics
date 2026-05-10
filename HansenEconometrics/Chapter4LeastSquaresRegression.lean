@@ -356,6 +356,78 @@ theorem olsClusteredVarianceEstimatorAdjusted_posSemidef_of_card
   olsClusteredVarianceEstimatorAdjusted_posSemidef X y cluster
     (clusterFiniteSampleAdjustment_nonneg (n := n) (k := k) hnk hG)
 
+/-- Row index type for observations belonging to cluster `g`. -/
+abbrev ClusterIndex {G : Type*} (cluster : n → G) (g : G) :=
+  {i : n // cluster i = g}
+
+/-- Cluster-level regressor block `X_g`. -/
+def clusterDesign {G : Type*} (X : Matrix n k ℝ) (cluster : n → G) (g : G) :
+    Matrix (ClusterIndex cluster g) k ℝ :=
+  X.submatrix Subtype.val id
+
+/-- Cluster-level full-sample OLS residual block `e_hat_g`. -/
+noncomputable def clusterResidual
+    {G : Type*} (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G) (g : G)
+    [Invertible (Xᵀ * X)] : ClusterIndex cluster g → ℝ :=
+  fun i => residual X y i
+
+/-- Cluster leverage block `X_g (X'X)^{-1} X_g'`. -/
+noncomputable def clusterLeverageBlock
+    {G : Type*} (X : Matrix n k ℝ) (cluster : n → G) (g : G)
+    [Invertible (Xᵀ * X)] : Matrix (ClusterIndex cluster g) (ClusterIndex cluster g) ℝ :=
+  clusterDesign X cluster g * ⅟ (Xᵀ * X) * (clusterDesign X cluster g)ᵀ
+
+/-- Hansen equation (4.52) adjustment matrix, `I_g - X_g (X'X)^{-1} X_g'`. -/
+noncomputable def clusterLeaveOutAdjustmentMatrix
+    {G : Type*} [DecidableEq G] (X : Matrix n k ℝ) (cluster : n → G) (g : G)
+    [DecidableEq n] [Invertible (Xᵀ * X)] :
+    Matrix (ClusterIndex cluster g) (ClusterIndex cluster g) ℝ :=
+  1 - clusterLeverageBlock X cluster g
+
+/-- Hansen equation (4.52): CR3-style cluster prediction errors
+`tilde e_g = (I_g - X_g (X'X)^{-1} X_g')^{-1} e_hat_g`. -/
+noncomputable def clusterCR3Residual
+    {G : Type*} [DecidableEq G] (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G) (g : G)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    [Invertible (clusterLeaveOutAdjustmentMatrix X cluster g)] :
+    ClusterIndex cluster g → ℝ :=
+  ⅟ (clusterLeaveOutAdjustmentMatrix X cluster g) *ᵥ
+    clusterResidual X y cluster g
+
+/-- Hansen equation (4.54): CR3-style cluster-robust covariance estimator using
+leave-cluster-out prediction errors. -/
+noncomputable def olsClusteredCR3VarianceEstimator
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    (hInv : ∀ g, Invertible (clusterLeaveOutAdjustmentMatrix X cluster g)) :
+    Matrix k k ℝ :=
+  let s : G → k → ℝ := fun g a =>
+    letI : Invertible (clusterLeaveOutAdjustmentMatrix X cluster g) := hInv g
+    ∑ i : ClusterIndex cluster g, X i.1 a * clusterCR3Residual X y cluster g i
+  ⅟ (Xᵀ * X) *
+    (∑ g, Matrix.vecMulVec (s g) (s g)) *
+    ⅟ (Xᵀ * X)
+
+/-- The CR3-style clustered covariance estimator is positive semidefinite. -/
+theorem olsClusteredCR3VarianceEstimator_posSemidef
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    (hInv : ∀ g, Invertible (clusterLeaveOutAdjustmentMatrix X cluster g)) :
+    (olsClusteredCR3VarianceEstimator X y cluster hInv).PosSemidef := by
+  let s : G → k → ℝ := fun g a =>
+    letI : Invertible (clusterLeaveOutAdjustmentMatrix X cluster g) := hInv g
+    ∑ i : ClusterIndex cluster g, X i.1 a * clusterCR3Residual X y cluster g i
+  have hmiddle : (∑ g, Matrix.vecMulVec (s g) (s g)).PosSemidef :=
+    sum_vecMulVec_posSemidef (κ := k) s
+  have hpsd := Matrix.PosSemidef.conjTranspose_mul_mul_same
+    hmiddle (⅟ (Xᵀ * X))
+  have hinvT : ((Xᵀ * X)⁻¹)ᵀ = (Xᵀ * X)⁻¹ := by
+    rw [Matrix.transpose_nonsing_inv, gram_transpose]
+  simpa [olsClusteredCR3VarianceEstimator, s, Matrix.conjTranspose_eq_transpose_of_trivial,
+    hinvT, inv_gram_transpose X, Matrix.mul_assoc] using hpsd
+
 omit [DecidableEq k] in
 /-- When every observation is its own cluster, Hansen's finite-sample cluster
 adjustment reduces to the HC1 degrees-of-freedom adjustment. -/
