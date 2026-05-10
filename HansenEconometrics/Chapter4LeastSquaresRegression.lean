@@ -394,6 +394,174 @@ noncomputable def clusterCR3Residual
   ⅟ (clusterLeaveOutAdjustmentMatrix X cluster g) *ᵥ
     clusterResidual X y cluster g
 
+/-- The CR3 residual solves the cluster adjustment equation
+`(I_g - X_g (X'X)^{-1} X_g') \tilde e_g = \hat e_g`. -/
+theorem clusterLeaveOutAdjustmentMatrix_mulVec_clusterCR3Residual
+    {G : Type*} [DecidableEq G] (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G) (g : G)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    [Invertible (clusterLeaveOutAdjustmentMatrix X cluster g)] :
+    clusterLeaveOutAdjustmentMatrix X cluster g *ᵥ
+      clusterCR3Residual X y cluster g =
+        clusterResidual X y cluster g := by
+  unfold clusterCR3Residual
+  rw [Matrix.mulVec_mulVec, mul_invOf_self, Matrix.one_mulVec]
+
+/-- Cluster-level response block `Y_g`. -/
+def clusterResponse {G : Type*} (y : n → ℝ) (cluster : n → G) (g : G) :
+    ClusterIndex cluster g → ℝ :=
+  fun i => y i
+
+/-- Cluster contribution `X_g'X_g` to the full Gram matrix. -/
+noncomputable def clusterGramContribution
+    {G : Type*} [DecidableEq G] (X : Matrix n k ℝ) (cluster : n → G) (g : G) :
+    Matrix k k ℝ :=
+  (clusterDesign X cluster g)ᵀ * clusterDesign X cluster g
+
+/-- Cluster contribution `X_g'Y_g` to the full cross product. -/
+noncomputable def clusterCrossContribution
+    {G : Type*} [DecidableEq G] (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G) (g : G) :
+    k → ℝ :=
+  (clusterDesign X cluster g)ᵀ *ᵥ clusterResponse y cluster g
+
+/-- Reduced Gram matrix after removing cluster `g`, written as
+`X'X - X_g'X_g`. -/
+noncomputable def clusterLeaveOutGram
+    {G : Type*} [DecidableEq G] (X : Matrix n k ℝ) (cluster : n → G) (g : G) :
+    Matrix k k ℝ :=
+  Xᵀ * X - clusterGramContribution X cluster g
+
+/-- Reduced cross product after removing cluster `g`, written as
+`X'Y - X_g'Y_g`. -/
+noncomputable def clusterLeaveOutCross
+    {G : Type*} [DecidableEq G] (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G) (g : G) :
+    k → ℝ :=
+  Xᵀ *ᵥ y - clusterCrossContribution X y cluster g
+
+/-- Cluster leave-out coefficient computed from the reduced Gram/cross products. -/
+noncomputable def clusterLeaveOutBeta
+    {G : Type*} [DecidableEq G] (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G) (g : G)
+    [Invertible (clusterLeaveOutGram X cluster g)] : k → ℝ :=
+  ⅟ (clusterLeaveOutGram X cluster g) *ᵥ
+    clusterLeaveOutCross X y cluster g
+
+/-- The reduced cluster coefficient satisfies the reduced normal equations. -/
+theorem clusterLeaveOutGram_mulVec_clusterLeaveOutBeta
+    {G : Type*} [DecidableEq G] (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G) (g : G)
+    [Invertible (clusterLeaveOutGram X cluster g)] :
+    clusterLeaveOutGram X cluster g *ᵥ clusterLeaveOutBeta X y cluster g =
+      clusterLeaveOutCross X y cluster g := by
+  unfold clusterLeaveOutBeta
+  rw [Matrix.mulVec_mulVec, mul_invOf_self, Matrix.one_mulVec]
+
+/-- Cluster residuals are the cluster response minus fitted values from the
+full-sample coefficient. -/
+theorem clusterResidual_eq_response_sub_design_mulVec_olsBeta
+    {G : Type*} (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G) (g : G)
+    [Invertible (Xᵀ * X)] :
+    clusterResidual X y cluster g =
+      clusterResponse y cluster g - clusterDesign X cluster g *ᵥ olsBeta X y := by
+  ext i
+  simp [clusterResidual, clusterResponse, clusterDesign, residual, fitted, Matrix.mulVec,
+    dotProduct]
+
+/-- Cluster cross product decomposes into fitted and residual cluster pieces. -/
+theorem clusterCrossContribution_eq_gram_mul_olsBeta_add_residual
+    {G : Type*} [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G) (g : G)
+    [Invertible (Xᵀ * X)] :
+    clusterCrossContribution X y cluster g =
+      clusterGramContribution X cluster g *ᵥ olsBeta X y +
+        (clusterDesign X cluster g)ᵀ *ᵥ clusterResidual X y cluster g := by
+  let C : Matrix (ClusterIndex cluster g) k ℝ := clusterDesign X cluster g
+  have hres := clusterResidual_eq_response_sub_design_mulVec_olsBeta X y cluster g
+  have hy : clusterResponse y cluster g = C *ᵥ olsBeta X y + clusterResidual X y cluster g := by
+    rw [hres]
+    ext i
+    simp [C]
+  unfold clusterCrossContribution clusterGramContribution
+  rw [hy, Matrix.mulVec_add, Matrix.mulVec_mulVec]
+
+/-- Applying `X_g'` to the CR3 adjustment equation gives the residual cluster
+cross product in terms of the adjusted CR3 residuals. -/
+theorem clusterDesign_transpose_mulVec_clusterResidual_eq_cr3
+    {G : Type*} [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G) (g : G)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    [Invertible (clusterLeaveOutAdjustmentMatrix X cluster g)] :
+    (clusterDesign X cluster g)ᵀ *ᵥ clusterResidual X y cluster g =
+      (clusterDesign X cluster g)ᵀ *ᵥ clusterCR3Residual X y cluster g -
+        clusterGramContribution X cluster g *ᵥ
+          (⅟ (Xᵀ * X) *ᵥ
+            ((clusterDesign X cluster g)ᵀ *ᵥ clusterCR3Residual X y cluster g)) := by
+  let C : Matrix (ClusterIndex cluster g) k ℝ := clusterDesign X cluster g
+  let u : ClusterIndex cluster g → ℝ := clusterCR3Residual X y cluster g
+  have h := congrArg (fun v => Cᵀ *ᵥ v)
+    (clusterLeaveOutAdjustmentMatrix_mulVec_clusterCR3Residual X y cluster g)
+  dsimp [C, u] at h
+  rw [clusterLeaveOutAdjustmentMatrix, clusterLeverageBlock, Matrix.sub_mulVec,
+    Matrix.one_mulVec, Matrix.mulVec_sub] at h
+  simpa [clusterGramContribution, C, Matrix.mulVec_mulVec, Matrix.mul_assoc] using h.symm
+
+/-- Hansen equation (4.53), reduced-Gram form.
+
+The cluster-deleted coefficient equals the full-sample coefficient minus the
+cluster leverage correction based on the CR3-style prediction errors. -/
+theorem clusterLeaveOutBeta_eq_olsBeta_sub_invGram_mulVec_cr3Residual
+    {G : Type*} [DecidableEq G]
+    (X : Matrix n k ℝ) (y : n → ℝ) (cluster : n → G) (g : G)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    [Invertible (clusterLeaveOutAdjustmentMatrix X cluster g)]
+    [Invertible (clusterLeaveOutGram X cluster g)] :
+    clusterLeaveOutBeta X y cluster g =
+      olsBeta X y -
+        ⅟ (Xᵀ * X) *ᵥ
+          ((clusterDesign X cluster g)ᵀ *ᵥ clusterCR3Residual X y cluster g) := by
+  let C : Matrix (ClusterIndex cluster g) k ℝ := clusterDesign X cluster g
+  let u : ClusterIndex cluster g → ℝ := clusterCR3Residual X y cluster g
+  let d : k → ℝ := ⅟ (Xᵀ * X) *ᵥ (Cᵀ *ᵥ u)
+  let β : k → ℝ := olsBeta X y
+  have hfull : (Xᵀ * X) *ᵥ β = Xᵀ *ᵥ y := by
+    dsimp [β]
+    unfold olsBeta
+    rw [Matrix.mulVec_mulVec, mul_invOf_self, Matrix.one_mulVec]
+  have hd : (Xᵀ * X) *ᵥ d = Cᵀ *ᵥ u := by
+    dsimp [d]
+    rw [Matrix.mulVec_mulVec, mul_invOf_self, Matrix.one_mulVec]
+  have hres := clusterDesign_transpose_mulVec_clusterResidual_eq_cr3
+    (X := X) (y := y) (cluster := cluster) (g := g)
+  have hcross := clusterCrossContribution_eq_gram_mul_olsBeta_add_residual
+    (X := X) (y := y) (cluster := cluster) (g := g)
+  have hnormal :
+      clusterLeaveOutGram X cluster g *ᵥ (β - d) =
+        clusterLeaveOutCross X y cluster g := by
+    calc
+      clusterLeaveOutGram X cluster g *ᵥ (β - d) =
+          (Xᵀ * X) *ᵥ β - clusterGramContribution X cluster g *ᵥ β -
+            ((Xᵀ * X) *ᵥ d - clusterGramContribution X cluster g *ᵥ d) := by
+            ext a
+            simp [clusterLeaveOutGram, Matrix.sub_mulVec, Matrix.mulVec_sub]
+      _ = Xᵀ *ᵥ y -
+            (clusterGramContribution X cluster g *ᵥ β +
+              ((clusterDesign X cluster g)ᵀ *ᵥ u -
+                clusterGramContribution X cluster g *ᵥ d)) := by
+            rw [hfull, hd]
+            ext a
+            simp
+            abel
+      _ = Xᵀ *ᵥ y - clusterCrossContribution X y cluster g := by
+            rw [hcross, hres]
+      _ = clusterLeaveOutCross X y cluster g := by
+            simp [clusterLeaveOutCross]
+  calc
+    clusterLeaveOutBeta X y cluster g =
+        ⅟ (clusterLeaveOutGram X cluster g) *ᵥ
+          clusterLeaveOutCross X y cluster g := rfl
+    _ = ⅟ (clusterLeaveOutGram X cluster g) *ᵥ
+          (clusterLeaveOutGram X cluster g *ᵥ (β - d)) := by
+          rw [hnormal]
+    _ = β - d := by
+          rw [Matrix.mulVec_mulVec, invOf_mul_self, Matrix.one_mulVec]
+
 /-- Hansen equation (4.54): CR3-style cluster-robust covariance estimator using
 leave-cluster-out prediction errors. -/
 noncomputable def olsClusteredCR3VarianceEstimator

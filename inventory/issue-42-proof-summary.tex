@@ -193,9 +193,10 @@ whenever its finite-sample scale factor is nonnegative, and
 \lean{clusterFiniteSampleAdjustment_nonneg} discharges that condition from
 $k<n$ and $G>1$.  The CR3-style leave-cluster-out layer now has
 \lean{ClusterIndex}, \lean{clusterDesign}, \lean{clusterCR3Residual},
+\lean{clusterLeaveOutBeta_eq_olsBeta_sub_invGram_mulVec_cr3Residual},
 \lean{olsClusteredCR3VarianceEstimator}, and
 \lean{olsClusteredCR3VarianceEstimator_posSemidef}, covering the deterministic
-equations (4.52) and (4.54) at the estimator-definition/PSD level.  This
+equations (4.52), (4.53), and (4.54) at the estimator-definition/PSD level.  This
 tightens the finite-sample Gauss--Markov and covariance-estimator proof layer.
 
 \section{Chapter 6: Asymptotic Infrastructure}
@@ -527,8 +528,7 @@ remaining gaps are:
 Area & Remaining work \\
 \midrule
 Chapter 4 & Clustered covariance asymptotics and multi-observation cluster
-partition infrastructure; CR3 leave-cluster-out coefficient identity and
-conditional conservativeness theorem. \\
+partition infrastructure; CR3 conditional conservativeness theorem. \\
 Chapter 5 & Kinal theorem 5.5, deferred unless a downstream theorem needs the
 exact moment-existence threshold. \\
 Chapter 6 & Scalar triangular-array Lindeberg/Lyapunov sufficient-condition
