@@ -209,7 +209,11 @@ level and reducing deterministic and conditional CR3 conservativeness to
 middle-matrix PSD dominance.  The block monotonicity lemmas
 \lean{clusterCovarianceMiddle_mono_posSemidef} and
 \lean{olsClusterConditionalVarianceMatrix_mono_posSemidef} reduce that dominance
-to clusterwise block dominance.  This
+to clusterwise block dominance.  The CR3 linear-model rewrites
+\lean{clusterResidual_linear_model}, \lean{clusterCR3Residual_linear_model},
+\lean{clusterCR3Score_linear_model}, and
+\lean{clusterCR3ScoreMiddle_linear_model} reduce the remaining CR3 block moments
+to deterministic transforms of annihilator-transformed structural errors.  This
 tightens the finite-sample Gauss--Markov and covariance-estimator proof layer.
 The cluster-block layer now also proves the finite partition identity
 \lean{clusterIndex_sum_eq_sum}, the Gram and cross-product decompositions
@@ -590,8 +594,9 @@ remaining gaps are:
 Area & Remaining work \\
 \midrule
 Chapter 4 & Clustered covariance asymptotics beyond the finite cluster-block
-identities; raw CR3 middle-moment identification needed to construct the
-conditional CR3 block covariances from primitive cluster error assumptions. \\
+identities; raw CR3 middle-moment identification needed to construct conditional
+covariance matrices for adjusted annihilator-error blocks from primitive cluster
+error assumptions. \\
 Chapter 5 & Exact random-design Kinal theorem 5.5 inverse-Gram moment threshold. \\
 Chapter 6 & Scalar triangular-array Lindeberg/Lyapunov sufficient-condition
 probability-engine discharge for Theorems 6.4 and 6.5 beyond the deterministic

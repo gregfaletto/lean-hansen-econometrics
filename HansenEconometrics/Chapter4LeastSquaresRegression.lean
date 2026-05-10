@@ -1293,6 +1293,64 @@ theorem olsClusteredVarianceEstimator_linear_model
         ⅟ (Xᵀ * X) := by
   simp [olsClusteredVarianceEstimator]
 
+/-- In the linear model, the cluster residual block is the corresponding block
+of the annihilator-transformed structural errors. -/
+theorem clusterResidual_linear_model
+    {G : Type*} (X : Matrix n k ℝ) (β : k → ℝ) (e : n → ℝ)
+    (cluster : n → G) (g : G) [DecidableEq n] [Invertible (Xᵀ * X)] :
+    clusterResidual X (X *ᵥ β + e) cluster g =
+      fun i => (annihilatorMatrix X *ᵥ e) i.1 := by
+  ext i
+  simp [clusterResidual]
+
+/-- In the linear model, CR3 cluster residuals are the leave-cluster-out
+adjustment applied to the annihilator-transformed structural errors. -/
+theorem clusterCR3Residual_linear_model
+    {G : Type*} [DecidableEq G]
+    (X : Matrix n k ℝ) (β : k → ℝ) (e : n → ℝ) (cluster : n → G) (g : G)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    [Invertible (clusterLeaveOutAdjustmentMatrix X cluster g)] :
+    clusterCR3Residual X (X *ᵥ β + e) cluster g =
+      ⅟ (clusterLeaveOutAdjustmentMatrix X cluster g) *ᵥ
+        (fun i : ClusterIndex cluster g => (annihilatorMatrix X *ᵥ e) i.1) := by
+  unfold clusterCR3Residual
+  rw [clusterResidual_linear_model]
+
+/-- In the linear model, the CR3 cluster score is a deterministic linear
+transform of the annihilator-transformed structural errors. -/
+theorem clusterCR3Score_linear_model
+    {G : Type*} [DecidableEq G]
+    (X : Matrix n k ℝ) (β : k → ℝ) (e : n → ℝ) (cluster : n → G) (g : G)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    [Invertible (clusterLeaveOutAdjustmentMatrix X cluster g)] :
+    clusterCR3Score X (X *ᵥ β + e) cluster g =
+      (clusterDesign X cluster g)ᵀ *ᵥ
+        (⅟ (clusterLeaveOutAdjustmentMatrix X cluster g) *ᵥ
+          (fun i : ClusterIndex cluster g => (annihilatorMatrix X *ᵥ e) i.1)) := by
+  unfold clusterCR3Score
+  rw [clusterCR3Residual_linear_model]
+
+/-- In the linear model, the CR3 score middle is the clusterwise outer product
+of the adjusted annihilator-error scores. -/
+theorem clusterCR3ScoreMiddle_linear_model
+    {G : Type*} [Fintype G] [DecidableEq G]
+    (X : Matrix n k ℝ) (β : k → ℝ) (e : n → ℝ) (cluster : n → G)
+    [DecidableEq n] [Invertible (Xᵀ * X)]
+    (hInv : ∀ g, Invertible (clusterLeaveOutAdjustmentMatrix X cluster g)) :
+    clusterCR3ScoreMiddle X (X *ᵥ β + e) cluster hInv =
+      ∑ g,
+        letI : Invertible (clusterLeaveOutAdjustmentMatrix X cluster g) := hInv g
+        let s : k → ℝ :=
+          (clusterDesign X cluster g)ᵀ *ᵥ
+            (⅟ (clusterLeaveOutAdjustmentMatrix X cluster g) *ᵥ
+              (fun i : ClusterIndex cluster g => (annihilatorMatrix X *ᵥ e) i.1))
+        Matrix.vecMulVec s s := by
+  unfold clusterCR3ScoreMiddle
+  refine Finset.sum_congr rfl ?_
+  intro g _
+  letI : Invertible (clusterLeaveOutAdjustmentMatrix X cluster g) := hInv g
+  rw [clusterCR3Score_linear_model]
+
 /-- Hansen's method-of-moments residual variance estimator
 `σ̂² = n⁻¹∑ᵢ êᵢ²`. -/
 noncomputable def olsSigmaSqHat

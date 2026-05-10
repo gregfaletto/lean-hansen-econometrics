@@ -87,6 +87,10 @@ implies sandwich-level PSD dominance. The block monotonicity lemmas
 clusterwise block dominance, and
 `condExp_olsClusteredCR3VarianceEstimator_conservative_of_block_middle` specializes the CR3
 conditional conservativeness lift to conditional CR3 middle blocks `Γ_g` that dominate `Σ_g`.
+The CR3 layer also has linear-model rewrites
+`clusterResidual_linear_model`, `clusterCR3Residual_linear_model`,
+`clusterCR3Score_linear_model`, and `clusterCR3ScoreMiddle_linear_model`, reducing the random CR3
+blocks to deterministic transforms of the annihilator-transformed structural errors.
 The multi-observation cluster block layer now also has the
 finite partition identity `clusterIndex_sum_eq_sum`, entrywise Gram/cross-product rewrites, cluster
 Gram and cross-product decompositions back to `Xᵀ * X` and `Xᵀ *ᵥ y`, the sandwich rewrite
@@ -108,14 +112,14 @@ For the current pass we are intentionally not pushing Chapter 4 to applied-compl
 The following are explicitly deferred unless they become prerequisite later:
 - clustered covariance asymptotics beyond the finite covariance-middle/block and conditional-sandwich
   identities now proved
-- the raw CR3 middle-moment identification needed to build the conditional CR3 block covariance
-  matrices `Γ_g` from primitive cluster error assumptions
+- the raw CR3 middle-moment identification needed to build the conditional covariance matrices
+  `Γ_g` for the adjusted annihilator-error blocks from primitive cluster error assumptions
 
 Reason: these are lower-priority extensions beyond the finite-sample estimator layer landed here.
 
 ## Immediate target
-If continuing Chapter 4, the next target is identifying the CR3 conditional block covariances
-`Γ_g` under explicit cluster error assumptions, or a genuine clustered asymptotic theorem beyond the finite
+If continuing Chapter 4, the next target is identifying the conditional covariance matrices `Γ_g`
+for the adjusted annihilator-error CR3 blocks under explicit cluster error assumptions, or a genuine clustered asymptotic theorem beyond the finite
 conditional covariance API; otherwise continue to the remaining Chapter 6 and Chapter 7 asymptotic gaps.
 
 ## LaTeX / Lean Crosswalk
@@ -189,6 +193,10 @@ Conventions:
 - [clusterLeaveOutBeta_eq_olsBeta_sub_invGram_mulVec_cr3Residual](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L685): equation (4.53) reduced-Gram cluster leave-out coefficient identity.
 - [clusterCR3Score](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L742): named `X_gᵀ *ᵥ \tilde e_g` CR3 cluster score.
 - [clusterCR3ScoreMiddle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): named CR3 score outer-product middle matrix.
+- [clusterResidual_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): cluster residual blocks reduce to annihilator-transformed structural errors in the linear model.
+- [clusterCR3Residual_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): CR3 residual blocks reduce to leave-cluster-out adjustments applied to annihilator-transformed structural errors.
+- [clusterCR3Score_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): CR3 cluster scores are deterministic linear transforms of annihilator-transformed structural errors.
+- [clusterCR3ScoreMiddle_linear_model](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): CR3 score middle rewrites as clusterwise outer products of those adjusted annihilator-error scores.
 - [olsClusteredCR3VarianceEstimator_eq_clusterCR3Score](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L775): CR3 sandwich estimator rewritten with the named CR3 score API.
 - [olsClusteredCR3VarianceEstimator_conservative_of_middle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean#L803): middle-matrix dominance implies CR3 sandwich conservativeness.
 - [condExp_olsClusteredCR3VarianceEstimator_eq_sandwich_of_middle](../../HansenEconometrics/Chapter4LeastSquaresRegression.lean): conditional expected CR3 sandwich from a conditional expected CR3 middle matrix.
@@ -216,4 +224,5 @@ Conventions:
   mostly a map from Hansen's notation into the matrix-valued Lean API.
 - The remaining covariance-estimator gaps are clustered asymptotics beyond these finite block
   identities and the raw CR3 middle-moment identification needed to construct the conditional
-  CR3 block covariances `Γ_g` from primitive cluster error assumptions.
+  covariance matrices `Γ_g` for adjusted annihilator-error blocks from primitive cluster error
+  assumptions.
