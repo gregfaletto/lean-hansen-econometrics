@@ -419,6 +419,30 @@ theorem symmetric_interval_scaled_remainder_tendsto_zero
   rw [tendsto_congr' heq] at hdiff
   simpa using hdiff
 
+omit [Fintype k] [DecidableEq k] in
+/-- Coefficient-specialized version of the symmetric two-sided Edgeworth
+cancellation theorem for Hansen's even-quadratic `p₁` and odd degree-five `p₂`
+polynomial shapes. -/
+theorem symmetric_interval_scaled_remainder_tendsto_zero_polynomial
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {T : ℕ → Ω → ℝ} {baseCDF density : ℝ → ℝ}
+    {a0 a2 b1 b3 b5 c : ℝ}
+    (h : SecondOrderEdgeworthExpansion μ T baseCDF density
+      (edgeworthP1Polynomial a0 a2) (edgeworthP2Polynomial b1 b3 b5))
+    (hdensity : density (-c) = density c) :
+    Tendsto
+      (fun n : ℕ =>
+        (n : ℝ) *
+          ((statisticCDFReal μ T n c - statisticCDFReal μ T n (-c)) -
+            (baseCDF c - baseCDF (-c)) -
+            (n : ℝ)⁻¹ *
+              (2 * (edgeworthP2Polynomial b1 b3 b5 c * density c))))
+      atTop (𝓝 0) :=
+  h.symmetric_interval_scaled_remainder_tendsto_zero c
+    (edgeworthP1Polynomial_neg a0 a2 c)
+    (edgeworthP2Polynomial_neg b1 b3 b5 c)
+    hdensity
+
 end SecondOrderEdgeworthExpansion
 
 omit [DecidableEq k] in
