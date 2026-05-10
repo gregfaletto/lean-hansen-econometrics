@@ -293,7 +293,10 @@ For weak convergence and moments, the branch adds:
   \item limit integrability under eventual first-moment bounds;
   \item real clipping functions and clipped-identity weak-moment convergence;
   \item pointwise and integral bounds showing clipping error is controlled by
-  large-tail integrals.
+  large-tail integrals;
+  \item conversion from Mathlib's \lean{UniformIntegrable} tail seminorms to
+  real clipping-tail bounds, and the resulting weak-convergence/UI moment
+  theorem.
 \end{itemize}
 
 The main theorem names are
@@ -301,7 +304,7 @@ The main theorem names are
 \lean{realClipBoundedContinuousFunction},
 \lean{TendstoInDistribution.integral_realClip_tendsto},
 \lean{abs_integral_sub_realClip_le_two_mul_integral_tail_abs}, and
-\lean{TendstoInDistribution.integral_tendsto_of_realClip_tails}.
+\lean{TendstoInDistribution.integral_tendsto_of_uniformIntegrable}.
 
 \subsection{Sample-Mean Sharpness}
 
@@ -490,8 +493,7 @@ exact moment-existence threshold. \\
 Chapter 6 & Scalar triangular-array Lindeberg/Lyapunov sufficient-condition
 discharge for Theorems 6.4 and 6.5; a.s.-continuity version of the CMT in
 distribution for Theorem 6.7; arbitrary-unbiased-estimator lower bound for
-Theorem 6.11; deriving the weak-convergence UI tail premise in Theorem 6.15
-directly from Mathlib \lean{UniformIntegrable}. \\
+Theorem 6.11. \\
 Chapter 7 & Further tightening of some public condition packages to the literal
 textbook iid/moment assumptions; concrete cumulant/polynomial Edgeworth
 expansion for Theorem 7.15. \\

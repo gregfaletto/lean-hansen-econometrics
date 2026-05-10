@@ -1,6 +1,7 @@
 import Mathlib.Algebra.Order.Ring.Star
 import Mathlib.Analysis.Matrix.Normed
 import Mathlib.MeasureTheory.Function.ConvergenceInDistribution
+import Mathlib.MeasureTheory.Function.UniformIntegrable
 import Mathlib.MeasureTheory.Measure.LevyConvergence
 import Mathlib.MeasureTheory.Measure.Tight
 import Mathlib.Probability.StrongLaw
@@ -29,7 +30,7 @@ directly to scalar, vector, and matrix random variables.
 -/
 
 open MeasureTheory ProbabilityTheory Filter
-open scoped ENNReal Topology MeasureTheory ProbabilityTheory Function
+open scoped NNReal ENNReal Topology MeasureTheory ProbabilityTheory Function
 
 namespace HansenEconometrics
 
@@ -518,6 +519,73 @@ theorem abs_integral_sub_realClip_le_two_mul_integral_tail_abs
     _ = 2 * ∫ ω, Set.indicator {ω | R ≤ |Y ω|} (fun ω => |Y ω|) ω ∂μ := by
       rw [integral_const_mul]
 
+/-- Raising the tail threshold can only reduce the real absolute-tail integral. -/
+theorem integral_tail_abs_mono_threshold
+    [IsFiniteMeasure μ] {Y : α → ℝ} (hY : Integrable Y μ) {C R : ℝ} (hCR : C ≤ R) :
+    ∫ ω, Set.indicator {ω | R ≤ |Y ω|} (fun ω => |Y ω|) ω ∂μ ≤
+      ∫ ω, Set.indicator {ω | C ≤ |Y ω|} (fun ω => |Y ω|) ω ∂μ := by
+  have hR_null : NullMeasurableSet {ω | R ≤ |Y ω|} μ :=
+    nullMeasurableSet_le aemeasurable_const
+      (continuous_abs.measurable.comp_aemeasurable hY.aemeasurable)
+  have hC_null : NullMeasurableSet {ω | C ≤ |Y ω|} μ :=
+    nullMeasurableSet_le aemeasurable_const
+      (continuous_abs.measurable.comp_aemeasurable hY.aemeasurable)
+  have hR_int :
+      Integrable (Set.indicator {ω | R ≤ |Y ω|} (fun ω => |Y ω|)) μ := by
+    simpa [Real.norm_eq_abs] using hY.norm.indicator₀ hR_null
+  have hC_int :
+      Integrable (Set.indicator {ω | C ≤ |Y ω|} (fun ω => |Y ω|)) μ := by
+    simpa [Real.norm_eq_abs] using hY.norm.indicator₀ hC_null
+  refine integral_mono hR_int hC_int ?_
+  intro ω
+  by_cases hωR : R ≤ |Y ω|
+  · have hωC : C ≤ |Y ω| := hCR.trans hωR
+    simp [hωR, hωC]
+  · have hnot : ω ∉ {ω | R ≤ |Y ω|} := hωR
+    rw [Set.indicator_of_notMem hnot]
+    exact Set.indicator_nonneg (fun ω _ => abs_nonneg (Y ω)) ω
+
+/-- Convert Mathlib's `L¹` tail seminorm bound into a real absolute-tail integral bound. -/
+theorem integral_tail_abs_le_of_eLpNorm_tail
+    [IsFiniteMeasure μ] {Y : α → ℝ} (hY : Integrable Y μ) {C : ℝ≥0} {ε : ℝ}
+    (hε : 0 ≤ ε)
+    (hTail : eLpNorm ({ω | C ≤ ‖Y ω‖₊}.indicator Y) 1 μ ≤ ENNReal.ofReal ε) :
+    ∫ ω, Set.indicator {ω | (C : ℝ) ≤ |Y ω|} (fun ω => |Y ω|) ω ∂μ ≤ ε := by
+  let sNN : Set α := {ω | C ≤ ‖Y ω‖₊}
+  let sR : Set α := {ω | (C : ℝ) ≤ |Y ω|}
+  have hs_eq : sNN = sR := by
+    ext ω
+    simp [sNN, sR, Real.norm_eq_abs, ← NNReal.coe_le_coe]
+  have hsNN_null : NullMeasurableSet sNN μ :=
+    by
+      simpa [sNN] using
+        (aestronglyMeasurable_const.nullMeasurableSet_le hY.aestronglyMeasurable.nnnorm :
+          NullMeasurableSet {ω | C ≤ ‖Y ω‖₊} μ)
+  have hg_aesm : AEStronglyMeasurable (sNN.indicator Y) μ :=
+    hY.aestronglyMeasurable.indicator₀ hsNN_null
+  have htail_eq :
+      (fun ω => Set.indicator sR (fun ω => |Y ω|) ω) =
+        fun ω => ‖sNN.indicator Y ω‖ := by
+    funext ω
+    by_cases hω : ω ∈ sNN
+    · have hωR : ω ∈ sR := by simpa [hs_eq] using hω
+      rw [Set.indicator_of_mem hωR, Set.indicator_of_mem hω, Real.norm_eq_abs]
+    · have hωR : ω ∉ sR := by simpa [hs_eq] using hω
+      rw [Set.indicator_of_notMem hωR, Set.indicator_of_notMem hω, norm_zero]
+  have hreal_eq :
+      ∫ ω, Set.indicator {ω | (C : ℝ) ≤ |Y ω|} (fun ω => |Y ω|) ω ∂μ =
+        (eLpNorm ({ω | C ≤ ‖Y ω‖₊}.indicator Y) 1 μ).toReal := by
+    calc
+      ∫ ω, Set.indicator {ω | (C : ℝ) ≤ |Y ω|} (fun ω => |Y ω|) ω ∂μ =
+          ∫ ω, ‖sNN.indicator Y ω‖ ∂μ := by
+        rw [show {ω | (C : ℝ) ≤ |Y ω|} = sR by rfl, htail_eq]
+      _ = (∫⁻ ω, ‖sNN.indicator Y ω‖ₑ ∂μ).toReal :=
+        integral_norm_eq_lintegral_enorm hg_aesm
+      _ = (eLpNorm ({ω | C ≤ ‖Y ω‖₊}.indicator Y) 1 μ).toReal := by
+        rw [eLpNorm_one_eq_lintegral_enorm]
+  rw [hreal_eq]
+  exact ENNReal.toReal_le_of_le_ofReal hε hTail
+
 /-- **Hansen Theorem 6.15, bounded continuous weak-moment face.**
 
 Weak convergence is exactly convergence of expectations for bounded continuous
@@ -644,6 +712,115 @@ theorem TendstoInDistribution.integral_tendsto_of_realClip_tails
       _ < ε := by
         linarith
   exact eventually_atTop.1 hEventually
+
+/-- **Hansen Theorem 6.15, weak-convergence UI moment wrapper.**
+
+If `Xₙ ⇒ Z` and the source sequence is uniformly integrable in `L¹`, then the
+real expectations converge.  The proof derives the explicit clipping-tail
+premise from Mathlib's `UniformIntegrable` tail characterization and the
+limit-law integrability supplied by the bounded-first-moment weak-convergence
+wrapper above. -/
+theorem TendstoInDistribution.integral_tendsto_of_uniformIntegrable
+    {Ω Ω' : Type*} {mΩ : MeasurableSpace Ω} {mΩ' : MeasurableSpace Ω'}
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {ν : Measure Ω'} [IsProbabilityMeasure ν]
+    {X : ℕ → Ω → ℝ} {Z : Ω' → ℝ}
+    (hX : TendstoInDistribution X atTop Z (fun _ => μ) ν)
+    (hUI : UniformIntegrable X 1 μ) :
+    Tendsto (fun n => ∫ ω, X n ω ∂μ) atTop (𝓝 (∫ ω, Z ω ∂ν)) := by
+  have hX_int : ∀ n, Integrable (X n) μ :=
+    fun n => memLp_one_iff_integrable.mp (hUI.memLp n)
+  obtain ⟨B, hB⟩ := hUI.2.2
+  have hBound :
+      ∀ᶠ n in atTop,
+        Integrable (fun ω => ‖X n ω‖) μ ∧ ∫ ω, ‖X n ω‖ ∂μ ≤ (B : ℝ) :=
+    Eventually.of_forall fun n => by
+      have hreal_eq :
+          ∫ ω, ‖X n ω‖ ∂μ = (eLpNorm (X n) 1 μ).toReal := by
+        calc
+          ∫ ω, ‖X n ω‖ ∂μ = (∫⁻ ω, ‖X n ω‖ₑ ∂μ).toReal :=
+            integral_norm_eq_lintegral_enorm (hX_int n).aestronglyMeasurable
+          _ = (eLpNorm (X n) 1 μ).toReal := by
+            rw [eLpNorm_one_eq_lintegral_enorm]
+      refine ⟨(hX_int n).norm, ?_⟩
+      rw [hreal_eq]
+      exact ENNReal.toReal_le_of_le_ofReal (NNReal.coe_nonneg B) (by
+        simpa [ENNReal.ofReal_coe_nnreal] using hB n)
+  have hZ_norm_int : Integrable (fun ω => ‖Z ω‖) ν :=
+    TendstoInDistribution.integrable_norm_limit_of_eventually_integral_norm_bound
+      (μ := μ) (ν := ν) (X := X) (Z := Z) hX hBound
+  have hZ_aesm : AEStronglyMeasurable Z ν := by
+    rw [aestronglyMeasurable_iff_aemeasurable]
+    exact hX.aemeasurable_limit
+  have hZ_int : Integrable Z ν :=
+    (integrable_norm_iff hZ_aesm).mp hZ_norm_int
+  have hZ_memLp : MemLp Z 1 ν :=
+    memLp_one_iff_integrable.mpr hZ_int
+  refine TendstoInDistribution.integral_tendsto_of_realClip_tails
+    (μ := μ) (ν := ν) (X := X) (Z := Z) hX ?_
+  intro ε hε
+  set η : ℝ := ε / 2 with hη_def
+  have hη_pos : 0 < η := by positivity
+  have hη_nonneg : 0 ≤ η := hη_pos.le
+  obtain ⟨Csrc, hCsrc_tail⟩ :=
+    UniformIntegrable.spec (μ := μ) (f := X)
+      (p := (1 : ℝ≥0∞)) (by simp) (by simp) hUI hη_pos
+  obtain ⟨Mlim, hMlim_nonneg, hMlim_tail⟩ :=
+    MemLp.integral_indicator_norm_ge_nonneg_le (μ := ν) (f := Z) hZ_memLp hη_pos
+  let Clim : ℝ≥0 := ⟨Mlim, hMlim_nonneg⟩
+  set R : ℝ := max (Csrc : ℝ) (Clim : ℝ) with hR_def
+  have hR_nonneg : 0 ≤ R := by
+    rw [hR_def]
+    exact (NNReal.coe_nonneg Csrc).trans (le_max_left _ _)
+  refine ⟨R, hR_nonneg, ?_, ?_⟩
+  · have hMlim_tail_e :
+        eLpNorm ({ω | Clim ≤ ‖Z ω‖₊}.indicator Z) 1 ν ≤ ENNReal.ofReal η := by
+      have hset :
+          {ω | Clim ≤ ‖Z ω‖₊} = {ω | Mlim ≤ (‖Z ω‖₊ : ℝ)} := by
+        ext ω
+        simp [Clim, ← NNReal.coe_le_coe]
+      simpa [eLpNorm_one_eq_lintegral_enorm, hset] using hMlim_tail
+    have htail_base :
+        ∫ ω, Set.indicator {ω | (Clim : ℝ) ≤ |Z ω|} (fun ω => |Z ω|) ω ∂ν ≤ η :=
+      integral_tail_abs_le_of_eLpNorm_tail (μ := ν) hZ_int hη_nonneg hMlim_tail_e
+    have htail_R :
+        ∫ ω, Set.indicator {ω | R ≤ |Z ω|} (fun ω => |Z ω|) ω ∂ν ≤ η :=
+      (integral_tail_abs_mono_threshold (μ := ν) hZ_int
+        (C := (Clim : ℝ)) (R := R) (by
+          rw [hR_def]
+          exact le_max_right _ _)).trans htail_base
+    have hclip :=
+      abs_integral_sub_realClip_le_two_mul_integral_tail_abs
+        (μ := ν) (Y := Z) hZ_int hR_nonneg
+    calc
+      |(∫ ω, Z ω ∂ν) - ∫ ω, realClip R (Z ω) ∂ν| ≤
+          2 * ∫ ω, Set.indicator {ω | R ≤ |Z ω|} (fun ω => |Z ω|) ω ∂ν := hclip
+      _ ≤ 2 * η := by nlinarith
+      _ = ε := by
+        rw [hη_def]
+        ring
+  · exact Eventually.of_forall fun n => by
+      have htail_base :
+          ∫ ω, Set.indicator {ω | (Csrc : ℝ) ≤ |X n ω|} (fun ω => |X n ω|) ω ∂μ ≤
+            η :=
+        integral_tail_abs_le_of_eLpNorm_tail (μ := μ) (Y := X n)
+          (hX_int n) hη_nonneg (hCsrc_tail n)
+      have htail_R :
+          ∫ ω, Set.indicator {ω | R ≤ |X n ω|} (fun ω => |X n ω|) ω ∂μ ≤ η :=
+        (integral_tail_abs_mono_threshold (μ := μ) (Y := X n) (hX_int n)
+          (C := (Csrc : ℝ)) (R := R) (by
+            rw [hR_def]
+            exact le_max_left _ _)).trans htail_base
+      have hclip :=
+        abs_integral_sub_realClip_le_two_mul_integral_tail_abs
+          (μ := μ) (Y := X n) (hX_int n) hR_nonneg
+      calc
+        |(∫ ω, X n ω ∂μ) - ∫ ω, realClip R (X n ω) ∂μ| ≤
+            2 * ∫ ω, Set.indicator {ω | R ≤ |X n ω|} (fun ω => |X n ω|) ω ∂μ := hclip
+        _ ≤ 2 * η := by nlinarith
+        _ = ε := by
+          rw [hη_def]
+          ring
 
 /-- Square-root continuous mapping at zero for nonnegative real-valued sequences.
 
