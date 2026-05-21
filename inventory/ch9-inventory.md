@@ -127,6 +127,12 @@ Conventions:
 | Theorem 9.10 | Under Assumptions 7.2, 7.3, 7.4, and θn = r (βn) = r0 + n−1/2h, |  |
 | Theorem 9.11 | Under Assumptions 7.2, 7.3, 7.4, and θn = r (βn) = θ0 + n−1/2h, |  |
 
+## Lean-only bridge results
+
+| Lean theorem | Role |
+| --- | --- |
+| [tTest_rejectionProb_tendsto_of_abs_tstat](../../HansenEconometrics/Chapter9HypothesisTesting.lean#L64) | Generic Chapter 9 asymptotic-size bridge: from an absolute-t-statistic distributional limit it derives the two-sided test's rejection-probability limit `P[|T| > c] → P[|Z| > c]`. The reusable engine behind the concrete OLS HC0 t-test endpoint, intended to back Theorems 9.2–9.11; the rejection-region counterpart of Chapter 7's `symmetricCI_coverage_of_abs_tstat`. |
+
 ## Notes
 
 - This is currently a theorem-surface map for the chapter; Lean cells stay blank until each
